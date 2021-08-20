@@ -41,10 +41,12 @@ class Error(Exception):
             type(self).__module__, type(self).__name__, self.args
         )
 
+    @property
     def name(self):
         """Return a string representation of the model plus class."""
         return "<{}.{}>".format(type(self).__module__, type(self).__name__)
 
+    @property
     def message(self):
         """Return the message passed as an argument."""
         return self.args[0]
@@ -114,21 +116,22 @@ class DebianPackage(object):
         )
 
     @staticmethod
-    def _apt(command: str, package_names: Union[str, List]) -> None:
+    def _apt(command: str, package_names: Union[str, List], optargs: Optional[List[str]] = None) -> None:
         """Wrap package management commands for Debian/Ubuntu systems"""
+        optargs = optargs if optargs is not None else []
         if isinstance(package_names, str):
             package_names = [package_names]
-        _cmd = ["apt-get", "-y", "--allow-downgrades", command, *package_names]
+        _cmd = ["apt-get", "-y", *optargs, command, *package_names]
         try:
             subprocess.check_call(_cmd)
         except CalledProcessError as e:
             raise PackageError(
-                "Could not %s package(s) [%s]: %s", command, *package_names, e.output
+                f"Could not {command} package(s) [{[*package_names]}]: {e.output}"
             )
 
     def _add(self) -> None:
         """Add a package to the system"""
-        self._apt("install", f"{self.name}={self.fullversion}")
+        self._apt("install", f"{self.name}={self.fullversion}", optargs=["--allow-downgrades"])
 
     def _remove(self) -> None:
         """Removes a package from the system. Implementation-specific"""
@@ -142,10 +145,11 @@ class DebianPackage(object):
     def ensure(self, state: PackageState):
         """Ensures that a package is in a given state."""
         if self._state is not state:
-            if state is not PackageState.Present:
+            if state not in (PackageState.Present, PackageState.Latest):
                 self._remove()
             else:
                 self._add()
+        self._state = state
 
     @property
     def present(self) -> bool:
@@ -165,6 +169,10 @@ class DebianPackage(object):
     @state.setter
     def state(self, state: PackageState) -> None:
         """Sets the package state to a given value."""
+        if state in (PackageState.Latest, PackageState.Present):
+            self._add()
+        else:
+            self._remove()
         self._state = state
 
     @property
@@ -223,10 +231,6 @@ class Version(object):
 
     def _compare_version(self, other, op: str) -> int:
         try:
-            if "21.0.3-0ubuntu0.3~20.04.1" in str(self):
-                print(
-                    "dpkg --compare-versions {} {} {}".format(str(self), op, str(other))
-                )
             rc = check_call(["dpkg", "--compare-versions", str(self), op, str(other)])
             return rc
         except CalledProcessError as e:
@@ -316,7 +320,7 @@ class PackageCache(Mapping):
         try:
             output = check_output(["apt-cache", "dumpavail"], universal_newlines=True)
         except CalledProcessError as e:
-            print("Could not list packages in apt-cache: {}".format(e.output))
+            raise PackageError("Could not list packages in apt-cache: {}".format(e.output))
 
         pkg_groups = output.strip().split("\n\n")
         keys = ("Package", "Architecture", "Version")
@@ -326,7 +330,7 @@ class PackageCache(Mapping):
             vals = {}
             for line in lines:
                 if line.startswith(keys):
-                    items = line.split(":")
+                    items = line.split(":", 1)
                     vals[items[0]] = items[1].strip()
                 else:
                     continue
@@ -350,7 +354,7 @@ class PackageCache(Mapping):
     @staticmethod
     def _get_epoch_from_version(version: str) -> Tuple[str, str]:
         """Pull the epoch, if any, out of a version string"""
-        epoch_matcher = re.compile(r"((?P<epoch>\d+):)?(?P<version>.*)")
+        epoch_matcher = re.compile(r"^((?P<epoch>\d+):)?(?P<version>.*)")
         matches = epoch_matcher.search(version).groupdict()
         return matches.get("epoch", ""), matches.get("version")
 
@@ -359,7 +363,7 @@ class PackageCache(Mapping):
         try:
             output = check_output(["dpkg", "-l"], universal_newlines=True)
         except CalledProcessError as e:
-            print("Could not list packages: {}".format(e.output))
+            raise PackageError("Could not list packages: {}".format(e.output))
 
         # Pop off the output from `dpkg -l' because there's no flag to
         # omit it`
@@ -453,11 +457,6 @@ class DebianRepository:
     def groups(self):
         """Return the enabled package groups."""
         return self._groups
-
-    @groups.setter
-    def groups(self, groups: List[str]):
-        """Allow enabling/disabling groups."""
-        self._groups = groups
 
     @property
     def filename(self):
@@ -659,7 +658,7 @@ class RepositoryList(Mapping):
         f = open(file, "r")
         for n, line in enumerate(f):
             repo = self._parse(line, file)
-            self._repository_map[repo.uri] = repo
+            self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo
 
     @staticmethod
     def _parse(line: str, filename: str) -> DebianRepository:
@@ -716,12 +715,12 @@ class RepositoryList(Mapping):
 
         with open(fname, "wb") as f:
             f.write(
-                f"{'#' if not repo.enabled else ''} "
-                f"{f'[signed-by={repo.gpg_key}]' if repo.gpg_key else ''} {repo.repotype} "
+                f"{'#' if not repo.enabled else ''}"
+                f"{f'[signed-by={repo.gpg_key}]' if repo.gpg_key else ''}{repo.repotype} "
                 f"{repo.uri} {repo.release} {' '.join(repo.groups)}\n".encode("utf-8")
             )
 
-        self._repository_map[repo.uri] = repo
+        self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo
 
     def disable(self, repo: DebianRepository) -> None:
         """Remove a repository. Disable by default."""
@@ -730,4 +729,4 @@ class RepositoryList(Mapping):
                 line = f"# {line}"
             print(line)
 
-        self._repository_map[repo.uri] = repo
+        self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo
