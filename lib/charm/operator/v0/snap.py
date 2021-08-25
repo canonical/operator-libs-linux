@@ -12,7 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Representations of the system's Snaps."""
+"""Representations of the system's Snaps, and abstractions around managing them.
+
+    In the `snap` module, :class:`SnapCache` creates a dict-like mapping of
+    :class:`Snap` objects at instantiation. Installed snaps are fully populated,
+    and available snaps are lazily-loaded upon request. This module relies on an
+    installed and running `snapd` daemon to perform operations over the `snapd`
+    HTTP API.
+
+    Typical usage:
+      cache = snap.SnapCache()
+      juju = cache["juju"]
+      juju.ensure(snap.SnapState.Latest, classic=True, channel="stable")
+"""
 
 import json
 import os
@@ -33,9 +45,7 @@ class Error(Exception):
     """Base class of most errors raised by this library."""
 
     def __repr__(self):
-        return "<{}.{} {}>".format(
-            type(self).__module__, type(self).__name__, self.args
-        )
+        return "<{}.{} {}>".format(type(self).__module__, type(self).__name__, self.args)
 
     @property
     def name(self):
@@ -64,13 +74,19 @@ class SnapStateBase(IntEnum):
     Available = 4
 
 
-SnapState = IntEnum(
-    "SnapState", [(i.name, i.value) for i in chain(StateBase, SnapStateBase)]
-)
+SnapState = IntEnum("SnapState", [(i.name, i.value) for i in chain(StateBase, SnapStateBase)])
 
 
 class Snap(object):
-    """Represents a snap package."""
+    """Represents a snap package and its properties.
+
+        :class:`Snap` exposes the following properties about a snap:
+          - name: the name of the snap
+          - state: a :class:`SnapState` representation of its install status
+          - channel: "stable", "candidate", "beta", and "edge" are common
+          - revision: a string representing the snap's revision
+          - confinement: "classic" or "strict"
+    """
 
     def __init__(
         self, name, state: SnapState, channel: str, revision: str, confinement: str
@@ -81,7 +97,7 @@ class Snap(object):
         self._revision = revision
         self._confinement = confinement
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         """Equality for comparison."""
         return (
             isinstance(other, self.__class__)
@@ -98,9 +114,7 @@ class Snap(object):
 
     def __repr__(self):
         """A representation of the snap."""
-        return "<{}.{}: {}>".format(
-            self.__module__, self.__class__.__name__, self.__dict__
-        )
+        return "<{}.{}: {}>".format(self.__module__, self.__class__.__name__, self.__dict__)
 
     def __str__(self):
         """A human-readable representation of the snap"""
@@ -113,8 +127,17 @@ class Snap(object):
         )
 
     def _snap(self, command: str, optargs: Optional[List[str]] = None) -> None:
+        """Perform a snap operation.
+
+            Args:
+              command: the snap command to execute
+              optargs: an (optional) list of additional arguments to pass,
+                commonly confinement or channel
+
+            Raises:
+              SnapError if there is a problem encountered
+        """
         optargs = optargs if optargs is not None else []
-        """Wrap snap management commands"""
         _cmd = ["snap", command, self._name, *optargs]
         try:
             subprocess.check_call(_cmd)
@@ -122,13 +145,21 @@ class Snap(object):
             raise SnapError("Could not %s snap [%s]: %s", _cmd, self._name, e.output)
 
     def _install(self, channel: Optional[str] = "") -> None:
-        """Add a snap to the system"""
+        """Add a snap to the system.
+
+            Args:
+              channel: the channel to install from
+        """
         confinement = "--classic" if self._confinement == "classic" else ""
         channel = f'--channel="{channel}"' if channel else ""
         self._snap("install", [confinement, channel])
 
     def _refresh(self, channel: Optional[str] = "") -> None:
-        """Refresh a snap"""
+        """Refresh a snap.
+
+            Args:
+              channel: the channel to install from
+        """
         channel = f"--{channel}" if channel else self._channel
         self._snap("refresh", [channel])
 
@@ -147,10 +178,17 @@ class Snap(object):
         classic: Optional[bool] = False,
         channel: Optional[str] = "",
     ):
-        """Ensures that a snap is in a given state."""
-        self._confinement = (
-            "classic" if classic or self._confinement == "classic" else ""
-        )
+        """Ensures that a snap is in a given state.
+
+            Args:
+              state: a :class:`SnapState` to reconcile to.
+              classic: an (Optional) boolean indicating whether classic confinement should be used
+              channeL: the channel to install from
+
+            Raises:
+              SnapError if an error is encountered
+        """
+        self._confinement = "classic" if classic or self._confinement == "classic" else ""
         if self._state is not state:
             if state not in (SnapState.Present, SnapState.Latest):
                 self._remove()
@@ -175,7 +213,14 @@ class Snap(object):
 
     @state.setter
     def state(self, state: SnapState) -> None:
-        """Sets the snap state to a given value."""
+        """Sets the snap state to a given value.
+
+            Args:
+              state: a :class:`SnapState` to reconcile the snap to.
+
+            Raises:
+              SnapError if an error is encountered
+        """
         if self._state is not state:
             self.ensure(state)
         self._state = state
@@ -197,7 +242,13 @@ class Snap(object):
 
 
 class SnapCache(Mapping):
-    """An abstraction to represent installed/available packages."""
+    """An abstraction to represent installed/available packages.
+
+        When instantiated, :class:`SnapCache` iterates through the list of installed
+        snaps using the `snapd` HTTP API, and a list of available snaps by reading
+        the filesystem to populate the cache. Information about available snaps is lazily-loaded
+        from the `snapd` API when requested.
+    """
 
     def __init__(self):
         self._snap_map = {}
@@ -271,7 +322,11 @@ class SnapCache(Mapping):
             self._snap_map[snap.name] = snap
 
     def _load_info(self, name) -> Snap:
-        """Load info for snaps which are not installed if requested."""
+        """Load info for snaps which are not installed if requested.
+
+            Args:
+              name: a string representing the name of the snap
+        """
         info = self._curl_cmd(f"find?name={name}")[0]
 
         return Snap(
