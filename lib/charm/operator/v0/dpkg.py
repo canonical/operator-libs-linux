@@ -13,7 +13,42 @@
 # limitations under the License.
 
 """Representations of the system's Debian/Ubuntu repository and package
-   information."""
+   information.
+
+   The `dpkg` module contains abstractions and wrappers around Debian/Ubuntu-style
+    repositories and packages, in order to easily provide an idiomatic and Pythonic
+    mechanism for adding packages and/or repositories to systems for use in machine
+    charms.
+
+    A sane default configuration is attainable through nothing more than insantiation
+    of the appropriate classes. :class:`DebianRepository`
+
+    :class:`PackageCache` will build a dict-like :class:`ABC.MutableMapping` of both
+    installed and available packages, indexed by package name. Retrieving a value will
+    return the installed version (if any), otherwise the most recent package version
+    known to apt-cache, as a :class:`DebianPackage` object.
+
+      Typical usage example:
+
+      cache = dpkg.PackageCache()
+      vim = cache["vim"]
+      vim.ensure(dpkg.PackageState.Latest)
+      # alternatively
+      vim.state = dpkg.PackageState.Latest
+
+    :class:`RepositoryList` will return a dict-like object containing enabled system
+    repositories and their properties (available groups, baseuri. gpg key). This class can
+    add, disable, or manipulate repositories. Items can be retrieved as :class:`DebianRepository`
+    objects.
+
+      Typical usage example:
+
+      repositories = dpkg.RepositoryList()
+      repositories.add(DebianRepository(
+        enabled=True, repotype="deb", uri="https://example.com", release="focal",
+        groups=["universe"]
+      ))
+"""
 
 import fileinput
 import glob
@@ -37,9 +72,7 @@ class Error(Exception):
     """Base class of most errors raised by this library."""
 
     def __repr__(self):
-        return "<{}.{} {}>".format(
-            type(self).__module__, type(self).__name__, self.args
-        )
+        return "<{}.{} {}>".format(type(self).__module__, type(self).__name__, self.args)
 
     @property
     def name(self):
@@ -74,7 +107,31 @@ PackageState = IntEnum(
 
 
 class DebianPackage(object):
-    """Represents a traditional system package."""
+    """Represents a traditional system package and its utility functions.
+
+    :class:`DebianPackage` wraps information and functionality around a known
+      package, whether installed or available. The version, epoch, name, and
+      architecture can be easily queried and compared against other
+      :class:`DebianPackage` objects to determine the latest version or to
+      install a specific version.
+
+      The representation of this object as a string mimics the output from
+      `dpkg` for familiarity.
+
+      Installation and removal of packages is handled through the `state` property
+      or `ensure` method, with the following options:
+
+        dpkg.PackageState.Absent
+        dpkg.PackageState.Available
+        dpkg.PackageState.Present
+        dpkg.PackageState.Latest
+
+      When :class:`PackageCache` is initialized, the state of a given
+      :class:`DebianPackage` object will be set to `Available`, `Present`, or
+      `Latest`, with `Absent` implemented as a convenience for removal (though it
+      operates essentially the same as `Available`).
+
+    """
 
     def __init__(
         self, name: str, version: str, epoch: str, arch: str, state: PackageState
@@ -84,8 +141,15 @@ class DebianPackage(object):
         self._state = state
         self._version = Version(version, epoch)
 
-    def __eq__(self, other):
-        """Equality for comparison."""
+    def __eq__(self, other) -> bool:
+        """Equality for comparison.
+
+        Args:
+          other: a :class:`DebianPackage` object for comparison
+
+        Returns:
+          A boolean reflecting equality
+        """
         return (
             isinstance(other, self.__class__)
             and (
@@ -101,9 +165,7 @@ class DebianPackage(object):
 
     def __repr__(self):
         """A representation of the package."""
-        return "<{}.{}: {}>".format(
-            self.__module__, self.__class__.__name__, self.__dict__
-        )
+        return "<{}.{}: {}>".format(self.__module__, self.__class__.__name__, self.__dict__)
 
     def __str__(self):
         """A human-readable representation of the package"""
@@ -116,8 +178,19 @@ class DebianPackage(object):
         )
 
     @staticmethod
-    def _apt(command: str, package_names: Union[str, List], optargs: Optional[List[str]] = None) -> None:
-        """Wrap package management commands for Debian/Ubuntu systems"""
+    def _apt(
+        command: str, package_names: Union[str, List], optargs: Optional[List[str]] = None
+    ) -> None:
+        """Wrap package management commands for Debian/Ubuntu systems
+
+        Args:
+          command: the command given to `apt-get`
+          pacakge_names: a package name or list of package names to operate on
+          optargs: an (Optional) list of additioanl arguments
+
+        Raises:
+          PackageError if an error is encountered
+        """
         optargs = optargs if optargs is not None else []
         if isinstance(package_names, str):
             package_names = [package_names]
@@ -125,9 +198,7 @@ class DebianPackage(object):
         try:
             subprocess.check_call(_cmd)
         except CalledProcessError as e:
-            raise PackageError(
-                f"Could not {command} package(s) [{[*package_names]}]: {e.output}"
-            )
+            raise PackageError(f"Could not {command} package(s) [{[*package_names]}]: {e.output}")
 
     def _add(self) -> None:
         """Add a package to the system"""
@@ -143,7 +214,14 @@ class DebianPackage(object):
         return self._name
 
     def ensure(self, state: PackageState):
-        """Ensures that a package is in a given state."""
+        """Ensures that a package is in a given state.
+
+        Args:
+          state: a :class:`PackageState` to reconcile the package to
+
+        Raises:
+          PackageError from the underlying call to apt
+        """
         if self._state is not state:
             if state not in (PackageState.Present, PackageState.Latest):
                 self._remove()
@@ -168,7 +246,14 @@ class DebianPackage(object):
 
     @state.setter
     def state(self, state: PackageState) -> None:
-        """Sets the package state to a given value."""
+        """Sets the package state to a given value.
+
+        Args:
+          state: a :class:`PackageState` to reconcile the package to
+
+        Raises:
+          PackageError from the underlying call to apt
+        """
         if state in (PackageState.Latest, PackageState.Present):
             self._add()
         else:
@@ -209,15 +294,11 @@ class Version(object):
 
     def __repr__(self):
         """A representation of the package."""
-        return "<{}.{}: {}>".format(
-            self.__module__, self.__class__.__name__, self.__dict__
-        )
+        return "<{}.{}: {}>".format(self.__module__, self.__class__.__name__, self.__dict__)
 
     def __str__(self):
         """A human-readable representation of the package"""
-        return "{}{}".format(
-            "{}".format(f"{self._epoch}:" if self._epoch else ""), self._version
-        )
+        return "{}{}".format("{}".format(f"{self._epoch}:" if self._epoch else ""), self._version)
 
     @property
     def epoch(self):
@@ -238,27 +319,40 @@ class Version(object):
             # return 0
             return e.returncode
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         return self._compare_version(other, "lt") == 0
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         return self._compare_version(other, "eq") == 0
 
-    def __gt__(self, other):
+    def __gt__(self, other) -> bool:
         return self._compare_version(other, "gt") == 0
 
-    def __le__(self, other):
+    def __le__(self, other) -> bool:
         return self.__eq__(other) or self.__lt__(other)
 
-    def __ge__(self, other):
+    def __ge__(self, other) -> bool:
         return self.__gt__(other) or self.__eq__(other)
 
-    def __ne__(self, other):
+    def __ne__(self, other) -> bool:
         return not self.__eq__(other)
 
 
 class PackageCache(Mapping):
-    """An abstraction to represent installed/available packages."""
+    """An abstraction to represent installed/available packages.
+
+    Instantiating :class:`PackageCache` will parse out the list of
+    available packages from `apt-cache`, then the list of installed packages
+    from `dpkg -l`, setting the :class:`PackageState` value of the
+    :class:`DebianPackage` objects stored in :class:`PackageState` to
+    `Present` or `Latest`, depending on version comparisons.
+
+    cache = dpkg.PackageCache()
+    vim = cache["vim"]
+    vim.ensure(dpkg.PackageState.Latest)
+    # alternatively
+    vim.state = dpkg.PackageState.Latest
+    """
 
     def __init__(self):
         self._package_map = {}
@@ -284,11 +378,19 @@ class PackageCache(Mapping):
             return pkgs[0]
 
     def get_all(self, package_name: str) -> List["DebianPackage"]:
-        """Return all known packages for a given package name."""
+        """Return all known packages for a given package name.
+
+        Args:
+          package_name: the base name of a package
+
+        Returns:
+          A list of packages with that name, sorted by version. The most recent version
+            will be the first value, whether that is the currently installed version or not.
+        """
         return self._package_map[package_name]
 
     def _merge_with_cache(self, packages: Dict) -> None:
-        """Update the cache with new packages."""
+        """Update the cache with new packages and reconcile their state."""
         for pkg in packages:
             packages[pkg].sort(key=lambda x: x.version, reverse=True)
 
@@ -314,6 +416,7 @@ class PackageCache(Mapping):
                 self._package_map[pkg] = packages[pkg]
 
     def _generate_packages_from_apt_cache(self) -> Dict:
+        """Add the list of packages apt-cache knows about to the map."""
         pkgs = {}
         output = ""
 
@@ -359,6 +462,7 @@ class PackageCache(Mapping):
         return matches.get("epoch", ""), matches.get("version")
 
     def _generate_packages_from_dpkg(self) -> Dict:
+        """Parse the list of installed packages into the cache."""
         output = ""
         try:
             output = check_output(["dpkg", "-l"], universal_newlines=True)
@@ -471,11 +575,10 @@ class DebianRepository:
     def disable(self) -> None:
         """Remove this repository. Disable by default."""
         for line in fileinput.input(self._filename, inplace=True):
-            if self._uri in line:
+            if self._uri in str(line):
                 line = f"# {line}"
-            print(line)
 
-    def import_key(self, key: str):
+    def import_key(self, key: str) -> None:
         """Import an ASCII Armor key.
         A Radix64 format keyid is also supported for backwards
         compatibility. In this case Ubuntu keyserver will be
@@ -485,10 +588,13 @@ class DebianRepository:
         man-in-the-middle attack (a proxy server impersonates
         keyserver TLS certificates and has to be explicitly
         trusted by the system).
-        :param key: A GPG key in ASCII armor format,
+
+        Args:
+          key: A GPG key in ASCII armor format,
                       including BEGIN and END markers or a keyid.
-        :type key: (bytes, str)
-        :raises: GPGKeyError if the key could not be imported
+
+        Raises:
+          GPGKeyError if the key could not be imported
         """
         key = key.strip()
         if "-" in key or "\n" in key:
@@ -504,17 +610,13 @@ class DebianRepository:
                 key_bytes = key.encode("utf-8")
                 key_name = self._get_keyid_by_gpg_key(key_bytes)
                 key_gpg = self._dearmor_gpg_key(key_bytes)
-                self._gpg_key_filename = "/etc/apt/trusted.gpg.d/{}.gpg".format(
-                    key_name
-                )
+                self._gpg_key_filename = "/etc/apt/trusted.gpg.d/{}.gpg".format(key_name)
                 self._write_apt_gpg_keyfile(key_name=key_name, key_material=key_gpg)
             else:
                 raise GPGKeyError("ASCII armor markers missing from GPG key")
         else:
             logger.warning("PGP key found (looks like Radix64 format)")
-            logger.warning(
-                "SECURELY importing PGP key from keyserver; " "full key not provided."
-            )
+            logger.warning("SECURELY importing PGP key from keyserver; " "full key not provided.")
             # as of bionic add-apt-repository uses curl with an HTTPS keyserver URL
             # to retrieve GPG keys. `apt-key adv` command is deprecated as is
             # apt-key in general as noted in its manpage. See lp:1433761 for more
@@ -568,16 +670,20 @@ class DebianRepository:
         https://keyserver.ubuntu.com/pks/lookup?search=0x6E85A86E4652B4E6
         40-digit key ID:
         https://keyserver.ubuntu.com/pks/lookup?search=0x35F77D63B5CEC106C577ED856E85A86E4652B4E6
-        :param keyid: An 8, 16 or 40 hex digit keyid to find a key for
-        :type keyid: (bytes, str)
-        :returns: A key material for the specified GPG key id
-        :rtype: (str, bytes)
-        :raises: subprocess.CalledProcessError
+
+        Args:
+          keyid: An 8, 16 or 40 hex digit keyid to find a key for
+
+        Returns:
+          A string contining key material for the specified GPG key id
+
+
+        Raises:
+          subprocess.CalledProcessError
         """
         # options=mr - machine-readable output (disables html wrappers)
         keyserver_url = (
-            "https://keyserver.ubuntu.com"
-            "/pks/lookup?op=get&options=mr&exact=on&search=0x{}"
+            "https://keyserver.ubuntu.com" "/pks/lookup?op=get&options=mr&exact=on&search=0x{}"
         )
         curl_cmd = ["curl", keyserver_url.format(keyid)]
         # use proxy server settings in order to retrieve the key
@@ -586,11 +692,15 @@ class DebianRepository:
     @staticmethod
     def _dearmor_gpg_key(key_asc: bytes) -> str:
         """Converts a GPG key in the ASCII armor format to the binary format.
-        :param key_asc: A GPG key in ASCII armor format.
-        :type key_asc: (str, bytes)
-        :returns: A GPG key in binary format
-        :rtype: (str, bytes)
-        :raises: GPGKeyError
+
+        Args:
+          key_asc: A GPG key in ASCII armor format.
+
+        Returns:
+          A GPG key in binary format as a string
+
+        Raises:
+          GPGKeyError
         """
         ps = subprocess.Popen(
             ["gpg", "--dearmor"],
@@ -610,19 +720,31 @@ class DebianRepository:
             return out
 
     @staticmethod
-    def _write_apt_gpg_keyfile(key_name: str, key_material: str):
+    def _write_apt_gpg_keyfile(key_name: str, key_material: str) -> None:
         """Writes GPG key material into a file at a provided path.
-        :param key_name: A key name to use for a key file (could be a fingerprint)
-        :type key_name: str
-        :param key_material: A GPG key material (binary)
-        :type key_material: (str, bytes)
+
+        Args:
+          key_name: A key name to use for a key file (could be a fingerprint)
+          key_material: A GPG key material (binary)
         """
         with open(key_name, "wb") as keyf:
             keyf.write(key_material.encode("utf-8"))
 
 
 class RepositoryList(Mapping):
-    """An abstraction to represent repositories."""
+    """An representation of known repositories.
+
+    Instantiation of :class:`RepositoryList` will iterate through the
+    filesystem, parse out repository files in `/etc/apt/...`, and create
+    :class:`DebianRepository` objects in this list.
+
+    Typical usage:
+      repositories = dpkg.RepositoryList()
+      repositories.add(DebianRepository(
+        enabled=True, repotype="deb", uri="https://example.com", release="focal",
+        groups=["universe"]
+      ))
+    """
 
     def __init__(self):
         self._repository_map = {}
@@ -647,14 +769,19 @@ class RepositoryList(Mapping):
         return iter(self._repository_map.values())
 
     def __getitem__(self, repository_uri: str) -> DebianRepository:
-        """Return a given repository."""
+        """Return a given :class:`DebianRepository`."""
         return self._repository_map[repository_uri]
 
     def __setitem__(self, repository_uri: str, repository: DebianRepository) -> None:
-        """Add a repository to the cache."""
+        """Add a :class:`DebianRepository` to the cache."""
         self._repository_map[repository_uri] = repository
 
     def load(self, file: str):
+        """Load a repository source file into the cache.
+
+        Args:
+          file: the path to the repository file
+        """
         f = open(file, "r")
         for n, line in enumerate(f):
             repo = self._parse(line, file)
@@ -662,7 +789,15 @@ class RepositoryList(Mapping):
 
     @staticmethod
     def _parse(line: str, filename: str) -> DebianRepository:
-        """Parse a line in a sources.list file."""
+        """Parse a line in a sources.list file.
+
+        Args:
+          line: a single line from `load` to parse
+          filename: the filename being read
+
+        Raises:
+          InvalidSoureError if the source type is unknown
+        """
         enabled = True
         repotype = uri = release = gpg_key = ""
         groups = []
@@ -682,9 +817,7 @@ class RepositoryList(Mapping):
         if source:
             chunks = source.split()
             if chunks[0] not in VALID_SOURCE_TYPES:
-                raise InvalidSourceError(
-                    "An invalid sources line was found in %s!", filename
-                )
+                raise InvalidSourceError("An invalid sources line was found in %s!", filename)
             if "[signed-by" in chunks[1]:
                 gpg_key = re.sub(r"\[signed-by=(.*?)]", r"\1", chunks[1])
                 del chunks[1]
@@ -693,23 +826,22 @@ class RepositoryList(Mapping):
             release = chunks[2]
             groups = chunks[3:]
 
-        return DebianRepository(
-            enabled, repotype, uri, release, groups, filename, gpg_key
-        )
+        return DebianRepository(enabled, repotype, uri, release, groups, filename, gpg_key)
 
-    def add(
-        self, repo: DebianRepository, default_filename: Optional[bool] = True
-    ) -> None:
-        """Add a new repository to the system."""
+    def add(self, repo: DebianRepository, default_filename: Optional[bool] = True) -> None:
+        """Add a new repository to the system.
+
+        Args:
+          repo: a :class:`DebianRepository` object
+          default_filename: an (Optional) filename if the default is not desirable
+        """
         if repo.filename and default_filename:
             logger.error(
                 "Cannot add a repository with a default filename and a "
                 "filename set in the `DebianRepository` object"
             )
 
-        new_filename = "{}-{}.list".format(
-            urlparse(repo.uri).path.replace("/", "-"), repo.release
-        )
+        new_filename = "{}-{}.list".format(urlparse(repo.uri).path.replace("/", "-"), repo.release)
 
         fname = repo.filename or new_filename
 
@@ -723,10 +855,13 @@ class RepositoryList(Mapping):
         self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo
 
     def disable(self, repo: DebianRepository) -> None:
-        """Remove a repository. Disable by default."""
+        """Remove a repository. Disable by default.
+
+        Args:
+          repo: a :class:`DebianRepository` to disable
+        """
         for line in fileinput.input(repo.filename, inplace=True):
-            if repo.uri in line:
+            if repo.uri in str(line):
                 line = f"# {line}"
-            print(line)
 
         self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo

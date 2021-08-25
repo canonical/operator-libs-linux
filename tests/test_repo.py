@@ -28,15 +28,15 @@ bad_sources_list = "dontload http://example.com invalid nogroups"
 nodesource_gpg_ring = """
 """
 
+
 class TestRepositoryList(TestCase):
     def setUp(self):
         self.setUpPyfakefs()
-        self.fs.create_file("/etc/apt/sources.list",
-                            contents=sources_list)
-        self.fs.create_file("/etc/apt/sources.list.d/nodesource.list",
-                            contents=nodesource_sources_list)
-        self.fs.create_file("/etc/apt/sources.list.list/debug.list",
-                            contents=debug_sources_list)
+        self.fs.create_file("/etc/apt/sources.list", contents=sources_list)
+        self.fs.create_file(
+            "/etc/apt/sources.list.d/nodesource.list", contents=nodesource_sources_list
+        )
+        self.fs.create_file("/etc/apt/sources.list.list/debug.list", contents=debug_sources_list)
 
     def test_can_load_repositories(self):
         r = dpkg.RepositoryList()
@@ -70,17 +70,30 @@ class TestRepositoryList(TestCase):
         other = r["deb-https://deb.nodesource.com/node_16.x-focal"]
 
         repo.disable()
-        self.assertIn(f"# {repo.repotype} {repo.uri} {repo.release} {' '.join(repo.groups)}\n",
-                      open(repo.filename).readlines())
+        self.assertIn(
+            f"# {repo.repotype} {repo.uri} {repo.release} {' '.join(repo.groups)}\n",
+            open(repo.filename).readlines(),
+        )
 
         r.disable(other)
-        self.assertIn(f"# {other.repotype} [signed-by={other.gpg_key}] {other.uri} {other.release} {' '.join(other.groups)}\n",
-                      open(other.filename).readlines())
+        self.assertIn(
+            f"# {other.repotype} [signed-by={other.gpg_key}] {other.uri} {other.release} {' '.join(other.groups)}\n",
+            open(other.filename).readlines(),
+        )
 
     def test_can_add_repositories(self):
         r = dpkg.RepositoryList()
-        d = dpkg.DebianRepository(True, "deb", "http://example.com", "test", ["group"],
-                                  "/etc/apt/sources.list.d/example-test.list", "")
+        d = dpkg.DebianRepository(
+            True,
+            "deb",
+            "http://example.com",
+            "test",
+            ["group"],
+            "/etc/apt/sources.list.d/example-test.list",
+            "",
+        )
         r.add(d)
-        self.assertIn(f"{d.repotype} {d.uri} {d.release} {' '.join(d.groups)}\n",
-                      open(d.filename).readlines())
+        self.assertIn(
+            f"{d.repotype} {d.uri} {d.release} {' '.join(d.groups)}\n",
+            open(d.filename).readlines(),
+        )

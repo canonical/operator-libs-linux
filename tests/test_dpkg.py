@@ -130,13 +130,15 @@ class TestDpkgCache(unittest.TestCase):
         self.assertEqual(pkg.version.number, "3.22.9-1")
 
         pkg.ensure(dpkg.PackageState.Latest)
-        mock_subprocess_call.assert_called_with(["apt-get", "-y", "--allow-downgrades", "install",
-                                                "aisleriot=1:3.22.9-1.amd64"])
+        mock_subprocess_call.assert_called_with(
+            ["apt-get", "-y", "--allow-downgrades", "install", "aisleriot=1:3.22.9-1.amd64"]
+        )
         self.assertEqual(pkg.state, dpkg.PackageState.Latest)
 
         pkg.state = dpkg.PackageState.Absent
-        mock_subprocess_call.assert_called_with(["apt-get", "-y", "remove",
-                                                 "aisleriot=1:3.22.9-1.amd64"])
+        mock_subprocess_call.assert_called_with(
+            ["apt-get", "-y", "remove", "aisleriot=1:3.22.9-1.amd64"]
+        )
 
     @patch("lib.charm.operator.v0.dpkg.check_output")
     @patch("lib.charm.operator.v0.dpkg.subprocess.check_call")
