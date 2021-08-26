@@ -1,9 +1,10 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import json
 import unittest
 
-from unittest.mock import mock_open, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 from lib.charm.operator.v0 import snap
 
@@ -179,6 +180,7 @@ class SnapCacheTester(snap.SnapCache):
     def __init__(self):
         # Fake out __init__ so we can test methods individually
         self._snap_map = {}
+        self._snap_client = MagicMock()
 
 
 class TestSnapCache(unittest.TestCase):
@@ -191,14 +193,14 @@ class TestSnapCache(unittest.TestCase):
 
     @patch("builtins.open", mock_open(read_data="curl\n"))
     @patch("os.path.isfile")
-    @patch("lib.charm.operator.v0.snap.check_output")
-    def test_can_lazy_load_snap_info(self, mock_subprocess, mock_exists):
+    def test_can_lazy_load_snap_info(self, mock_exists):
         mock_exists.return_value = True
         s = SnapCacheTester()
+        s._snap_client.get_snap_information.return_value = json.loads(lazy_load_result)[
+            "result"
+        ][0]
         s._load_available_snaps()
         self.assertIn("curl", s._snap_map)
-
-        mock_subprocess.return_value = lazy_load_result
 
         result = s["curl"]
         self.assertEqual(result.name, "curl")
@@ -208,11 +210,12 @@ class TestSnapCache(unittest.TestCase):
         self.assertEqual(result.revision, "233")
 
     @patch("os.path.isfile")
-    @patch("lib.charm.operator.v0.snap.check_output")
-    def test_can_load_installed_snap_info(self, mock_subprocess, mock_exists):
+    def test_can_load_installed_snap_info(self, mock_exists):
         mock_exists.return_value = True
         s = SnapCacheTester()
-        mock_subprocess.return_value = installed_result
+        s._snap_client.get_installed_snaps.return_value = json.loads(installed_result)[
+            "result"
+        ]
 
         s._load_installed_snaps()
 
@@ -229,9 +232,14 @@ class TestSnapCache(unittest.TestCase):
     def test_raises_error_if_snap_not_running(self, mock_exists):
         mock_exists.return_value = False
         s = SnapCacheTester()
-        with self.assertRaises(snap.SnapError) as ctx:
+        s._snap_client.get_installed_snaps.side_effect = snap.SnapAPIError(
+            {}, 400, "error", "snapd is not running"
+        )
+        with self.assertRaises(snap.SnapAPIError) as ctx:
             s._load_installed_snaps()
-        self.assertEqual("<lib.charm.operator.v0.snap.SnapError>", ctx.exception.name)
+        self.assertEqual(
+            "<lib.charm.operator.v0.snap.SnapAPIError>", ctx.exception.name
+        )
         self.assertIn("snapd is not running", ctx.exception.message)
 
     def test_can_compare_snap_equality(self):
