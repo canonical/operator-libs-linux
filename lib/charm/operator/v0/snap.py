@@ -398,7 +398,7 @@ class SnapClient:
                 message = "{} - {}".format(type(e2).__name__, e2)
             raise SnapAPIError(body, code, status, message)
         except urllib.error.URLError as e:
-            raise ConnectionError(e.reason)
+            raise SnapAPIError("500", "Not found", "Not found", e.reason)
         return response
 
     def get_installed_snaps(self) -> Dict:

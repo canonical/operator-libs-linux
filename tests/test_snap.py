@@ -6,6 +6,7 @@ import unittest
 
 from unittest.mock import MagicMock, mock_open, patch
 
+import tests.fake_snapd as fake_snapd
 from lib.charm.operator.v0 import snap
 
 lazy_load_result = r"""
@@ -264,3 +265,22 @@ class TestSnapCache(unittest.TestCase):
 
         foo.state = snap.SnapState.Absent
         mock_subprocess.assert_called_with(["snap", "remove", "foo"])
+
+
+class TestSocketClient(unittest.TestCase):
+    def test_socket_not_found(self):
+        client = snap.SnapClient(socket_path="/does/not/exist")
+        with self.assertRaises(snap.SnapAPIError) as ctx:
+            client.get_installed_snaps()
+        self.assertIsInstance(ctx.exception, snap.SnapAPIError)
+
+    def test_fake_socket(self):
+        shutdown, socket_path = fake_snapd.start_server()
+
+        try:
+            client = snap.SnapClient(socket_path)
+            with self.assertRaises(snap.SnapAPIError) as ctx:
+                client.get_installed_snaps()
+            self.assertIsInstance(ctx.exception, snap.SnapAPIError)
+        finally:
+            shutdown()
