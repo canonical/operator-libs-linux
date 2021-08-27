@@ -38,13 +38,39 @@ import urllib.parse
 import urllib.request
 
 from collections.abc import Mapping
-from enum import IntEnum
-from itertools import chain
+from enum import Enum
 from subprocess import CalledProcessError
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Union
 
 
 logger = logging.getLogger(__name__)
+
+
+def _cache_init(func):
+    if _Cache.cache is None:
+        _Cache.cache = SnapCache()
+
+    def inner(*args, **kwargs):
+        return func(*args, **kwargs)
+
+    return inner
+
+
+class MetaCache(type):
+    @property
+    def cache(cls) -> "SnapCache":
+        return cls._cache
+
+    @cache.setter
+    def cache(cls, cache: "SnapCache") -> None:
+        cls._cache = cache
+
+    def __getitem__(cls, name) -> "Snap":
+        return cls._cache[name]
+
+
+class _Cache(object, metaclass=MetaCache):
+    _cache = None
 
 
 class Error(Exception):
@@ -83,25 +109,17 @@ class SnapAPIError(Error):
         )
 
 
-class StateBase(IntEnum):
-    Present = 1
-    Absent = 2
+class SnapState(Enum):
+    """The state of a snap on the system or in the cache"""
+
+    Present = "present"
+    Absent = "absent"
+    Latest = "latest"
+    Available = "available"
 
 
 class SnapError(Error):
     """Raised when there's an error installing or removing a snap"""
-
-
-class SnapStateBase(IntEnum):
-    """A parent class to combine IntEnums, since Python does not otherwise allow this."""
-
-    Latest = 3
-    Available = 4
-
-
-SnapState = IntEnum(
-    "SnapState", [(i.name, i.value) for i in chain(StateBase, SnapStateBase)]
-)
 
 
 class Snap(object):
@@ -230,7 +248,7 @@ class Snap(object):
     @property
     def present(self) -> bool:
         """Returns whether or not a snap is present."""
-        return self._state is SnapState.Present
+        return self._state in (SnapState.Present, SnapState.Latest)
 
     @property
     def latest(self) -> bool:
@@ -398,7 +416,7 @@ class SnapClient:
                 message = "{} - {}".format(type(e2).__name__, e2)
             raise SnapAPIError(body, code, status, message)
         except urllib.error.URLError as e:
-            raise SnapAPIError("500", "Not found", "Not found", e.reason)
+            raise SnapAPIError({}, 500, "Not found", e.reason)
         return response
 
     def get_installed_snaps(self) -> Dict:
@@ -488,3 +506,78 @@ class SnapCache(Mapping):
             info["revision"],
             info["confinement"],
         )
+
+
+class SnapNotFoundError(Error):
+    """Raised when a requested snap is not known to the system"""
+
+
+@_cache_init
+def add(
+    name: str,
+    state: Union[str, SnapState] = SnapState.Latest,
+    channel: Optional[str] = "latest",
+    classic: Optional[bool] = False,
+) -> Snap:
+    """Add a snap to the system.
+
+    Args:
+        name: the name of a snap
+        state: a string or :class:`SnapState` representation of the desired state, one of [`Present` or `Latest`]
+        channel: an (Optional) channel as a string. Defaults to 'latest'
+        classic: an (Optional) boolean specifying whether it should be added with classic confinement. Default `False`
+
+    Raises:
+        SnapNotFoundError if the snap is not in the cache.
+    """
+    try:
+        snap = _Cache[name]
+        if type(state) is str:
+            state = SnapState(state)
+        snap.ensure(state=state, classic=classic, channel=channel)
+        return snap
+    except KeyError:
+        raise SnapNotFoundError("Snap '{}' not found in cache!".format(name))
+
+
+@_cache_init
+def remove(name) -> Snap:
+    """Removes a snap from the system.
+
+    Args:
+        name: the name of a snap
+
+    Raises:
+        SnapNotFoundError if the snap is not in the cache.
+    """
+    try:
+        snap = _Cache[name]
+        snap.ensure(state=SnapState.Absent)
+        return snap
+    except KeyError:
+        raise SnapNotFoundError(r"Snap '{}' not found in cache!".format(name))
+
+
+@_cache_init
+def ensure(
+    name: str,
+    state: str,
+    channel: Optional[str] = "latest",
+    classic: Optional[bool] = False,
+) -> Snap:
+    """Ensures a snap is in a given state to the system.
+
+    Args:
+        name: the name of a snap
+        state: a string representation of the desired state, from :class:`SnapState`
+        channel: an (Optional) channel as a string. Defaults to 'latest'
+        classic: an (Optional) boolean specifying whether it should be added with classic confinement. Default `False`
+
+    Raises:
+        SnapNotFoundError if the snap is not in the cache.
+    """
+
+    if state in ("present", "latest"):
+        return add(name, SnapState(state), channel, classic)
+    else:
+        return remove(name)

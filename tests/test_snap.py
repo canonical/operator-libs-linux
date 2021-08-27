@@ -7,6 +7,8 @@ import unittest
 from unittest.mock import MagicMock, mock_open, patch
 
 import tests.fake_snapd as fake_snapd
+
+patch("lib.charm.operator.v0.snap._cache_init", lambda x: x).start()
 from lib.charm.operator.v0 import snap
 
 lazy_load_result = r"""
@@ -284,3 +286,52 @@ class TestSocketClient(unittest.TestCase):
             self.assertIsInstance(ctx.exception, snap.SnapAPIError)
         finally:
             shutdown()
+
+
+class TestSnapBareMethods(unittest.TestCase):
+    def setUp(self):
+        snap._Cache.cache = SnapCacheTester()
+        snap._Cache.cache._snap_client.get_installed_snaps.return_value = json.loads(
+            installed_result
+        )["result"]
+        snap._Cache.cache._snap_client.get_snap_information.return_value = json.loads(
+            lazy_load_result
+        )["result"][0]
+        snap._Cache.cache._load_installed_snaps()
+        snap._Cache.cache._load_available_snaps()
+
+    @patch("lib.charm.operator.v0.snap.subprocess.check_call")
+    def test_can_run_bare_changes(self, mock_subprocess):
+        mock_subprocess.return_value = 0
+        foo = snap.add("curl", classic=True, channel="latest")
+        mock_subprocess.assert_called_with(
+            ["snap", "install", "curl", "--classic", '--channel="latest"']
+        )
+        self.assertEqual(foo.present, True)
+
+        bar = snap.remove("charmcraft")
+        bar.ensure(snap.SnapState.Absent)
+        mock_subprocess.assert_called_with(["snap", "remove", "charmcraft"])
+        self.assertEqual(bar.present, False)
+
+    @patch("lib.charm.operator.v0.snap.subprocess.check_call")
+    def test_can_ensure_states(self, mock_subprocess):
+        mock_subprocess.return_value = 0
+        foo = snap.ensure("curl", "latest", classic=True, channel="latest/test")
+        mock_subprocess.assert_called_with(
+            ["snap", "install", "curl", "--classic", '--channel="latest/test"']
+        )
+        self.assertEqual(foo.present, True)
+
+        bar = snap.ensure("charmcraft", "absent")
+        bar.ensure(snap.SnapState.Absent)
+        mock_subprocess.assert_called_with(["snap", "remove", "charmcraft"])
+        self.assertEqual(bar.present, False)
+
+    def test_raises_snap_not_found_error(self):
+        with self.assertRaises(snap.SnapNotFoundError) as ctx:
+            snap.add("nothere")
+        self.assertEqual(
+            "<lib.charm.operator.v0.snap.SnapNotFoundError>", ctx.exception.name
+        )
+        self.assertIn("Snap 'nothere' not found", ctx.exception.message)
