@@ -199,9 +199,9 @@ class TestSnapCache(unittest.TestCase):
     def test_can_lazy_load_snap_info(self, mock_exists):
         mock_exists.return_value = True
         s = SnapCacheTester()
-        s._snap_client.get_snap_information.return_value = json.loads(lazy_load_result)[
-            "result"
-        ][0]
+        s._snap_client.get_snap_information.return_value = json.loads(lazy_load_result)["result"][
+            0
+        ]
         s._load_available_snaps()
         self.assertIn("curl", s._snap_map)
 
@@ -216,9 +216,7 @@ class TestSnapCache(unittest.TestCase):
     def test_can_load_installed_snap_info(self, mock_exists):
         mock_exists.return_value = True
         s = SnapCacheTester()
-        s._snap_client.get_installed_snaps.return_value = json.loads(installed_result)[
-            "result"
-        ]
+        s._snap_client.get_installed_snaps.return_value = json.loads(installed_result)["result"]
 
         s._load_installed_snaps()
 
@@ -240,9 +238,7 @@ class TestSnapCache(unittest.TestCase):
         )
         with self.assertRaises(snap.SnapAPIError) as ctx:
             s._load_installed_snaps()
-        self.assertEqual(
-            "<lib.charm.operator.v0.snap.SnapAPIError>", ctx.exception.name
-        )
+        self.assertEqual("<lib.charm.operator.v0.snap.SnapAPIError>", ctx.exception.name)
         self.assertIn("snapd is not running", ctx.exception.message)
 
     def test_can_compare_snap_equality(self):
@@ -331,7 +327,5 @@ class TestSnapBareMethods(unittest.TestCase):
     def test_raises_snap_not_found_error(self):
         with self.assertRaises(snap.SnapNotFoundError) as ctx:
             snap.add("nothere")
-        self.assertEqual(
-            "<lib.charm.operator.v0.snap.SnapNotFoundError>", ctx.exception.name
-        )
+        self.assertEqual("<lib.charm.operator.v0.snap.SnapNotFoundError>", ctx.exception.name)
         self.assertIn("Snap 'nothere' not found", ctx.exception.message)

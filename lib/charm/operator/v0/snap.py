@@ -21,9 +21,20 @@
     HTTP API.
 
     Typical usage:
+      try:
+          snap.add("charmcraft", classic=True)
+      except SnapNotFoundError:
+          logger.error("snap charmcraft not found in snap cache!")
+      except SnapError as e:
+          logger.error(f"An exception occurred when installing charmcraft. Reason: {e.message}")
+
+      ---------------------------
       cache = snap.SnapCache()
-      juju = cache["juju"]
-      juju.ensure(snap.SnapState.Latest, classic=True, channel="stable")
+      try:
+          juju = cache["juju"]
+          juju.ensure(snap.SnapState.Latest, classic=True, channel="stable")
+      except SnapNotFoundError:
+          logger.error("snap juju not found in snap cache!")
 """
 
 import http.client
@@ -77,9 +88,7 @@ class Error(Exception):
     """Base class of most errors raised by this library."""
 
     def __repr__(self):
-        return "<{}.{} {}>".format(
-            type(self).__module__, type(self).__name__, self.args
-        )
+        return "<{}.{} {}>".format(type(self).__module__, type(self).__name__, self.args)
 
     @property
     def name(self):
@@ -159,9 +168,7 @@ class Snap(object):
 
     def __repr__(self):
         """A representation of the snap."""
-        return "<{}.{}: {}>".format(
-            self.__module__, self.__class__.__name__, self.__dict__
-        )
+        return "<{}.{}: {}>".format(self.__module__, self.__class__.__name__, self.__dict__)
 
     def __str__(self):
         """A human-readable representation of the snap"""
@@ -235,9 +242,7 @@ class Snap(object):
         Raises:
           SnapError if an error is encountered
         """
-        self._confinement = (
-            "classic" if classic or self._confinement == "classic" else ""
-        )
+        self._confinement = "classic" if classic or self._confinement == "classic" else ""
         if self._state is not state:
             if state not in (SnapState.Present, SnapState.Latest):
                 self._remove()
@@ -303,9 +308,7 @@ class _UnixSocketConnection(http.client.HTTPConnection):
     def connect(self):
         """Override connect to use Unix socket (instead of TCP socket)."""
         if not hasattr(socket, "AF_UNIX"):
-            raise NotImplementedError(
-                "Unix sockets not supported on {}".format(sys.platform)
-            )
+            raise NotImplementedError("Unix sockets not supported on {}".format(sys.platform))
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(self.socket_path)
         if self.timeout is not None:
@@ -456,7 +459,10 @@ class SnapCache(Mapping):
 
     def __getitem__(self, snap_name: str) -> Snap:
         """Return either the installed version or latest version for a given snap."""
-        snap = self._snap_map[snap_name]
+        try:
+            snap = self._snap_map[snap_name]
+        except KeyError:
+            raise SnapNotFoundError("Snap '{}' not found in cache!".format(snap_name))
 
         if snap is None:
             self._snap_map[snap_name] = self._load_info(snap_name)
