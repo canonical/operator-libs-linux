@@ -4,9 +4,11 @@
 import subprocess
 import unittest
 
+from pyfakefs.fake_filesystem_unittest import TestCase
 from unittest.mock import patch
 
-from lib.charm.operator.v0 import dpkg
+patch("lib.charm.operator.v0.apt._cache_init", lambda x: x).start()
+from lib.charm.operator.v0 import apt
 
 dpkg_l_output = """Desired=Unknown/Install/Remove/Purge/Hold
 | Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
@@ -65,24 +67,53 @@ SHA256: de4c7b85ca7d9023af0232aa9e9c88b0ec4ea0b2b140597148b530ff9622a202
 Homepage: https://bitbucket.org/zzzeek/alembic
 Description: lightweight database migration tool for SQLAlchemy
 Description-md5: cd0efbf0f89bffe2d4dc35fa935c7c7e
+
+Package: mocktester
+Architecture: amd64
+Version: 1:1.2.3-4
+Priority: optional
+Section: test
+Origin: Ubuntu
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Original-Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>
+Bugs: https://bugs.launchpad.net/ubuntu/+filebug
+Installed-Size: 1234
+Depends: vim-common
+Recommends: zsh
+Suggests: foobar
+Filename: pool/main/m/mocktester/mocktester_1:1.2.3-4_amd64.deb
+Size: 65536
+MD5sum: a87e414ad5aede7c820ce4c4e6bc7fa9
+SHA1: b21d6ce47cb471c73fb4ec07a24c6f4e56fd19fc
+SHA256: 89e7d5f61a0e3d32ef9aebd4b16e61840cd97e10196dfa186b06b6cde2f900a2
+Homepage: https://wiki.gnome.org/Apps/MockTester
+Description: Testing Package
+Task: ubuntu-desktop
+Description-md5: e7f99df3aa92cf870d335784e155ec33
 """
 
 
-class DpkgCacheTester(dpkg.PackageCache):
+class AptCacheTester(apt.PackageCache):
     def __init__(self):
         # Fake out __init__ so we can test methods individually
         self._package_map = {}
 
 
-class TestDpkgCache(unittest.TestCase):
-    @patch("lib.charm.operator.v0.dpkg.check_output")
+class TestAptCache(TestCase):
+    def setUp(self):
+        self.setUpPyfakefs()
+        self.fs.create_file(
+            "/var/lib/apt/lists/repository_tester_binary.list", contents=apt_cache_output
+        )
+
+    @patch("lib.charm.operator.v0.apt.check_output")
     def test_can_load_from_dpkg(self, mock_subprocess):
         mock_subprocess.return_value = dpkg_l_output
-        d = DpkgCacheTester()
+        d = AptCacheTester()
         d._merge_with_cache(d._generate_packages_from_dpkg())
         self.assertIn("zsh", d)
         self.assertEqual(len(d), 4)
-        self.assertEqual(d["zsh"].state, dpkg.PackageState.Present)
+        self.assertEqual(d["zsh"].state, apt.PackageState.Present)
 
         vim = d["vim-common"]
         self.assertEqual(vim.epoch, "2")
@@ -90,37 +121,31 @@ class TestDpkgCache(unittest.TestCase):
         self.assertEqual(vim.fullversion, "2:8.1.2269-1ubuntu5.all")
         self.assertEqual(str(vim.version), "2:8.1.2269-1ubuntu5")
 
-    @patch("lib.charm.operator.v0.dpkg.check_output")
-    def test_can_load_from_apt_cache(self, mock_subprocess):
-        mock_subprocess.return_value = apt_cache_output
-        d = DpkgCacheTester()
+    def test_can_load_from_apt_cache(self):
+        d = AptCacheTester()
         d._merge_with_cache(d._generate_packages_from_apt_cache())
 
-        self.assertEqual(len(d), 2)
+        self.assertEqual(len(d), 3)
         self.assertIn("aisleriot", d)
-        self.assertEqual(len(d), 2)
         self.assertEqual(d["aisleriot"].epoch, "1")
         self.assertEqual(d["aisleriot"].fullversion, "1:3.22.9-1.amd64")
         self.assertEqual(d["aisleriot"].arch, "amd64")
 
-    @patch("lib.charm.operator.v0.dpkg.check_output")
+    @patch("lib.charm.operator.v0.apt.check_output")
     def test_can_merge_cache(self, mock_subprocess):
-        d = DpkgCacheTester()
+        d = AptCacheTester()
         mock_subprocess.return_value = dpkg_l_output
         d._merge_with_cache(d._generate_packages_from_dpkg())
-        mock_subprocess.return_value = apt_cache_output
         d._merge_with_cache(d._generate_packages_from_apt_cache())
 
         self.assertIn("zsh", d)
         self.assertIn("aisleriot", d)
-        self.assertEqual(len(d), 5)
+        self.assertEqual(len(d), 6)
 
-    @patch("lib.charm.operator.v0.dpkg.check_output")
-    @patch("lib.charm.operator.v0.dpkg.subprocess.check_call")
-    def test_can_run_apt_commands(self, mock_subprocess_call, mock_subprocess_output):
-        mock_subprocess_output.return_value = apt_cache_output
+    @patch("lib.charm.operator.v0.apt.subprocess.check_call")
+    def test_can_run_apt_commands(self, mock_subprocess_call):
         mock_subprocess_call.return_value = 0
-        d = DpkgCacheTester()
+        d = AptCacheTester()
         d._merge_with_cache(d._generate_packages_from_apt_cache())
 
         pkg = d["aisleriot"]
@@ -129,41 +154,45 @@ class TestDpkgCache(unittest.TestCase):
         self.assertEqual(pkg.version.epoch, "1")
         self.assertEqual(pkg.version.number, "3.22.9-1")
 
-        pkg.ensure(dpkg.PackageState.Latest)
+        pkg.ensure(apt.PackageState.Latest)
         mock_subprocess_call.assert_called_with(
-            ["apt-get", "-y", "--allow-downgrades", "install", "aisleriot=1:3.22.9-1.amd64"]
+            [
+                "apt-get",
+                "-y",
+                "--option=Dpkg::Options::=--force-confold",
+                "install",
+                "aisleriot=1:3.22.9-1",
+            ]
         )
-        self.assertEqual(pkg.state, dpkg.PackageState.Latest)
+        self.assertEqual(pkg.state, apt.PackageState.Latest)
 
-        pkg.state = dpkg.PackageState.Absent
+        pkg.state = apt.PackageState.Absent
         mock_subprocess_call.assert_called_with(
-            ["apt-get", "-y", "remove", "aisleriot=1:3.22.9-1.amd64"]
+            ["apt-get", "-y", "remove", "aisleriot=1:3.22.9-1"]
         )
 
-    @patch("lib.charm.operator.v0.dpkg.check_output")
-    @patch("lib.charm.operator.v0.dpkg.subprocess.check_call")
-    def test_will_throw_apt_errors(self, mock_subprocess_call, mock_subprocess_output):
-        mock_subprocess_output.return_value = apt_cache_output
+    @patch("lib.charm.operator.v0.apt.subprocess.check_call")
+    def test_will_throw_apt_errors(self, mock_subprocess_call):
         mock_subprocess_call.side_effect = subprocess.CalledProcessError(
             returncode=1, cmd=["apt-get", "-y", "install"]
         )
-        d = DpkgCacheTester()
+        d = AptCacheTester()
         d._merge_with_cache(d._generate_packages_from_apt_cache())
 
         pkg = d["aisleriot"]
         self.assertEqual(pkg.present, False)
 
-        with self.assertRaises(dpkg.PackageError) as ctx:
-            pkg.ensure(dpkg.PackageState.Latest)
+        with self.assertRaises(apt.PackageError) as ctx:
+            pkg.ensure(apt.PackageState.Latest)
 
-        self.assertEqual("<lib.charm.operator.v0.dpkg.PackageError>", ctx.exception.name)
+        self.assertEqual("<lib.charm.operator.v0.apt.PackageError>", ctx.exception.name)
         self.assertIn("Could not install package", ctx.exception.message)
 
     def test_can_compare_versions(self):
-        old_version = dpkg.Version("1.0.0", "")
-        old_dupe = dpkg.Version("1.0.0", "")
-        new_version = dpkg.Version("1.0.1", "")
-        new_epoch = dpkg.Version("1.0.1", "1")
+        old_version = apt.Version("1.0.0", "")
+        old_dupe = apt.Version("1.0.0", "")
+        new_version = apt.Version("1.0.1", "")
+        new_epoch = apt.Version("1.0.1", "1")
 
         self.assertEqual(old_version, old_dupe)
         self.assertGreater(new_version, old_version)
@@ -174,6 +203,78 @@ class TestDpkgCache(unittest.TestCase):
         self.assertNotEqual(new_version, old_version)
 
     def test_can_parse_epoch_and_version(self):
-        d = DpkgCacheTester()
+        d = AptCacheTester()
         self.assertEqual((None, "1.0.0"), d._get_epoch_from_version("1.0.0"))
         self.assertEqual(("2", "9.8-7ubuntu6"), d._get_epoch_from_version("2:9.8-7ubuntu6"))
+
+
+class TestAptBareMethods(TestCase):
+    @patch("lib.charm.operator.v0.apt.check_output")
+    def setUp(self, mock_subprocess):
+        self.setUpPyfakefs()
+        self.fs.create_file(
+            "/var/lib/apt/lists/repository_tester_binary.list", contents=apt_cache_output
+        )
+        apt._Cache.cache = AptCacheTester()
+        mock_subprocess.return_value = dpkg_l_output
+        apt._Cache.cache._merge_with_cache(apt._Cache.cache._generate_packages_from_dpkg())
+        apt._Cache.cache._merge_with_cache(apt._Cache.cache._generate_packages_from_apt_cache())
+
+    @patch("lib.charm.operator.v0.apt.subprocess.check_call")
+    def test_can_run_bare_changes_on_single_package(self, mock_subprocess):
+        mock_subprocess.return_value = 0
+        foo = apt.add_package("aisleriot")[0]
+        mock_subprocess.assert_called_with(
+            [
+                "apt-get",
+                "-y",
+                "--option=Dpkg::Options::=--force-confold",
+                "install",
+                "aisleriot=1:3.22.9-1",
+            ]
+        )
+        self.assertEqual(foo.present, True)
+
+        bar = apt.remove_package("zsh")[0]
+        bar.ensure(apt.PackageState.Absent)
+        mock_subprocess.assert_called_with(["apt-get", "-y", "remove", "zsh=5.8-3ubuntu1"])
+        self.assertEqual(bar.present, False)
+
+    @patch("lib.charm.operator.v0.apt.subprocess.check_call")
+    def test_can_run_bare_changes_on_multiple_packages(self, mock_subprocess):
+        mock_subprocess.return_value = 0
+        foo = apt.add_package(["aisleriot", "mocktester"])
+        mock_subprocess.assert_any_call(
+            [
+                "apt-get",
+                "-y",
+                "--option=Dpkg::Options::=--force-confold",
+                "install",
+                "aisleriot=1:3.22.9-1",
+            ]
+        )
+        mock_subprocess.assert_any_call(
+            [
+                "apt-get",
+                "-y",
+                "--option=Dpkg::Options::=--force-confold",
+                "install",
+                "mocktester=1:1.2.3-4",
+            ]
+        )
+        self.assertEqual(foo[0].present, True)
+        self.assertEqual(foo[1].present, True)
+
+        bar = apt.remove_package(["vim-common", "zsh"])
+        mock_subprocess.assert_any_call(
+            ["apt-get", "-y", "remove", "vim-common=2:8.1.2269-1ubuntu5"]
+        )
+        mock_subprocess.assert_any_call(["apt-get", "-y", "remove", "zsh=5.8-3ubuntu1"])
+        self.assertEqual(bar[0].present, False)
+        self.assertEqual(bar[1].present, False)
+
+    def test_raises_package_not_found_error(self):
+        with self.assertRaises(apt.PackageNotFoundError) as ctx:
+            apt.add_package("nothere")
+        self.assertEqual("<lib.charm.operator.v0.apt.PackageNotFoundError>", ctx.exception.name)
+        self.assertIn("package 'nothere' not found", ctx.exception.message)
