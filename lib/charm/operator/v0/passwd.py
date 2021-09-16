@@ -14,25 +14,25 @@
 
 """Representations of the system's users and groups, and abstractions around managing them.
 
-    In the `passwd` module, :class:`UserCache` creates a dict-like mapping of
-    :class:`User` objects at instantiation, and :class:`GroupCache` does the same for groups.
-    Users and groups are fully populated, referencing the object types of both.
+In the `passwd` module, :class:`UserCache` creates a dict-like mapping of
+:class:`User` objects at instantiation, and :class:`GroupCache` does the same for groups.
+Users and groups are fully populated, referencing the object types of both.
 
-    Groups are initialized upon instantiation of `UserCache` if this is not already done.
+Groups are initialized upon instantiation of `UserCache` if this is not already done.
 
-    Typical usage:
-      try:
-          user.add("test", )
-      except UserError as e:
-          logger.error(e.message)
+Typical usage:
+  try:
+      user.add("test", )
+  except UserError as e:
+      logger.error(e.message)
 
-      ---------------------------
-      cache = passwd.UserCache()
-      try:
-          snap = cache["snap"]
-          snap.ensure(passwd.UserState.NoLogin)
-      except UserNotFoundError:
-          logger.error("User snap not found!")
+  ##############################
+  cache = passwd.UserCache()
+  try:
+      snap = cache["snap"]
+      snap.ensure(passwd.UserState.NoLogin)
+  except UserNotFoundError:
+      logger.error("User snap not found!")
 """
 
 import os
@@ -52,11 +52,11 @@ logger = logging.getLogger(__name__)
 
 def _cache_init(func):
     """Warm all of the caches in the correct order if it isn't already done."""
-    _GROUP_CACHE = GroupCache()
-    _USER_CACHE = UserCache()
-    _GROUP_CACHE.realize_users()
 
     def inner(*args, **kwargs):
+        _GROUP_CACHE = GroupCache()
+        _USER_CACHE = UserCache()
+        _GROUP_CACHE.realize_users()
         return func(*args, **kwargs)
 
     return inner
@@ -75,12 +75,12 @@ class Error(Exception):
     """Base class of most errors raised by this library."""
 
     def __repr__(self):
-        return "<{}.{} {}>".format(type(self).__module__, type(self).__name__, self.args)
+        return f"<{type(self).__module__}.{type(self).__name__} {self.args}>"
 
     @property
     def name(self):
         """Return a string representation of the model plus class."""
-        return "<{}.{}>".format(type(self).__module__, type(self).__name__)
+        return f"<{type(self).__module__}.{type(self).__name__}>"
 
     @property
     def message(self):
@@ -89,7 +89,7 @@ class Error(Exception):
 
 
 class UserState(Enum):
-    """The state of a snap on the system or in the cache."""
+    """The state of a user on the system or in the cache."""
 
     Present = "present"
     Absent = "absent"
@@ -148,11 +148,11 @@ class User(object):
         return hash((self._name, self._uid))
 
     def __repr__(self):
-        """A representation of the snap."""
-        return "<{}.{}: {}>".format(self.__module__, self.__class__.__name__, self.__dict__)
+        """A representation of the user."""
+        return f"<{self.__module__}.{self.__class__.__name__}: {self.__dict__}>"
 
     def __str__(self):
-        """A human-readable representation of the snap"""
+        """A human-readable representation of the user."""
         return "<{}: {}-{}.{}: {} -- {}>".format(
             self.__class__.__name__,
             self._name,
@@ -248,9 +248,7 @@ class User(object):
 
             subprocess.check_call(["useradd", *args, self.name])
         except CalledProcessError as e:
-            raise UserError(
-                "Could not add user '{}' to the system: {}".format(self.name, e.output)
-            )
+            raise UserError(f"Could not add user '{self.name}' to the system: {e.output}")
 
     def _remove(self) -> None:
         """Removes a user from the system."""
@@ -260,9 +258,7 @@ class User(object):
         try:
             subprocess.check_call(["userdel", self.name])
         except CalledProcessError as e:
-            raise UserError(
-                "Could not remove user '{}' to the system: {}".format(self.name, e.output)
-            )
+            raise UserError(f"Could not remove user '{self.name}' to the system: {e.output}")
 
     def _disable_login(self):
         """Disable logins for a user by setting the shell to `/sbin/nologin."""
@@ -270,9 +266,7 @@ class User(object):
         try:
             subprocess.check_call(["usermod", "-s", "/sbin/nologin", self.name])
         except CalledProcessError as e:
-            raise UserError(
-                "Could not disable login for user account {}: {}".format(self.name, e.output)
-            )
+            raise UserError(f"Could not disable login for user account {self.name}: {e.output}")
 
     def _disable_account(self):
         """Disable a user account by locking it."""
@@ -280,14 +274,14 @@ class User(object):
         try:
             subprocess.check_call(["usermod", "-L", self.name])
         except CalledProcessError as e:
-            raise UserError("Could not disable user account {}: {}".format(self.name, e.output))
+            raise UserError(f"Could not disable user account {self.name}: {e.output}")
 
     def _enable_account(self):
         """Enable a user account by unlocking it."""
         try:
             subprocess.check_call(["usermod", "-U", self.name])
         except CalledProcessError as e:
-            raise UserError("Could not enable user account {}: {}".format(self.name, e.output))
+            raise UserError(f"Could not enable user account {self.name}: {e.output}")
 
     def _check_if_present(self, add_if_absent: Optional[bool] = False) -> bool:
         """Ensures a user is present in /etc/passwd.
@@ -318,7 +312,7 @@ class User(object):
             return True
         elif not found:
             raise UserNotFoundError(
-                "User {} was not found on the system and was not force-added!".format(self.name)
+                f"User {self.name} was not found on the system and was not force-added!"
             )
 
         return found
@@ -373,7 +367,7 @@ class UserCache(Mapping, metaclass=Singleton):
         try:
             return self._user_map[user_name]
         except KeyError:
-            raise UserNotFoundError("User '{}' not found!".format(user_name))
+            raise UserNotFoundError(f"User '{user_name}' not found!")
 
     def _load_users(self) -> None:
         """Parse /etc/passwd to get information about available passwd."""
@@ -422,13 +416,8 @@ class Group(object):
         self._users = [user.name if type(user) == User else user for user in users]
 
     def __str__(self) -> str:
-        """A human-readable representation of the group"""
-        return "<{}: {}-{} -- {}>".format(
-            self.__class__.__name__,
-            self._name,
-            self._gid,
-            self._users,
-        )
+        """A human-readable representation of the group."""
+        return f"<{self.__class__.__name__}: {self._name}-{self._gid} -- {self._users}>"
 
     def __eq__(self, other):
         return (self._name, self._gid) == (other.name, other.gid)
@@ -484,7 +473,7 @@ class GroupCache(Mapping, metaclass=Singleton):
         try:
             return self._group_map[group_name]
         except KeyError:
-            raise GroupNotFoundError("Group '{}' not found!".format(group_name))
+            raise GroupNotFoundError(f"Group '{group_name}' not found!")
 
     def get_by_gid(self, gid: int) -> "Group":
         """Look up a group by group id.
@@ -499,7 +488,7 @@ class GroupCache(Mapping, metaclass=Singleton):
             if group.gid == gid:
                 return group
 
-        raise GroupNotFoundError("Could not find a group with GID {}!".format(gid))
+        raise GroupNotFoundError(f"Could not find a group with GID {gid}!")
 
     def add(self, group: Group) -> None:
         """Adds a group to the system.
@@ -513,7 +502,7 @@ class GroupCache(Mapping, metaclass=Singleton):
         try:
             subprocess.check_call(["groupadd", "-g", group.gid, group.name])
         except CalledProcessError as e:
-            raise GroupError("Could not add group {}! Reason: {}".format(self.name, e.output))
+            raise GroupError(f"Could not add group {self.name}! Reason: {e.output}")
 
     def _load_groups(self) -> None:
         """Parse /etc/group to get information about available groups."""
