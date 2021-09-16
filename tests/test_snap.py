@@ -305,9 +305,8 @@ class TestSnapBareMethods(unittest.TestCase):
         )
         self.assertEqual(foo.present, True)
 
-        bar = snap.remove("charmcraft")
-        bar.ensure(snap.SnapState.Absent)
-        mock_subprocess.assert_called_with(["snap", "remove", "charmcraft"])
+        bar = snap.remove("curl")
+        mock_subprocess.assert_called_with(["snap", "remove", "curl"])
         self.assertEqual(bar.present, False)
 
     @patch("lib.charm.operator.v0.snap.subprocess.check_call")
@@ -319,9 +318,8 @@ class TestSnapBareMethods(unittest.TestCase):
         )
         self.assertEqual(foo.present, True)
 
-        bar = snap.ensure("charmcraft", "absent")
-        bar.ensure(snap.SnapState.Absent)
-        mock_subprocess.assert_called_with(["snap", "remove", "charmcraft"])
+        bar = snap.ensure("curl", "absent")
+        mock_subprocess.assert_called_with(["snap", "remove", "curl"])
         self.assertEqual(bar.present, False)
 
     def test_raises_snap_not_found_error(self):

@@ -14,27 +14,27 @@
 
 """Representations of the system's Snaps, and abstractions around managing them.
 
-    In the `snap` module, :class:`SnapCache` creates a dict-like mapping of
-    :class:`Snap` objects at instantiation. Installed snaps are fully populated,
-    and available snaps are lazily-loaded upon request. This module relies on an
-    installed and running `snapd` daemon to perform operations over the `snapd`
-    HTTP API.
+In the `snap` module, :class:`SnapCache` creates a dict-like mapping of
+:class:`Snap` objects at instantiation. Installed snaps are fully populated,
+and available snaps are lazily-loaded upon request. This module relies on an
+installed and running `snapd` daemon to perform operations over the `snapd`
+HTTP API.
 
-    Typical usage:
-      try:
-          snap.add("charmcraft", classic=True)
-      except SnapNotFoundError:
-          logger.error("snap charmcraft not found in snap cache!")
-      except SnapError as e:
-          logger.error(f"An exception occurred when installing charmcraft. Reason: {e.message}")
+Typical usage:
+  try:
+      snap.add("charmcraft", classic=True)
+  except SnapNotFoundError:
+      logger.error("snap charmcraft not found in snap cache!")
+  except SnapError as e:
+      logger.error(f"An exception occurred when installing charmcraft. Reason: {e.message}")
 
-      ---------------------------
-      cache = snap.SnapCache()
-      try:
-          juju = cache["juju"]
-          juju.ensure(snap.SnapState.Latest, classic=True, channel="stable")
-      except SnapNotFoundError:
-          logger.error("snap juju not found in snap cache!")
+  ##############################
+  cache = snap.SnapCache()
+  try:
+      juju = cache["juju"]
+      juju.ensure(snap.SnapState.Latest, classic=True, channel="stable")
+  except SnapNotFoundError:
+      logger.error("snap juju not found in snap cache!")
 """
 
 import http.client
@@ -58,10 +58,9 @@ logger = logging.getLogger(__name__)
 
 
 def _cache_init(func):
-    if _Cache.cache is None:
-        _Cache.cache = SnapCache()
-
     def inner(*args, **kwargs):
+        if _Cache.cache is None:
+            _Cache.cache = SnapCache()
         return func(*args, **kwargs)
 
     return inner
@@ -88,12 +87,12 @@ class Error(Exception):
     """Base class of most errors raised by this library."""
 
     def __repr__(self):
-        return "<{}.{} {}>".format(type(self).__module__, type(self).__name__, self.args)
+        return f"<{type(self).__module__}.{type(self).__name__} {self.args}>"
 
     @property
     def name(self):
         """Return a string representation of the model plus class."""
-        return "<{}.{}>".format(type(self).__module__, type(self).__name__)
+        return f"<{type(self).__module__}.{type(self).__name__}>"
 
     @property
     def message(self):
@@ -119,7 +118,7 @@ class SnapAPIError(Error):
 
 
 class SnapState(Enum):
-    """The state of a snap on the system or in the cache"""
+    """The state of a snap on the system or in the cache."""
 
     Present = "present"
     Absent = "absent"
@@ -128,7 +127,7 @@ class SnapState(Enum):
 
 
 class SnapError(Error):
-    """Raised when there's an error installing or removing a snap"""
+    """Raised when there's an error installing or removing a snap."""
 
 
 class Snap(object):
@@ -168,10 +167,10 @@ class Snap(object):
 
     def __repr__(self):
         """A representation of the snap."""
-        return "<{}.{}: {}>".format(self.__module__, self.__class__.__name__, self.__dict__)
+        return f"<{self.__module__}.{self.__class__.__name__}: {self.__dict__}>"
 
     def __str__(self):
-        """A human-readable representation of the snap"""
+        """A human-readable representation of the snap."""
         return "<{}: {}-{}.{} -- {}>".format(
             self.__class__.__name__,
             self._name,
@@ -223,7 +222,7 @@ class Snap(object):
 
     @property
     def name(self) -> str:
-        """Returns the name of the snap"""
+        """Returns the name of the snap."""
         return self._name
 
     def ensure(
@@ -308,7 +307,7 @@ class _UnixSocketConnection(http.client.HTTPConnection):
     def connect(self):
         """Override connect to use Unix socket (instead of TCP socket)."""
         if not hasattr(socket, "AF_UNIX"):
-            raise NotImplementedError("Unix sockets not supported on {}".format(sys.platform))
+            raise NotImplementedError(f"Unix sockets not supported on {sys.platform}")
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(self.socket_path)
         if self.timeout is not None:
@@ -416,7 +415,7 @@ class SnapClient:
             except (IOError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
                 body = {}
-                message = "{} - {}".format(type(e2).__name__, e2)
+                message = f"{type(e2).__name__} - {e2}"
             raise SnapAPIError(body, code, status, message)
         except urllib.error.URLError as e:
             raise SnapAPIError({}, 500, "Not found", e.reason)
@@ -462,7 +461,7 @@ class SnapCache(Mapping):
         try:
             snap = self._snap_map[snap_name]
         except KeyError:
-            raise SnapNotFoundError("Snap '{}' not found in cache!".format(snap_name))
+            raise SnapNotFoundError(f"Snap '{snap_name}' not found in cache!")
 
         if snap is None:
             self._snap_map[snap_name] = self._load_info(snap_name)
@@ -515,7 +514,7 @@ class SnapCache(Mapping):
 
 
 class SnapNotFoundError(Error):
-    """Raised when a requested snap is not known to the system"""
+    """Raised when a requested snap is not known to the system."""
 
 
 @_cache_init
@@ -543,7 +542,7 @@ def add(
         snap.ensure(state=state, classic=classic, channel=channel)
         return snap
     except KeyError:
-        raise SnapNotFoundError("Snap '{}' not found in cache!".format(name))
+        raise SnapNotFoundError(f"Snap '{name}' not found in cache!")
 
 
 @_cache_init

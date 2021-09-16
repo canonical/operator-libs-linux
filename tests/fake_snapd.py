@@ -70,7 +70,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def internal_server_error(self, msg):
         d = {
             "result": {
-                "message": "internal server error: {}".format(msg),
+                "message": f"internal server error: {msg}",
             },
             "status": "Internal Server Error",
             "status-code": 500,
