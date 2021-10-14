@@ -352,14 +352,36 @@ class TestAptBareMethods(unittest.TestCase):
         self.assertEqual(bar[1].present, False)
 
     @patch("lib.charm.operator.v0.apt.check_output")
-    def test_raises_package_not_found_error(self, mock_subprocess_output):
+    @patch("lib.charm.operator.v0.apt.subprocess.check_call")
+    def test_refreshes_apt_cache_if_not_found(self, mock_subprocess, mock_subprocess_output):
+        mock_subprocess.return_value = 0
         mock_subprocess_output.side_effect = [
             "amd64",
             subprocess.CalledProcessError(returncode=100, cmd=["dpkg", "-l", "nothere"]),
             "amd64",
             subprocess.CalledProcessError(returncode=100, cmd=["apt-cache", "show", "nothere"]),
+            "amd64",
+            subprocess.CalledProcessError(returncode=100, cmd=["dpkg", "-l", "nothere"]),
+            "amd64",
+            apt_cache_aisleriot,
         ]
-        with self.assertRaises(apt.PackageNotFoundError) as ctx:
+        pkg = apt.add_package("aisleriot")[0]
+        mock_subprocess.assert_any_call(["apt-get", "update"])
+        self.assertEqual(pkg.name, "aisleriot")
+        self.assertEqual(pkg.present, True)
+
+    @patch("lib.charm.operator.v0.apt.check_output")
+    @patch("lib.charm.operator.v0.apt.subprocess.check_call")
+    def test_raises_package_not_found_error(self, mock_subprocess, mock_subprocess_output):
+        mock_subprocess.return_value = 0
+        mock_subprocess_output.side_effect = [
+            "amd64",
+            subprocess.CalledProcessError(returncode=100, cmd=["dpkg", "-l", "nothere"]),
+            "amd64",
+            subprocess.CalledProcessError(returncode=100, cmd=["apt-cache", "show", "nothere"]),
+        ] * 2  # Double up for the retry after update
+        with self.assertRaises(apt.PackageError) as ctx:
             apt.add_package("nothere")
-        self.assertEqual("<lib.charm.operator.v0.apt.PackageNotFoundError>", ctx.exception.name)
-        self.assertIn("Package 'nothere' could not be found", ctx.exception.message)
+        mock_subprocess.assert_any_call(["apt-get", "update"])
+        self.assertEqual("<lib.charm.operator.v0.apt.PackageError>", ctx.exception.name)
+        self.assertIn("Failed to install packages: nothere", ctx.exception.message)

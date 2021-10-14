@@ -26,7 +26,7 @@ Typical usage example:
 
     try:
         # Run `apt-get update`
-        apt.update_cache()
+        apt.update()
         apt.add_package("zsh")
         apt.add_package(["vim", "htop", "wget"])
     except PackageNotFoundError:
@@ -623,15 +623,23 @@ def add_package(
     package_names: Union[str, List[str]],
     version: Optional[str] = "",
     arch: Optional[str] = "",
+    update_cache: Optional[bool] = False,
 ) -> List[DebianPackage]:
     """Add a package or list of packages to the system.
     Args:
         name: the name(s) of the package(s)
-        version: an (Optional) version as a string. Defaults to the latest known.
+        version: an (Optional) version as a string. Defaults to the latest known
+        arch: an optional architecture for the package
+        update_cache: whether or not to run `apt-get update` prior to operating
     Raises:
         PackageNotFoundError if the package is not in the cache.
     """
-    packages = []
+    cache_refreshed = False
+    if update_cache:
+        update()
+        cache_refreshed = True
+
+    packages = {"success": [], "retry": [], "failed": []}
 
     package_names = [package_names] if type(package_names) is str else package_names
     if not package_names:
@@ -643,20 +651,50 @@ def add_package(
         )
 
     for p in package_names:
-        packages.append(_add(p, version))
+        pkg, success = _add(p, version, arch)
+        if success:
+            packages["success"].append(pkg)
+        else:
+            logger.warn(f"Failed to locate and install/update {pkg}!")
+            packages["retry"].append(p)
 
-    return packages
+    if packages["retry"] and not cache_refreshed:
+        logger.info("Updating the apt-cache and retrying installation of failed packages.")
+        update()
+
+        for p in packages["retry"]:
+            pkg, success = _add(p, version, arch)
+            if success:
+                packages["success"].append(pkg)
+            else:
+                packages["failed"].append(p)
+
+    if packages["failed"]:
+        raise PackageError(f"Failed to install packages: {', '.join(packages['failed'])}")
+
+    return packages["success"]
 
 
 def _add(
     name: str,
     version: Optional[str] = "",
     arch: Optional[str] = "",
-) -> DebianPackage:
-    """Adds a package."""
-    pkg = DebianPackage.from_system(name, version, arch)
-    pkg.ensure(state=PackageState.Present)
-    return pkg
+) -> Tuple[Union[DebianPackage, str], bool]:
+    """Adds a package.
+    Args:
+        name: the name(s) of the package(s)
+        version: an (Optional) version as a string. Defaults to the latest known
+        arch: an optional architecture for the package
+
+    Returns: a tuple of :class:`DebianPackage` if found, or a :str: if it is not, and
+        a boolean indicating success
+    """
+    try:
+        pkg = DebianPackage.from_system(name, version, arch)
+        pkg.ensure(state=PackageState.Present)
+        return pkg, True
+    except PackageNotFoundError:
+        return name, False
 
 
 def remove_package(package_names: Union[str, List[str]]) -> List[DebianPackage]:
@@ -684,6 +722,6 @@ def remove_package(package_names: Union[str, List[str]]) -> List[DebianPackage]:
     return packages
 
 
-def update_cache() -> None:
+def update() -> None:
     """Updates the apt cache via `apt-get update`."""
     subprocess.check_call(["apt-get", "update"])
