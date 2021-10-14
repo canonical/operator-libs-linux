@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Representations of the system's Debian/Ubuntu repository and package information.
+"""Representations of the system's Debian/Ubuntu package information.
 
 The `apt` module contains abstractions and wrappers around Debian/Ubuntu-style
 repositories and packages, in order to easily provide an idiomatic and Pythonic
@@ -22,90 +22,30 @@ charms.
 A sane default configuration is attainable through nothing more than instantiation
 of the appropriate classes.
 
-:class:`PackageCache` will build a dict-like :class:`ABC.MutableMapping` of both
-installed and available packages, indexed by package name. Retrieving a value will
-return the installed version (if any), otherwise the most recent package version
-known to apt-cache, as a :class:`DebianPackage` object.
-
 Typical usage example:
 
     try:
+        # Run `apt-get update`
+        apt.update_cache()
         apt.add_package("zsh")
         apt.add_package(["vim", "htop", "wget"])
     except PackageNotFoundError:
         logger.error("A specified package not found in package cache or on system")
     except PackageError as e:
         logger.error(f"Could not install package. Reason: {e.message}")
-
-
-    ##########################
-    cache = apt.PackageCache()
-
-    try:
-        vim = cache["vim"]
-        vim.ensure(dpkg.PackageState.Latest)
-        # alternatively
-        vim.state = dpkg.PackageState.Latest
-    except PackageNotFoundError as e:
-        print(e.message)
-
-:class:`RepositoryMapping` will return a dict-like object containing enabled system
-repositories and their properties (available groups, baseuri. gpg key). This class can
-add, disable, or manipulate repositories. Items can be retrieved as :class:`DebianRepository`
-objects.
-
-Typical usage example:
-
-    repositories = apt.RepositoryMapping()
-    repositories.add(DebianRepository(
-    enabled=True, repotype="deb", uri="https://example.com", release="focal",
-    groups=["universe"]
-    ))
 """
 
-import fileinput
-import glob
-from io import TextIOWrapper
 import logging
-import os
 import re
 import subprocess
 
-from collections.abc import Mapping
 from enum import Enum
 from pathlib import Path
-from subprocess import check_call, check_output, CalledProcessError
-from typing import Dict, Iterable, List, Optional, Tuple, Union
-from urllib.parse import urlparse
+from subprocess import check_output, CalledProcessError
+from typing import Dict, List, Optional, Tuple, Union
 
 
 logger = logging.getLogger(__name__)
-
-
-def _cache_init(func):
-    def inner(*args, **kwargs):
-        if _Cache.cache is None:
-            _Cache.cache = PackageCache()
-        return func(*args, **kwargs)
-
-    return inner
-
-
-class MetaCache(type):
-    @property
-    def cache(cls) -> "PackageCache":
-        return cls._cache
-
-    @cache.setter
-    def cache(cls, cache: "PackageCache") -> None:
-        cls._cache = cache
-
-    def __getitem__(cls, name) -> "DebianPackage":
-        return cls._cache[name]
-
-
-class _Cache(metaclass=MetaCache):
-    _cache = None
 
 
 class Error(Exception):
@@ -125,6 +65,14 @@ class Error(Exception):
         return self.args[0]
 
 
+class PackageError(Error):
+    """Raised when there's an error installing or removing a package."""
+
+
+class PackageNotFoundError(Error):
+    """Raised when a requested package is not known to the system."""
+
+
 class PackageState(Enum):
     """A class to represent possible package states."""
 
@@ -132,10 +80,6 @@ class PackageState(Enum):
     Absent = "absent"
     Latest = "latest"
     Available = "available"
-
-
-class PackageError(Error):
-    """Raised when there's an error installing or removing a package."""
 
 
 class DebianPackage:
@@ -158,7 +102,7 @@ class DebianPackage:
         dpkg.PackageState.Present
         dpkg.PackageState.Latest
 
-      When :class:`PackageCache` is initialized, the state of a given
+      When :class:`DebianPackage` is initialized, the state of a given
       :class:`DebianPackage` object will be set to `Available`, `Present`, or
       `Latest`, with `Absent` implemented as a convenience for removal (though it
       operates essentially the same as `Available`).
@@ -319,6 +263,152 @@ class DebianPackage:
     def fullversion(self) -> str:
         """Returns the name+epoch for a package."""
         return f"{self._version}.{self._arch}"
+
+    @staticmethod
+    def _get_epoch_from_version(version: str) -> Tuple[str, str]:
+        """Pull the epoch, if any, out of a version string."""
+        epoch_matcher = re.compile(r"^((?P<epoch>\d+):)?(?P<version>.*)")
+        matches = epoch_matcher.search(version).groupdict()
+        return matches.get("epoch", ""), matches.get("version")
+
+    @classmethod
+    def from_system(
+        cls, package: str, version: Optional[str] = "", arch: Optional[str] = ""
+    ) -> "DebianPackage":
+        """Locates a package, either on the system or known to apt, and serializes the information.
+
+        Args:
+            package: a string representing the package
+            version: an optional string if a specific version isr equested
+            arch: an optional architecture, defaulting to `dpkg --print-architecture`. If an architecture is not specified, this will be used for selection.
+
+        """
+        try:
+            return DebianPackage.from_installed_package(package, version, arch)
+        except PackageNotFoundError:
+            logger.debug(
+                f"Package {package} is not currently installed or has the wrong architecture."
+            )
+
+        # Ok, try `apt-cache ...`
+        try:
+            return DebianPackage.from_apt_cache(package, version, arch)
+        except (PackageNotFoundError, PackageError):
+            # If we get here, it's not known to the systems.
+            # This seems unnecessary, but virtually all `apt` commands have a return code of `100`, and
+            # providing meaningful error messages without this is ugly.
+            raise PackageNotFoundError(
+                f"Package '{package}{f'.{arch}' if arch else ''}' could not be found on the system or in the apt cache!"
+            ) from None
+
+    @classmethod
+    def from_installed_package(
+        cls, package: str, version: Optional[str] = "", arch: Optional[str] = ""
+    ) -> "DebianPackage":
+        """Check whether the package is already installed and return an instance.
+
+        Args:
+            package: a string representing the package
+            version: an optional string if a specific version isr equested
+            arch: an optional architecture, defaulting to `dpkg --print-architecture`. If an architecture is not specified, this will be used for selection.
+        """
+        system_arch = check_output(
+            ["dpkg", "--print-architecture"], universal_newlines=True
+        ).strip()
+        arch = arch if arch else system_arch
+
+        # Regexps are a really terrible way to do this. Thanks dpkg
+        output = ""
+        try:
+            output = check_output(["dpkg", "-l", package], universal_newlines=True)
+        except CalledProcessError:
+            raise PackageNotFoundError(f"Package is not installed: {package}") from None
+
+        # Pop off the output from `dpkg -l' because there's no flag to
+        # omit it`
+        lines = str(output).splitlines()[5:]
+
+        dpkg_matcher = re.compile(
+            r"""
+        ^(?P<package_status>\w+?)\s+
+        (?P<package_name>.*?)(?P<throwaway_arch>:\w+?)?\s+
+        (?P<version>.*?)\s+
+        (?P<arch>\w+?)\s+
+        (?P<description>.*)
+        """,
+            re.VERBOSE,
+        )
+
+        for line in lines:
+            try:
+                matches = dpkg_matcher.search(line).groupdict()
+                epoch, split_version = DebianPackage._get_epoch_from_version(matches["version"])
+                pkg = DebianPackage(
+                    matches["package_name"],
+                    split_version,
+                    epoch,
+                    matches["arch"],
+                    PackageState.Present,
+                )
+                if pkg.arch == arch and (version == "" or str(pkg.version) == version):
+                    return pkg
+            except AttributeError:
+                logger.warning(f"dpkg matcher could not parse line: {line}")
+
+        # If we didn't find it, fail through
+        raise PackageNotFoundError(f"Package {package}.{arch} is not installed!")
+
+    @classmethod
+    def from_apt_cache(
+        cls, package: str, version: Optional[str] = "", arch: Optional[str] = ""
+    ) -> "DebianPackage":
+        """Check whether the package is already installed and return an instance.
+
+        Args:
+            package: a string representing the package
+            version: an optional string if a specific version isr equested
+            arch: an optional architecture, defaulting to `dpkg --print-architecture`. If an architecture is not specified, this will be used for selection.
+        """
+        system_arch = check_output(
+            ["dpkg", "--print-architecture"], universal_newlines=True
+        ).strip()
+        arch = arch if arch else system_arch
+
+        # Regexps are a really terrible way to do this. Thanks dpkg
+        keys = ("Package", "Architecture", "Version")
+
+        try:
+            output = check_output(["apt-cache", "show", package], universal_newlines=True)
+        except CalledProcessError as e:
+            raise PackageError(f"Could not list packages in apt-cache: {e.output}") from None
+
+        pkg_groups = output.strip().split("\n\n")
+        keys = ("Package", "Architecture", "Version")
+
+        for pkg_raw in pkg_groups:
+            lines = str(pkg_raw).splitlines()
+            vals = {}
+            for line in lines:
+                if line.startswith(keys):
+                    items = line.split(":", 1)
+                    vals[items[0]] = items[1].strip()
+                else:
+                    continue
+
+            epoch, split_version = DebianPackage._get_epoch_from_version(vals["Version"])
+            pkg = DebianPackage(
+                vals["Package"],
+                split_version,
+                epoch,
+                vals["Architecture"],
+                PackageState.Available,
+            )
+
+            if pkg.arch == arch and (version == "" or str(pkg.version) == version):
+                return pkg
+
+        # If we didn't find it, fail through
+        raise PackageNotFoundError(f"Package {package}.{arch} is not in the apt cache!")
 
 
 class Version:
@@ -529,209 +619,14 @@ class Version:
         return not self.__eq__(other)
 
 
-class PackageNotFoundError(Error):
-    """Raised when a requested package is not known to the system."""
-
-
-class PackageCache(Mapping):
-    """An abstraction to represent installed/available packages.
-
-    Instantiating :class:`PackageCache` will parse out the list of
-    available packages from the apt cache, then the list of installed packages
-    from `dpkg -l`, setting the :class:`PackageState` value of the
-    :class:`DebianPackage` objects stored in :class:`PackageState` to
-    `Present` or `Latest`, depending on version comparisons.
-
-    cache = dpkg.PackageCache()
-    vim = cache["vim"]
-    vim.ensure(dpkg.PackageState.Latest)
-    # alternatively
-    vim.state = dpkg.PackageState.Latest
-    """
-
-    def __init__(self):
-        self._package_map = {}
-        self._merge_with_cache(self._generate_packages_from_apt_cache())
-        self._merge_with_cache(self._generate_packages_from_dpkg())
-
-    def __contains__(self, key: str) -> bool:
-        return key in self._package_map
-
-    def __len__(self) -> int:
-        return len(self._package_map)
-
-    def __iter__(self) -> Iterable["DebianPackage"]:
-        return iter(self._package_map.values())
-
-    def __getitem__(self, package_name: str) -> DebianPackage:
-        """Return either the installed version or latest version for a given package."""
-        try:
-            pkgs = self._package_map[package_name]
-        except KeyError:
-            raise PackageNotFoundError(f"package '{package_name}' not found!") from None
-
-        for p in pkgs:
-            if p.state is PackageState.Present:
-                return p
-        else:
-            return pkgs[0]
-
-    def get_all(self, package_name: str) -> List["DebianPackage"]:
-        """Return all known packages for a given package name.
-
-        Args:
-          package_name: the base name of a package
-
-        Returns:
-          A list of packages with that name, sorted by version. The most recent version
-            will be the first value, whether that is the currently installed version or not.
-        """
-        return self._package_map[package_name]
-
-    def _merge_with_cache(self, packages: Dict) -> None:
-        """Update the cache with new packages and reconcile their state."""
-        # Sort by native architecture first
-        sort_order = ["amd64", "aarch64", "arm64", "ppc64", "i386", "all"]
-        for pkg in packages:
-            if pkg in self._package_map:
-                for p in packages[pkg]:
-                    if p.state == PackageState.Present and p in self._package_map[pkg]:
-                        # Since the list is sorted, we know that the first value will
-                        # be the latest version
-                        latest = self._package_map[pkg].index(p) == 0
-                        if latest:
-                            self._package_map[pkg].remove(p)
-                            p._state = PackageState.Latest
-
-                # Don't get duplicates in the list in case `dpkg -l` and `apt cache` have the
-                # same entries which don't match above
-                unique = list(set(packages[pkg]) | set(self._package_map[pkg]))
-
-                if len(unique) > 1:
-                    unique = unique.sort(
-                        key=lambda x: (-sort_order.index(x.arch), x.version), reverse=True
-                    )
-
-                self._package_map[pkg] = unique
-            else:
-                # If the key isn't already in the map, then we've received a list of packages
-                # with the same name but different architectures. No need to sort on version
-                if len(packages[pkg]) > 1:
-                    # Sort by architecture
-                    packages[pkg].sort(
-                        key=lambda x: (-sort_order.index(x.arch), x.version), reverse=True
-                    )
-                self._package_map[pkg] = packages[pkg]
-
-    @staticmethod
-    def _chunk_apt_caches(file: TextIOWrapper) -> str:
-        """Break an apt cache file into manageable chunksself.
-
-        Args:
-            file: a :class:`Path` object representing the file to read.
-        """
-        package_block = ""
-
-        for line in file:
-            if not line.strip() and package_block:
-                yield package_block
-                package_block = ""
-            package_block += line
-        yield package_block
-
-    def _generate_packages_from_apt_cache(self) -> Dict:
-        """Add the list of packages apt-cache knows about to the map."""
-        pkgs = {}
-        keys = ("Package", "Architecture", "Version")
-
-        for f in Path("/var/lib/apt/lists").glob("*binary*"):
-            with f.open() as filedata:
-                for pkg_raw in self._chunk_apt_caches(filedata):
-                    lines = str(pkg_raw).splitlines()
-                    vals = {}
-                    for line in lines:
-                        if line.startswith(keys):
-                            items = line.split(":", 1)
-                            vals[items[0]] = items[1].strip()
-                        else:
-                            continue
-
-                    epoch, version = self._get_epoch_from_version(vals["Version"])
-                    pkg = DebianPackage(
-                        vals["Package"],
-                        version,
-                        epoch,
-                        vals["Architecture"],
-                        PackageState.Available,
-                    )
-
-                    if vals["Package"] in pkgs:
-                        pkgs[vals["Package"]].append(pkg)
-                    else:
-                        pkgs[vals["Package"]] = [pkg]
-
-        return pkgs
-
-    @staticmethod
-    def _get_epoch_from_version(version: str) -> Tuple[str, str]:
-        """Pull the epoch, if any, out of a version string."""
-        epoch_matcher = re.compile(r"^((?P<epoch>\d+):)?(?P<version>.*)")
-        matches = epoch_matcher.search(version).groupdict()
-        return matches.get("epoch", ""), matches.get("version")
-
-    def _generate_packages_from_dpkg(self) -> Dict:
-        """Parse the list of installed packages into the cache."""
-        output = ""
-        try:
-            output = check_output(["dpkg", "-l"], universal_newlines=True)
-        except CalledProcessError as e:
-            raise PackageError(f"Could not list packages: {e.output}") from None
-
-        # Pop off the output from `dpkg -l' because there's no flag to
-        # omit it`
-        lines = str(output).splitlines()[5:]
-
-        # Regexps are a really terrible way to do this. Thanks dpkg
-        dpkg_matcher = re.compile(
-            r"""
-        ^(?P<package_status>\w+?)\s+
-        (?P<package_name>.*?)(?P<throwaway_arch>:\w+?)?\s+
-        (?P<version>.*?)\s+
-        (?P<arch>\w+?)\s+
-        (?P<description>.*)
-        """,
-            re.VERBOSE,
-        )
-
-        pkgs = {}
-        for line in lines:
-            matches = dpkg_matcher.search(line).groupdict()
-            epoch, version = self._get_epoch_from_version(matches["version"])
-            pkg = DebianPackage(
-                matches["package_name"],
-                version,
-                epoch,
-                matches["arch"],
-                PackageState.Present,
-            )
-
-            if matches["package_name"] in pkgs:
-                pkgs[matches["package_name"]].append(pkg)
-            else:
-                pkgs[matches["package_name"]] = [pkg]
-
-        return pkgs
-
-
-@_cache_init
 def add_package(
     package_names: Union[str, List[str]],
     version: Optional[str] = "",
+    arch: Optional[str] = "",
 ) -> List[DebianPackage]:
     """Add a package or list of packages to the system.
     Args:
         name: the name(s) of the package(s)
-        state: a string or :class:`PackageState` representation of the desired state, one of [`lresent` or `latest`] as a string
         version: an (Optional) version as a string. Defaults to the latest known.
     Raises:
         PackageNotFoundError if the package is not in the cache.
@@ -756,29 +651,17 @@ def add_package(
 def _add(
     name: str,
     version: Optional[str] = "",
+    arch: Optional[str] = "",
 ) -> DebianPackage:
     """Adds a package."""
-    try:
-        if version:
-            found = False
-            for p in _Cache.cache.get_all(name):
-                if str(p.version) == version:
-                    found = True
-                    pkg = p
-                    break
-            if not found:
-                raise PackageNotFoundError(f"package '{name}' is unknown!!") from None
-        else:
-            pkg = _Cache[name]
-        pkg.ensure(state=PackageState.Present)
-        return pkg
-    except KeyError:
-        raise PackageNotFoundError(f"package '{name}' is unknown!!") from None
+    pkg = DebianPackage.from_system(name, version, arch)
+    pkg.ensure(state=PackageState.Present)
+    return pkg
 
 
-@_cache_init
 def remove_package(package_names: Union[str, List[str]]) -> List[DebianPackage]:
     """Removes a package from the system.
+
     Args:
         name: the name of a package
     Raises:
@@ -792,402 +675,15 @@ def remove_package(package_names: Union[str, List[str]]) -> List[DebianPackage]:
 
     for p in package_names:
         try:
-            pkg = _Cache[p]
+            pkg = DebianPackage.from_installed_package(p)
             pkg.ensure(state=PackageState.Absent)
             packages.append(pkg)
-        except KeyError:
-            raise PackageNotFoundError(f"package '{p}' is unknown!!") from None
+        except PackageNotFoundError:
+            logger.info(f"Package {p} was requested for removal, but it was not installed.")
 
     return packages
 
 
-VALID_SOURCE_TYPES = ("deb", "deb-src")
-
-
-class InvalidSourceError(Error):
-    """Exceptions for invalid source entries."""
-
-
-class GPGKeyError(Error):
-    """Exceptions for GPG keys."""
-
-
-class DebianMapping:
-    """An abstraction to represent a repository."""
-
-    def __init__(
-        self,
-        enabled: bool,
-        repotype: str,
-        uri: str,
-        release: str,
-        groups: List[str],
-        filename: Optional[str] = "",
-        gpg_key_filename: Optional[str] = "",
-    ):
-        self._enabled = enabled
-        self._repotype = repotype
-        self._uri = uri
-        self._release = release
-        self._groups = groups
-        self._filename = filename
-        self._gpg_key_filename = gpg_key_filename
-
-    @property
-    def enabled(self):
-        """Return whether or not the repository is enabled."""
-        return self._enabled
-
-    @property
-    def repotype(self):
-        """Return whether it is binary or source."""
-        return self._repotype
-
-    @property
-    def uri(self):
-        """Return the URI."""
-        return self._uri
-
-    @property
-    def release(self):
-        """Return which Debian/Ubuntu releases it is valid for."""
-        return self._release
-
-    @property
-    def groups(self):
-        """Return the enabled package groups."""
-        return self._groups
-
-    @property
-    def filename(self):
-        """Returns the filename for a repository."""
-        return self._filename
-
-    @property
-    def gpg_key(self):
-        """Returns the path to the GPG key for this repository."""
-        return self._gpg_key_filename
-
-    @classmethod
-    def from_repo_line(cls, repo_line: str, write_file: Optional[bool] = True) -> "DebianMapping":
-        """Instantiate a new :class:`DebianRepository` a `sources.list` entry line.
-
-        Args:
-            repo_line: a string representing a repository entry
-        """
-        repo = RepositoryMapping._parse(repo_line, "UserInput")
-        fname = f"{urlparse(repo.uri).path.replace('/', '-')}-{repo.release}.list"
-
-        if write_file:
-            with open(fname, "wb") as f:
-                f.write(
-                    f"{'#' if not repo.enabled else ''}"
-                    f"{f'[signed-by={repo.gpg_key}]' if repo.gpg_key else ''}{repo.repotype} "
-                    f"{repo.uri} {repo.release} {' '.join(repo.groups)}\n".encode("utf-8")
-                )
-
-        return repo
-
-    def disable(self) -> None:
-        """Remove this repository from consideration. Disable it instead of removing from the repository file."""
-        searcher = f"{self.repotype} {f'[signed-by={self.gpg_key}]' if self.gpg_key else ''}{self.uri} {self.release}"
-        for line in fileinput.input(self._filename, inplace=True):
-            if re.match(rf"^{re.escape(searcher)}\s", line):
-                print(f"# {line}", end="")
-            else:
-                print(line, end="")
-
-    def import_key(self, key: str) -> None:
-        """Import an ASCII Armor key.
-        A Radix64 format keyid is also supported for backwards
-        compatibility. In this case Ubuntu keyserver will be
-        queried for a key via HTTPS by its keyid. This method
-        is less preferrable because https proxy servers may
-        require traffic decryption which is equivalent to a
-        man-in-the-middle attack (a proxy server impersonates
-        keyserver TLS certificates and has to be explicitly
-        trusted by the system).
-
-        Args:
-          key: A GPG key in ASCII armor format,
-                      including BEGIN and END markers or a keyid.
-
-        Raises:
-          GPGKeyError if the key could not be imported
-        """
-        key = key.strip()
-        if "-" in key or "\n" in key:
-            # Send everything not obviously a keyid to GPG to import, as
-            # we trust its validation better than our own. eg. handling
-            # comments before the key.
-            logger.debug("PGP key found (looks like ASCII Armor format)")
-            if (
-                "-----BEGIN PGP PUBLIC KEY BLOCK-----" in key
-                and "-----END PGP PUBLIC KEY BLOCK-----" in key
-            ):
-                logger.debug("Writing provided PGP key in the binary format")
-                key_bytes = key.encode("utf-8")
-                key_name = self._get_keyid_by_gpg_key(key_bytes)
-                key_gpg = self._dearmor_gpg_key(key_bytes)
-                self._gpg_key_filename = f"/etc/apt/trusted.gpg.d/{key_name}.gpg"
-                self._write_apt_gpg_keyfile(key_name=key_name, key_material=key_gpg)
-            else:
-                raise GPGKeyError("ASCII armor markers missing from GPG key")
-        else:
-            logger.warning(
-                "PGP key found (looks like Radix64 format). "
-                "SECURELY importing PGP key from keyserver; "
-                "full key not provided."
-            )
-            # as of bionic add-apt-repository uses curl with an HTTPS keyserver URL
-            # to retrieve GPG keys. `apt-key adv` command is deprecated as is
-            # apt-key in general as noted in its manpage. See lp:1433761 for more
-            # history. Instead, /etc/apt/trusted.gpg.d is used directly to drop
-            # gpg
-            key_asc = self._get_key_by_keyid(key)
-            # write the key in GPG format so that apt-key list shows it
-            key_gpg = self._dearmor_gpg_key(key_asc.encode("utf-8"))
-            self._gpg_key_filename = f"/etc/apt/trusted.gpg.d/{key}.gpg"
-            self._write_apt_gpg_keyfile(key_name=key, key_material=key_gpg)
-
-    @staticmethod
-    def _get_keyid_by_gpg_key(key_material: bytes) -> str:
-        """Get a GPG key fingerprint by GPG key material.
-        Gets a GPG key fingerprint (40-digit, 160-bit) by the ASCII armor-encoded
-        or binary GPG key material. Can be used, for example, to generate file
-        names for keys passed via charm options.
-        """
-        # Use the same gpg command for both Xenial and Bionic
-        cmd = ["gpg", "--with-colons", "--with-fingerprint"]
-        ps = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            stdin=subprocess.PIPE,
-            universal_newlines=True,
-        )
-        out, err = ps.communicate(input=str(key_material))
-        if "gpg: no valid OpenPGP data found." in err:
-            raise GPGKeyError("Invalid GPG key material provided")
-        # from gnupg2 docs: fpr :: Fingerprint (fingerprint is in field 10)
-        return re.search(r"^fpr:{9}([0-9A-F]{40}):$", out, re.MULTILINE).group(1)
-
-    @staticmethod
-    def _get_key_by_keyid(keyid: str) -> str:
-        """Get a key via HTTPS from the Ubuntu keyserver.
-        Different key ID formats are supported by SKS keyservers (the longer ones
-        are more secure, see "dead beef attack" and https://evil32.com/). Since
-        HTTPS is used, if SSLBump-like HTTPS proxies are in place, they will
-        impersonate keyserver.ubuntu.com and generate a certificate with
-        keyserver.ubuntu.com in the CN field or in SubjAltName fields of a
-        certificate. If such proxy behavior is expected it is necessary to add the
-        CA certificate chain containing the intermediate CA of the SSLBump proxy to
-        every machine that this code runs on via ca-certs cloud-init directive (via
-        cloudinit-userdata model-config) or via other means (such as through a
-        custom charm option). Also note that DNS resolution for the hostname in a
-        URL is done at a proxy server - not at the client side.
-        8-digit (32 bit) key ID
-        https://keyserver.ubuntu.com/pks/lookup?search=0x4652B4E6
-        16-digit (64 bit) key ID
-        https://keyserver.ubuntu.com/pks/lookup?search=0x6E85A86E4652B4E6
-        40-digit key ID:
-        https://keyserver.ubuntu.com/pks/lookup?search=0x35F77D63B5CEC106C577ED856E85A86E4652B4E6
-
-        Args:
-          keyid: An 8, 16 or 40 hex digit keyid to find a key for
-
-        Returns:
-          A string contining key material for the specified GPG key id
-
-
-        Raises:
-          subprocess.CalledProcessError
-        """
-        # options=mr - machine-readable output (disables html wrappers)
-        keyserver_url = (
-            "https://keyserver.ubuntu.com" "/pks/lookup?op=get&options=mr&exact=on&search=0x{}"
-        )
-        curl_cmd = ["curl", keyserver_url.format(keyid)]
-        # use proxy server settings in order to retrieve the key
-        return check_output(curl_cmd)
-
-    @staticmethod
-    def _dearmor_gpg_key(key_asc: bytes) -> str:
-        """Converts a GPG key in the ASCII armor format to the binary format.
-
-        Args:
-          key_asc: A GPG key in ASCII armor format.
-
-        Returns:
-          A GPG key in binary format as a string
-
-        Raises:
-          GPGKeyError
-        """
-        ps = subprocess.Popen(
-            ["gpg", "--dearmor"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            stdin=subprocess.PIPE,
-            universal_newlines=True,
-        )
-        out, err = ps.communicate(input=str(key_asc))
-        if "gpg: no valid OpenPGP data found." in err:
-            raise GPGKeyError(
-                "Invalid GPG key material. Check your network setup"
-                " (MTU, routing, DNS) and/or proxy server settings"
-                " as well as destination keyserver status."
-            )
-        else:
-            return out
-
-    @staticmethod
-    def _write_apt_gpg_keyfile(key_name: str, key_material: str) -> None:
-        """Writes GPG key material into a file at a provided path.
-
-        Args:
-          key_name: A key name to use for a key file (could be a fingerprint)
-          key_material: A GPG key material (binary)
-        """
-        with open(key_name, "wb") as keyf:
-            keyf.write(key_material.encode("utf-8"))
-
-
-class RepositoryMapping(Mapping):
-    """An representation of known repositories.
-
-    Instantiation of :class:`RepositoryMapping` will iterate through the
-    filesystem, parse out repository files in `/etc/apt/...`, and create
-    :class:`DebianRepository` objects in this list.
-
-    Typical usage:
-      repositories = dpkg.RepositoryMapping()
-      repositories.add(DebianRepository(
-        enabled=True, repotype="deb", uri="https://example.com", release="focal",
-        groups=["universe"]
-      ))
-    """
-
-    def __init__(self):
-        self._repository_map = {}
-        # Repositories that we're adding -- used to implement mode param
-        self.default_file = "/etc/apt/sources.list"
-
-        # read sources.list if it exists
-        if os.path.isfile(self.default_file):
-            self.load(self.default_file)
-
-        # read sources.list.d
-        for file in glob.iglob("/etc/apt/sources.list.d/*.list"):
-            self.load(file)
-
-    def __contains__(self, key: str) -> bool:
-        return key in self._repository_map
-
-    def __len__(self) -> int:
-        return len(self._repository_map)
-
-    def __iter__(self) -> Iterable[DebianMapping]:
-        return iter(self._repository_map.values())
-
-    def __getitem__(self, repository_uri: str) -> DebianMapping:
-        """Return a given :class:`DebianRepository`."""
-        return self._repository_map[repository_uri]
-
-    def __setitem__(self, repository_uri: str, repository: DebianMapping) -> None:
-        """Add a :class:`DebianRepository` to the cache."""
-        self._repository_map[repository_uri] = repository
-
-    def load(self, file: str):
-        """Load a repository source file into the cache.
-
-        Args:
-          file: the path to the repository file
-        """
-        f = open(file, "r")
-        for n, line in enumerate(f):
-            repo = self._parse(line, file)
-            self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo
-
-    @staticmethod
-    def _parse(line: str, filename: str) -> DebianMapping:
-        """Parse a line in a sources.list file.
-
-        Args:
-          line: a single line from `load` to parse
-          filename: the filename being read
-
-        Raises:
-          InvalidSoureError if the source type is unknown
-        """
-        enabled = True
-        repotype = uri = release = gpg_key = ""
-        groups = []
-
-        line = line.strip()
-        if line.startswith("#"):
-            enabled = False
-            line = line[1:]
-
-        # Check for another "#" in the line and treat a part after it as a comment, then strip it off.
-        i = line.find("#")
-        if i > 0:
-            line = line[:i]
-
-        # Split a source into substrings to initialize a new repo.
-        source = line.strip()
-        if source:
-            chunks = source.split()
-            if chunks[0] not in VALID_SOURCE_TYPES:
-                raise InvalidSourceError("An invalid sources line was found in %s!", filename)
-            if "[signed-by" in chunks[1]:
-                gpg_key = re.sub(r"\[signed-by=(.*?)]", r"\1", chunks[1])
-                del chunks[1]
-            repotype = chunks[0]
-            uri = chunks[1]
-            release = chunks[2]
-            groups = chunks[3:]
-
-        return DebianMapping(enabled, repotype, uri, release, groups, filename, gpg_key)
-
-    def add(self, repo: DebianMapping, default_filename: Optional[bool] = True) -> None:
-        """Add a new repository to the system.
-
-        Args:
-          repo: a :class:`DebianRepository` object
-          default_filename: an (Optional) filename if the default is not desirable
-        """
-        if repo.filename and default_filename:
-            logger.error(
-                "Cannot add a repository with a default filename and a "
-                "filename set in the `DebianRepository` object"
-            )
-
-        new_filename = f"{urlparse(repo.uri).path.replace('/', '-')}-{repo.release}.list"
-
-        fname = repo.filename or new_filename
-
-        with open(fname, "wb") as f:
-            f.write(
-                f"{'#' if not repo.enabled else ''}"
-                f"{f'[signed-by={repo.gpg_key}]' if repo.gpg_key else ''}{repo.repotype} "
-                f"{repo.uri} {repo.release} {' '.join(repo.groups)}\n".encode("utf-8")
-            )
-
-        self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo
-
-    def disable(self, repo: DebianMapping) -> None:
-        """Remove a repository. Disable by default.
-
-        Args:
-          repo: a :class:`DebianRepository` to disable
-        """
-        searcher = f"{repo.repotype} {f'[signed-by={repo.gpg_key}]' if repo.gpg_key else ''} {repo.uri} {repo.release}"
-
-        for line in fileinput.input(repo.filename, inplace=True):
-            if re.match(rf"^{re.escape(searcher)}\s", line):
-                print(f"# {line}", end="")
-            else:
-                print(line, end="")
-
-        self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo
+def update_cache() -> None:
+    """Updates the apt cache via `apt-get update`."""
+    subprocess.check_call(["apt-get", "update"])
