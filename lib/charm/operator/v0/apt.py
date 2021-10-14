@@ -30,17 +30,14 @@ Typical usage example:
 
 import fileinput
 import glob
-from io import TextIOWrapper
 import logging
 import os
 import re
 import subprocess
 
 from collections.abc import Mapping
-from enum import Enum
-from pathlib import Path
-from subprocess import check_call, check_output, CalledProcessError
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from subprocess import check_output
+from typing import Iterable, List, Optional
 from urllib.parse import urlparse
 
 
