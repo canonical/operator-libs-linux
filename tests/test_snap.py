@@ -246,23 +246,24 @@ class TestSnapCache(unittest.TestCase):
         foo2 = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
         self.assertEqual(foo1, foo2)
 
-    @patch("lib.charm.operator.v0.snap.subprocess.check_call")
+    @patch("lib.charm.operator.v0.snap.subprocess.check_output")
     def test_can_run_snap_commands(self, mock_subprocess):
         mock_subprocess.return_value = 0
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
         self.assertEqual(foo.present, True)
 
         foo.ensure(snap.SnapState.Absent)
-        mock_subprocess.assert_called_with(["snap", "remove", "foo"])
+        mock_subprocess.assert_called_with(["snap", "remove", "foo"], universal_newlines=True)
 
         foo.ensure(snap.SnapState.Latest, classic=True, channel="latest/edge")
         mock_subprocess.assert_called_with(
-            ["snap", "install", "foo", "--classic", '--channel="latest/edge"']
+            ["snap", "install", "foo", "--classic", '--channel="latest/edge"'],
+            universal_newlines=True,
         )
         self.assertEqual(foo.latest, True)
 
         foo.state = snap.SnapState.Absent
-        mock_subprocess.assert_called_with(["snap", "remove", "foo"])
+        mock_subprocess.assert_called_with(["snap", "remove", "foo"], universal_newlines=True)
 
 
 class TestSocketClient(unittest.TestCase):
@@ -296,30 +297,31 @@ class TestSnapBareMethods(unittest.TestCase):
         snap._Cache.cache._load_installed_snaps()
         snap._Cache.cache._load_available_snaps()
 
-    @patch("lib.charm.operator.v0.snap.subprocess.check_call")
+    @patch("lib.charm.operator.v0.snap.subprocess.check_output")
     def test_can_run_bare_changes(self, mock_subprocess):
         mock_subprocess.return_value = 0
         foo = snap.add("curl", classic=True, channel="latest")
         mock_subprocess.assert_called_with(
-            ["snap", "install", "curl", "--classic", '--channel="latest"']
+            ["snap", "install", "curl", "--classic", '--channel="latest"'], universal_newlines=True
         )
         self.assertEqual(foo.present, True)
 
         bar = snap.remove("curl")
-        mock_subprocess.assert_called_with(["snap", "remove", "curl"])
+        mock_subprocess.assert_called_with(["snap", "remove", "curl"], universal_newlines=True)
         self.assertEqual(bar.present, False)
 
-    @patch("lib.charm.operator.v0.snap.subprocess.check_call")
+    @patch("lib.charm.operator.v0.snap.subprocess.check_output")
     def test_can_ensure_states(self, mock_subprocess):
         mock_subprocess.return_value = 0
         foo = snap.ensure("curl", "latest", classic=True, channel="latest/test")
         mock_subprocess.assert_called_with(
-            ["snap", "install", "curl", "--classic", '--channel="latest/test"']
+            ["snap", "install", "curl", "--classic", '--channel="latest/test"'],
+            universal_newlines=True,
         )
         self.assertEqual(foo.present, True)
 
         bar = snap.ensure("curl", "absent")
-        mock_subprocess.assert_called_with(["snap", "remove", "curl"])
+        mock_subprocess.assert_called_with(["snap", "remove", "curl"], universal_newlines=True)
         self.assertEqual(bar.present, False)
 
     def test_raises_snap_not_found_error(self):

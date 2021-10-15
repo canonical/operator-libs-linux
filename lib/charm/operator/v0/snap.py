@@ -173,7 +173,7 @@ class Snap(object):
             str(self._state),
         )
 
-    def _snap(self, command: str, optargs: Optional[List[str]] = None) -> None:
+    def _snap(self, command: str, optargs: Optional[List[str]] = None) -> str:
         """Perform a snap operation.
 
         Args:
@@ -187,9 +187,34 @@ class Snap(object):
         optargs = optargs if optargs is not None else []
         _cmd = ["snap", command, self._name, *optargs]
         try:
-            subprocess.check_call(_cmd)
+            return subprocess.check_output(_cmd, universal_newlines=True)
         except CalledProcessError as e:
             raise SnapError("Could not %s snap [%s]: %s", _cmd, self._name, e.output)
+
+    def get(self, key) -> str:
+        """Gets a snap configuration value.
+
+        Args:
+            key: the key to retrieve
+        """
+        return self._snap("get", [key])
+
+    def set(self, key, value) -> str:
+        """Sets a snap configuration value.
+
+        Args:
+            key: the key to retrieve
+            value: the value to set it to
+        """
+        return self._snap("get", [key, value])
+
+    def unset(self, key) -> str:
+        """Unsets a snap configuration value.
+
+        Args:
+            key: the key to unset
+        """
+        return self._snap("unset", [key])
 
     def _install(self, channel: Optional[str] = "") -> None:
         """Add a snap to the system.
@@ -605,3 +630,34 @@ def _wrap_snap_operations(
         )
 
     return snaps["success"] if len(snaps["success"]) > 1 else snaps["success"][0]
+
+
+def install_local(
+    self, filename: str, classic: Optional[bool] = False, dangerous: Optional[bool] = False
+) -> Snap:
+    """Perform a snap operation.
+
+    Args:
+        filename: the path to a local .snap file to install
+        classic: whether to use classic confinement
+        dangerous: whether --dangerous should be passed to install snaps without a signature
+
+    Raises:
+        SnapError if there is a problem encountered
+    """
+    _cmd = [
+        "snap",
+        "install",
+        filename,
+        "--classic" if classic else "",
+        "--dangerous" if dangerous else "",
+    ]
+    try:
+        result = subprocess.check_output(_cmd, universal_newlines=True).splitlines()[0]
+        snap_name, _ = result.split(" ", 1)
+
+        c = SnapCache()
+
+        return c[snap_name]
+    except CalledProcessError as e:
+        raise SnapError("Could not install snap [%s]: %s", _cmd, filename, e.output)
