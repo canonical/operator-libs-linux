@@ -624,7 +624,7 @@ def add_package(
     version: Optional[str] = "",
     arch: Optional[str] = "",
     update_cache: Optional[bool] = False,
-) -> List[DebianPackage]:
+) -> Union[DebianPackage, List[DebianPackage]]:
     """Add a package or list of packages to the system.
     Args:
         name: the name(s) of the package(s)
@@ -655,7 +655,7 @@ def add_package(
         if success:
             packages["success"].append(pkg)
         else:
-            logger.warn(f"Failed to locate and install/update {pkg}!")
+            logger.warning(f"Failed to locate and install/update {pkg}!")
             packages["retry"].append(p)
 
     if packages["retry"] and not cache_refreshed:
@@ -672,7 +672,7 @@ def add_package(
     if packages["failed"]:
         raise PackageError(f"Failed to install packages: {', '.join(packages['failed'])}")
 
-    return packages["success"]
+    return packages["success"] if len(packages["success"]) > 1 else packages["success"][0]
 
 
 def _add(
@@ -697,7 +697,9 @@ def _add(
         return name, False
 
 
-def remove_package(package_names: Union[str, List[str]]) -> List[DebianPackage]:
+def remove_package(
+    package_names: Union[str, List[str]]
+) -> Union[DebianPackage, List[DebianPackage]]:
     """Removes a package from the system.
 
     Args:
@@ -719,7 +721,7 @@ def remove_package(package_names: Union[str, List[str]]) -> List[DebianPackage]:
         except PackageNotFoundError:
             logger.info(f"Package {p} was requested for removal, but it was not installed.")
 
-    return packages
+    return packages if len(packages) > 1 else packages[0]
 
 
 def update() -> None:

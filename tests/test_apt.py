@@ -287,7 +287,7 @@ class TestAptBareMethods(unittest.TestCase):
             apt_cache_aisleriot,
         ]
 
-        foo = apt.add_package("aisleriot")[0]
+        foo = apt.add_package("aisleriot")
         mock_subprocess.assert_called_with(
             [
                 "apt-get",
@@ -300,7 +300,7 @@ class TestAptBareMethods(unittest.TestCase):
         self.assertEqual(foo.present, True)
 
         mock_subprocess_output.side_effect = ["amd64", dpkg_output_zsh]
-        bar = apt.remove_package("zsh")[0]
+        bar = apt.remove_package("zsh")
         bar.ensure(apt.PackageState.Absent)
         mock_subprocess.assert_called_with(["apt-get", "-y", "remove", "zsh=5.8-3ubuntu1"])
         self.assertEqual(bar.present, False)
@@ -365,7 +365,7 @@ class TestAptBareMethods(unittest.TestCase):
             "amd64",
             apt_cache_aisleriot,
         ]
-        pkg = apt.add_package("aisleriot")[0]
+        pkg = apt.add_package("aisleriot")
         mock_subprocess.assert_any_call(["apt-get", "update"])
         self.assertEqual(pkg.name, "aisleriot")
         self.assertEqual(pkg.present, True)
