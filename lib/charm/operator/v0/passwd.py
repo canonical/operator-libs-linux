@@ -14,23 +14,22 @@
 
 """Representations of the system's users and groups, and abstractions around managing them.
 
-In the `passwd` module, :class:`UserCache` creates a dict-like mapping of
-:class:`User` objects at instantiation, and :class:`GroupCache` does the same for groups.
-Users and groups are fully populated, referencing the object types of both.
-
-Groups are initialized upon instantiation of `UserCache` if this is not already done.
+In the `passwd` module, :class:`Passwd` creates dictionaries of :class:`User` and
+:class:`Group` objects accessible by plain :str: keys, and exposed as properties on
+`Passwd.groups` and `Passwd.users`. Users and groups are fully populated, referencing
+the object types of both
 
 Typical usage:
+  import passwd
   try:
-      user.add("test", )
+      passwd.add_user("test", )
   except UserError as e:
       logger.error(e.message)
 
   ##############################
-  cache = passwd.UserCache()
   try:
-      snap = cache["snap"]
-      snap.ensure(passwd.UserState.NoLogin)
+      snap_user = passwd.Passwd().users["snap"]
+      snap_user.ensure(passwd.UserState.NoLogin)
   except UserNotFoundError:
       logger.error("User snap not found!")
 """
@@ -40,35 +39,13 @@ import logging
 import re
 import subprocess
 
-from abc import ABCMeta
-from collections.abc import Mapping
+from collections import UserDict
 from enum import Enum
 from subprocess import CalledProcessError
-from typing import Iterable, List, Optional, Union
+from typing import List, Optional, Union
 
 
 logger = logging.getLogger(__name__)
-
-
-def _cache_init(func):
-    """Warm all of the caches in the correct order if it isn't already done."""
-
-    def inner(*args, **kwargs):
-        _GROUP_CACHE = GroupCache()
-        _USER_CACHE = UserCache()
-        _GROUP_CACHE.realize_users()
-        return func(*args, **kwargs)
-
-    return inner
-
-
-class Singleton(ABCMeta):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
 
 
 class Error(Exception):
@@ -105,6 +82,14 @@ class UserNotFoundError(Error):
     """Raised when a requested user is not known to the system."""
 
 
+class GroupError(Error):
+    """Raised when there's an error managing a user account."""
+
+
+class GroupNotFoundError(Error):
+    """Raised when a requested group is not known to the system."""
+
+
 class User(object):
     """Represents a user and its properties.
 
@@ -122,11 +107,11 @@ class User(object):
     def __init__(
         self,
         name,
-        uid: int,
-        group: Union[int, "Group"],
-        homedir: str,
-        shell: str,
         state: "UserState",
+        group: Optional[Union[int, "Group"]] = None,
+        homedir: Optional[str] = "",
+        shell: Optional[str] = "",
+        uid: Optional[int] = None,
         gecos: Optional[str] = "",
         groups: Optional[List[Union["str", "Group"]]] = None,
     ) -> None:
@@ -136,11 +121,13 @@ class User(object):
         self._shell = shell
         self._state = state
         self._gecos = gecos
-        self._primary_group = group if type(group) is Group else GroupCache().get_by_gid(group)
+
+        if group:
+            self._primary_group = group if type(group) is Group else Passwd.group_by_gid(group)
+        else:
+            self._primary_group = None
         self._groups = (
-            [g if type(g) is Group else GroupCache().get_by_gid(g) for g in groups]
-            if groups
-            else []
+            [g if type(g) is Group else Passwd.group_by_gid(g) for g in groups] if groups else []
         )
 
     def __hash__(self):
@@ -228,22 +215,22 @@ class User(object):
         except UserNotFoundError as e:
             logger.debug("User {} not found, adding", self.name)
 
+        argbuilder = lambda x, y: [x, y] if y else []
+
         try:
-            args = [
-                "-g",
-                self.primary_group.gid,
-                "-s",
-                self.shell,
-                "-d",
-                self.homedir,
-                "-u",
-                self.uid,
+            args = []
+            params = [
+                ["-g", self.primary_group.gid if self.primary_group else None],
+                ["-s", self.shell],
+                ["-d", self.homedir],
+                ["-u", self.uid],
+                ["-c", self.gecos],
             ]
 
-            if self.gecos:
-                args.append("-c", self.gecos)
+            for p in params:
+                args.extend(argbuilder(p[0], p[1]))
 
-            if self.uid < 1000:
+            if self.uid and self.uid < 1000:
                 args.append("-r")
 
             subprocess.check_call(["useradd", *args, self.name])
@@ -342,65 +329,6 @@ class User(object):
         self._state = state
 
 
-class UserCache(Mapping, metaclass=Singleton):
-    """An abstraction to represent users present on the system.
-
-    When instantiated, :class:`UserCache` iterates through the list of installed
-    enabled users by parsing `/etc/passwd` to get details.
-    """
-
-    def __init__(self, groups: Optional["GroupCache"] = None):
-        self._user_map = {}
-        self._load_users()
-
-    def __contains__(self, key: str) -> bool:
-        return key in self._user_map
-
-    def __len__(self) -> int:
-        return len(self._user_map)
-
-    def __iter__(self) -> Iterable["User"]:
-        return iter(self._user_map.values())
-
-    def __getitem__(self, user_name: str) -> "User":
-        """Return details about a user."""
-        try:
-            return self._user_map[user_name]
-        except KeyError:
-            raise UserNotFoundError(f"User '{user_name}' not found!")
-
-    def _load_users(self) -> None:
-        """Parse /etc/passwd to get information about available passwd."""
-        if not os.path.isfile("/etc/passwd"):
-            raise UserError("/etc/passwd not found on the system!")
-
-        with open("/etc/passwd", "r") as f:
-            for line in f:
-                if line.strip():
-                    self._parse(line)
-
-    def _parse(self, line) -> None:
-        """Get values out of /etc/passwd and turn them into a :class:`User` object to cache."""
-        fields = line.split(":")
-        name = fields[0]
-        uid = int(fields[2])
-        gid = int(fields[3])
-        gecos = fields[4]
-        homedir = fields[5]
-        shell = fields[6].strip()
-
-        state = UserState.NoLogin if shell == "/usr/sbin/nologin" else UserState.Present
-        self._user_map[name] = User(name, uid, gid, homedir, shell, state, gecos)
-
-
-class GroupError(Error):
-    """Raised when there's an error managing a user account."""
-
-
-class GroupNotFoundError(Error):
-    """Raised when a requested group is not known to the system."""
-
-
 class Group(object):
     """Represents a group and its properties.
 
@@ -410,9 +338,11 @@ class Group(object):
         - users: a list of user IDs belonging to the group
     """
 
-    def __init__(self, name: str, gid: int, users: Union[List[str], List[User]]):
+    def __init__(
+        self, name: str, users: Union[List[str], List[User]], gid: Optional[Union[str, int]] = None
+    ):
         self._name = name
-        self._gid = int(gid)
+        self._gid = (gid) if gid else None
         self._users = [user.name if type(user) == User else user for user in users]
 
     def __str__(self) -> str:
@@ -437,60 +367,157 @@ class Group(object):
         """Returns a list of users in the group."""
         return self._users
 
-    @users.setter
-    def users(self, users: List[User]) -> None:
-        """Convert the existing users to the appropriate object types.
+    def add(self) -> None:
+        """Adds a group to the system.
 
-        Args:
-            users: a list of :class:`User` objects to set the group to.
+        Raises:
+            CalledProcessError
         """
-        self._users = users
+        try:
+            subprocess.check_call(["groupadd", "-g", self.gid, self.name])
+        except CalledProcessError as e:
+            raise GroupError(f"Could not add group {self.name}! Reason: {e.output}")
+
+    def remove(self) -> None:
+        """Removes a group from the system.
+
+        Raises:
+            CalledProcessError
+        """
+        try:
+            subprocess.check_call(["groupdel", self.name])
+        except CalledProcessError as e:
+            raise GroupError(f"Could not delete group {self.name}! Reason: {e.output}")
 
 
-class GroupCache(Mapping, metaclass=Singleton):
-    """An abstraction to represent groups present on the system.
+class Users(UserDict):
+    """A very small wrapper so __getitem__ returns nice errors."""
 
-    When instantiated, :class:`GroupCache` iterates through the list of installed
-    enabled users by parsing `/etc/group` to get details.
+    def __getitem__(self, key: str) -> User:
+        """Return a :class:`UserNotFoundError` if it isn't there."""
+        try:
+            return super().__getitem__(key)
+        except KeyError:
+            raise UserNotFoundError(f"User '{key}' not found!")
+
+
+class Groups(UserDict):
+    """A very small wrapper so __getitem__ returns nice errors."""
+
+    def __getitem__(self, key: str) -> Group:
+        """Return a :class:`GroupNotFoundError` if it isn't there."""
+        try:
+            return super().__getitem__(key)
+        except KeyError:
+            raise GroupNotFoundError(f"Group '{key}' not found!")
+
+
+class Passwd:
+    """An abstraction to represent users and groups present on the system.
+
+    When instantiated, :class:`Passwd` parses out /etc/group and /etc/passwd
+    to create abstracted objects.
     """
 
-    def __init__(self, users: Optional[UserCache] = None):
-        self._group_map = {}
+    # Leave these ass class-level so we can hit them with @classmethod
+    _groups = Groups()
+    _users = Users()
+
+    def __init__(self):
         self._load_groups()
-        self._realized = False
+        self._load_users()
+        self._realize_users()
 
-    def __contains__(self, key: str) -> bool:
-        return key in self._group_map
+    @property
+    def users(self) -> Users:
+        """Return a mapping of the users on the system."""
+        return self._users
 
-    def __len__(self) -> int:
-        return len(self._group_map)
+    @property
+    def groups(self) -> Groups:
+        """Return a mapping of the groups on the system."""
+        return self._groups
 
-    def __iter__(self) -> Iterable["Group"]:
-        return iter(self._group_map.values())
+    def _load_users(self) -> None:
+        """Parse /etc/passwd to get information about available passwd."""
+        if not os.path.isfile("/etc/passwd"):
+            raise UserError("/etc/passwd not found on the system!")
 
-    def __getitem__(self, group_name: str) -> "Group":
-        """Return details about a group."""
-        try:
-            return self._group_map[group_name]
-        except KeyError:
-            raise GroupNotFoundError(f"Group '{group_name}' not found!")
+        with open("/etc/passwd", "r") as f:
+            for line in f:
+                if line.strip():
+                    self._parse_passwd_line(line)
 
-    def get_by_gid(self, gid: int) -> "Group":
+    def _parse_passwd_line(self, line) -> None:
+        """Get values out of /etc/passwd and turn them into a :class:`User` object to cache."""
+        fields = line.split(":")
+        name = fields[0]
+        uid = int(fields[2])
+        gid = int(fields[3])
+        gecos = fields[4]
+        homedir = fields[5]
+        shell = fields[6].strip()
+
+        state = UserState.NoLogin if shell == "/usr/sbin/nologin" else UserState.Present
+        self._users[name] = User(
+            name, state, homedir=homedir, shell=shell, uid=uid, group=gid, gecos=gecos
+        )
+
+    @classmethod
+    def group_by_gid(cls, gid: int) -> "Group":
         """Look up a group by group id.
-
         Args:
             gid: an `int` representing the groupid
-
         Raises:
             GroupNotFoundError
         """
-        for group in self._group_map.values():
+        # Make sure we know about groups
+        cls._fetch_groups_for_user()
+
+        for group in cls._groups.values():
             if group.gid == gid:
                 return group
 
         raise GroupNotFoundError(f"Could not find a group with GID {gid}!")
 
-    def add(self, group: Group) -> None:
+    @classmethod
+    def _fetch_groups_for_user(cls) -> Groups:
+        """Retrieve or parse out groups for single-user initialization."""
+        if not cls._groups:
+            cls._load_groups()
+
+        return cls._groups
+
+    @classmethod
+    def _load_groups(cls) -> None:
+        """Parse /etc/group to get information about available groups."""
+
+        if not os.path.isfile("/etc/group"):
+            raise GroupError("/etc/group not found on the system!")
+
+        with open("/etc/group", "r") as f:
+            for line in f:
+                if line.strip():
+                    cls._parse_groups_line(line)
+
+    @classmethod
+    def _parse_groups_line(cls, line) -> None:
+        """Get values out of /etc/group and turn them into a :class:`Group` object to cache."""
+        fields = line.split(":")
+        name = fields[0]
+        gid = int(fields[2])
+        usernames = [u for u in fields[3].strip().split(",") if u]
+        cls._groups[name] = Group(name, usernames, gid=gid)
+
+    def _realize_users(self) -> None:
+        """Map user strings to :class:`User` objects for coherency."""
+        for k, v in self._groups.items():
+            v._users = [
+                self._users[uname] if type(uname) is not User else uname for uname in v.users
+            ]
+            self._groups[k] = v
+
+    def add_group(self, group: Group) -> None:
         """Adds a group to the system.
 
         Args:
@@ -500,33 +527,15 @@ class GroupCache(Mapping, metaclass=Singleton):
             CalledProcessError
         """
         try:
-            subprocess.check_call(["groupadd", "-g", group.gid, group.name])
+            args = ["-g", group.gid] if group.gid else []
+            subprocess.check_call(["groupadd", *args, group.name])
         except CalledProcessError as e:
             raise GroupError(f"Could not add group {self.name}! Reason: {e.output}")
 
-    def _load_groups(self) -> None:
-        """Parse /etc/group to get information about available groups."""
+    def add_user(self, user: User) -> None:
+        """Adds a user to the system.
 
-        if not os.path.isfile("/etc/group"):
-            raise GroupError("/etc/group not found on the system!")
-
-        with open("/etc/group", "r") as f:
-            for line in f:
-                if line.strip():
-                    self._parse(line)
-
-    def _parse(self, line) -> None:
-        """Get values out of /etc/group and turn them into a :class:`Group` object to cache."""
-        fields = line.split(":")
-        name = fields[0]
-        gid = int(fields[2])
-        usernames = [u for u in fields[3].strip().split(",") if u]
-        self._group_map[name] = Group(name, gid, usernames)
-
-    def realize_users(self) -> None:
-        """Map user strings to :class:`User` objects with the cache warmed up."""
-        for k, v in self._group_map.items():
-            v.users = [
-                UserCache()[uname] if type(uname) is not User else uname for uname in v.users
-            ]
-            self._group_map[k] = v
+        Args:
+            user: a :class:`User` object to add
+        """
+        user.ensure(state=UserState.Present)
