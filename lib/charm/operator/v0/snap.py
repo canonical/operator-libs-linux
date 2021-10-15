@@ -23,18 +23,8 @@ HTTP API.
 Typical usage:
   try:
       snap.add("charmcraft", classic=True)
-  except SnapNotFoundError:
-      logger.error("snap charmcraft not found in snap cache!")
   except SnapError as e:
       logger.error(f"An exception occurred when installing charmcraft. Reason: {e.message}")
-
-  ##############################
-  cache = snap.SnapCache()
-  try:
-      juju = cache["juju"]
-      juju.ensure(snap.SnapState.Latest, classic=True, channel="stable")
-  except SnapNotFoundError:
-      logger.error("snap juju not found in snap cache!")
 """
 
 import http.client
@@ -128,6 +118,10 @@ class SnapState(Enum):
 
 class SnapError(Error):
     """Raised when there's an error installing or removing a snap."""
+
+
+class SnapNotFoundError(Error):
+    """Raised when a requested snap is not known to the system."""
 
 
 class Snap(object):
@@ -513,76 +507,101 @@ class SnapCache(Mapping):
         )
 
 
-class SnapNotFoundError(Error):
-    """Raised when a requested snap is not known to the system."""
-
-
 @_cache_init
 def add(
-    name: str,
+    snap_names: Union[str, List[str]],
     state: Union[str, SnapState] = SnapState.Latest,
     channel: Optional[str] = "latest",
     classic: Optional[bool] = False,
-) -> Snap:
+) -> Union[Snap, List[Snap]]:
     """Add a snap to the system.
 
     Args:
-        name: the name of a snap
+        snap_names: the name or names of the snaps to install
         state: a string or :class:`SnapState` representation of the desired state, one of [`Present` or `Latest`]
         channel: an (Optional) channel as a string. Defaults to 'latest'
         classic: an (Optional) boolean specifying whether it should be added with classic confinement. Default `False`
 
     Raises:
-        SnapNotFoundError if the snap is not in the cache.
+        SnapError if some snaps failed to install or were not found.
     """
-    try:
-        snap = _Cache[name]
-        if type(state) is str:
-            state = SnapState(state)
-        snap.ensure(state=state, classic=classic, channel=channel)
-        return snap
-    except KeyError:
-        raise SnapNotFoundError(f"Snap '{name}' not found in cache!")
+    snap_names = [snap_names] if type(snap_names) is str else snap_names
+    if not snap_names:
+        raise TypeError("Expected at least one snap to add, received zero!")
+
+    if type(state) is str:
+        state = SnapState(state)
+
+    return _wrap_snap_operations(snap_names, state, channel, classic)
 
 
 @_cache_init
-def remove(name) -> Snap:
+def remove(snap_names: Union[str, List[str]]) -> Union[Snap, List[Snap]]:
     """Removes a snap from the system.
 
     Args:
-        name: the name of a snap
+        snap_names: the name or names of the snaps to install
 
     Raises:
-        SnapNotFoundError if the snap is not in the cache.
+        SnapError if some snaps failed to install.
     """
-    try:
-        snap = _Cache[name]
-        snap.ensure(state=SnapState.Absent)
-        return snap
-    except KeyError:
-        raise SnapNotFoundError(r"Snap '{}' not found in cache!".format(name))
+    snap_names = [snap_names] if type(snap_names) is str else snap_names
+    if not snap_names:
+        raise TypeError("Expected at least one snap to add, received zero!")
+
+    return _wrap_snap_operations(snap_names, SnapState.Absent, "", False)
 
 
 @_cache_init
 def ensure(
-    name: str,
+    snap_names: Union[str, List[str]],
     state: str,
     channel: Optional[str] = "latest",
     classic: Optional[bool] = False,
-) -> Snap:
+) -> Union[Snap, List[Snap]]:
     """Ensures a snap is in a given state to the system.
 
     Args:
-        name: the name of a snap
+        name: the name(s) of the snaps to operate on
         state: a string representation of the desired state, from :class:`SnapState`
         channel: an (Optional) channel as a string. Defaults to 'latest'
         classic: an (Optional) boolean specifying whether it should be added with classic confinement. Default `False`
 
     Raises:
-        SnapNotFoundError if the snap is not in the cache.
+        SnapError if the snap is not in the cache.
     """
-
     if state in ("present", "latest"):
-        return add(name, SnapState(state), channel, classic)
+        return add(snap_names, SnapState(state), channel, classic)
     else:
-        return remove(name)
+        return remove(snap_names)
+
+
+def _wrap_snap_operations(
+    snap_names: List[str], state: SnapState, channel: str, classic: bool
+) -> Union[Snap, List[Snap]]:
+    """Wrap common operations for bare commands."""
+    snaps = {"success": [], "failed": []}
+
+    op = "remove" if state is SnapState.Absent else "install or refresh"
+
+    for s in snap_names:
+        try:
+            snap = _Cache[s]
+            if state is SnapState.Absent:
+                snap.ensure(state=SnapState.Absent)
+            else:
+                snap.ensure(state=state, classic=classic, channel=channel)
+            snaps["success"].append(snap)
+        except SnapError as e:
+            logger.warning(f"Failed to {op} snap {s}: {e.message}!")
+            snaps["failed"].append(s)
+        except SnapNotFoundError:
+            logger.warning(f"Snap '{s}' not found in cache!")
+            snaps["failed"].append(s)
+
+    if len(snaps["failed"]):
+        raise SnapError(
+            f"Failed to install or refresh snap(s): {', '.join([s for s in snaps['failed']])}"
+        )
+
+    return snaps["success"] if len(snaps["success"]) > 1 else snaps["success"][0]

@@ -323,7 +323,7 @@ class TestSnapBareMethods(unittest.TestCase):
         self.assertEqual(bar.present, False)
 
     def test_raises_snap_not_found_error(self):
-        with self.assertRaises(snap.SnapNotFoundError) as ctx:
+        with self.assertRaises(snap.SnapError) as ctx:
             snap.add("nothere")
-        self.assertEqual("<lib.charm.operator.v0.snap.SnapNotFoundError>", ctx.exception.name)
-        self.assertIn("Snap 'nothere' not found", ctx.exception.message)
+        self.assertEqual("<lib.charm.operator.v0.snap.SnapError>", ctx.exception.name)
+        self.assertIn("Failed to install or refresh snap(s): nothere", ctx.exception.message)
