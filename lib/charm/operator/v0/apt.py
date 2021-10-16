@@ -40,9 +40,8 @@ import re
 import subprocess
 
 from enum import Enum
-from pathlib import Path
 from subprocess import check_output, CalledProcessError
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 
 logger = logging.getLogger(__name__)
@@ -97,10 +96,10 @@ class DebianPackage:
       Installation and removal of packages is handled through the `state` property
       or `ensure` method, with the following options:
 
-        dpkg.PackageState.Absent
-        dpkg.PackageState.Available
-        dpkg.PackageState.Present
-        dpkg.PackageState.Latest
+        apt.PackageState.Absent
+        apt.PackageState.Available
+        apt.PackageState.Present
+        apt.PackageState.Latest
 
       When :class:`DebianPackage` is initialized, the state of a given
       :class:`DebianPackage` object will be set to `Available`, `Present`, or
