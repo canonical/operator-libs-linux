@@ -82,13 +82,13 @@ class TestPasswd(TestCase):
         p = passwd.Passwd()
 
         u = p.users["systemd-coredump"]
-        u.ensure(passwd.UserState.Disabled)
+        u.ensure_state(passwd.UserState.Disabled)
         mock_subprocess.assert_called_with(["usermod", "-L", u.name])
         print(open("/etc/passwd").readlines())
-        u.ensure(passwd.UserState.NoLogin)
+        u.ensure_state(passwd.UserState.NoLogin)
 
         v = p.users["testuser"]
-        v.ensure(passwd.UserState.NoLogin)
+        v.ensure_state(passwd.UserState.NoLogin)
         mock_subprocess.assert_called_with(["usermod", "-s", "/sbin/nologin", v.name])
 
     @patch("lib.charm.operator.v0.passwd.subprocess.check_call")
@@ -107,7 +107,7 @@ class TestPasswd(TestCase):
             homedir="/home/foo",
             shell="/usr/bin/bash",
         )
-        u.ensure(u.state)
+        u.ensure_state(u.state)
         mock_subprocess.assert_called_with(
             ["useradd", "-g", 1001, "-s", "/usr/bin/bash", "-d", "/home/foo", "-u", 1001, "foo"]
         )

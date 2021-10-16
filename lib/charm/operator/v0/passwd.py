@@ -184,27 +184,24 @@ class User(object):
         """Returns the groups for this user."""
         return self._groups
 
-    def ensure(
+    def ensure_state(
         self,
         state: UserState,
     ):
         """Ensures that a user is in a given state.
 
         Args:
-          state: a :class:`SnapState` to reconcile to.
+          state: a :class:`UserState` to reconcile to.
 
         Raises:
           UserError if an error is encountered
         """
-        {
-            UserState.NoLogin: lambda: self._enable_account()
-            if self.state == UserState.Disabled
-            else self._disable_login(),
-            UserState.Disabled: lambda: self._disable_account(),
-            UserState.Present: lambda: self._enable_account()
-            if self.state == UserState.Disabled
-            else self._add(),
-        }[state]()
+        if state is UserState.NoLogin:
+            self._enable_account() if self.state == UserState.Disabled else self._disable_login()
+        elif state is UserState.Disabled:
+            self._disable_account()
+        elif state is UserState.Present:
+            self._enable_account() if self.state == UserState.Disabled else self._add()
         self._state = state
 
     def _add(self) -> None:
@@ -249,7 +246,10 @@ class User(object):
 
     def _disable_login(self):
         """Disable logins for a user by setting the shell to `/sbin/nologin."""
-        self._check_if_present(add_if_absent=True)
+        if not self._check_if_present(add_if_absent=True):
+            raise UserError(
+                f"Could not disable login for user account {self.name}. User is not present!"
+            )
         try:
             subprocess.check_call(["usermod", "-s", "/sbin/nologin", self.name])
         except CalledProcessError as e:
@@ -257,7 +257,8 @@ class User(object):
 
     def _disable_account(self):
         """Disable a user account by locking it."""
-        self._check_if_present(add_if_absent=True)
+        if not self._check_if_present(add_if_absent=True):
+            raise UserError(f"Could not disable account {self.name}. User is not present!")
         try:
             subprocess.check_call(["usermod", "-L", self.name])
         except CalledProcessError as e:
@@ -275,18 +276,12 @@ class User(object):
 
         Args:
             add_if_absent: an (Optional) boolean for whether the user should be added if not found. Default `false`.
-
-        Raises:
-            UserNotFoundError if add_if_absent is `false` and the account is not found.
-
         """
         matcher = (
             rf"{self.name}:{'!' if self.state is UserState.Disabled else 'x'}:{self.uid}:"
             + f"{self.primary_group.gid}:{self.gecos}:{self.homedir}:{self.shell}"
         )
         found = False
-
-        print(matcher)
 
         with open("/etc/passwd", "r") as f:
             for line in f:
@@ -297,17 +292,13 @@ class User(object):
         if not found and add_if_absent:
             self._add()
             return True
-        elif not found:
-            raise UserNotFoundError(
-                f"User {self.name} was not found on the system and was not force-added!"
-            )
 
         return found
 
     @property
     def present(self) -> bool:
         """Returns whether or not a user is present."""
-        return self._state in self._check_if_present()
+        return self._check_if_present()
 
     @property
     def state(self) -> UserState:
@@ -446,9 +437,10 @@ class Passwd:
         with open("/etc/passwd", "r") as f:
             for line in f:
                 if line.strip():
-                    self._parse_passwd_line(line)
+                    user = self._parse_passwd_line(line)
+                    self._users[user.name] = user
 
-    def _parse_passwd_line(self, line) -> None:
+    def _parse_passwd_line(self, line) -> User:
         """Get values out of /etc/passwd and turn them into a :class:`User` object to cache."""
         fields = line.split(":")
         name = fields[0]
@@ -459,12 +451,10 @@ class Passwd:
         shell = fields[6].strip()
 
         state = UserState.NoLogin if shell == "/usr/sbin/nologin" else UserState.Present
-        self._users[name] = User(
-            name, state, homedir=homedir, shell=shell, uid=uid, group=gid, gecos=gecos
-        )
+        return User(name, state, homedir=homedir, shell=shell, uid=uid, group=gid, gecos=gecos)
 
     @classmethod
-    def group_by_gid(cls, gid: int) -> "Group":
+    def group_by_gid(cls, gid: int) -> Group:
         """Look up a group by group id.
         Args:
             gid: an `int` representing the groupid
@@ -498,16 +488,17 @@ class Passwd:
         with open("/etc/group", "r") as f:
             for line in f:
                 if line.strip():
-                    cls._parse_groups_line(line)
+                    group = cls._parse_groups_line(line)
+                    cls._groups[group.name] = group
 
     @classmethod
-    def _parse_groups_line(cls, line) -> None:
+    def _parse_groups_line(cls, line) -> Group:
         """Get values out of /etc/group and turn them into a :class:`Group` object to cache."""
         fields = line.split(":")
         name = fields[0]
         gid = int(fields[2])
         usernames = [u for u in fields[3].strip().split(",") if u]
-        cls._groups[name] = Group(name, usernames, gid=gid)
+        return Group(name, usernames, gid=gid)
 
     def _realize_users(self) -> None:
         """Map user strings to :class:`User` objects for coherency."""
