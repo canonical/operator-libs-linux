@@ -14,17 +14,42 @@
 
 """Representations of the system's Snaps, and abstractions around managing them.
 
+The `snap` module provides convenience methods for listing, installing, refreshing,
+and removing Snap packages, in addition to setting and getting configuration
+options for them.
+
 In the `snap` module, :class:`SnapCache` creates a dict-like mapping of
-:class:`Snap` objects at instantiation. Installed snaps are fully populated,
+:class:`Snap` objects at when instantiated. Installed snaps are fully populated,
 and available snaps are lazily-loaded upon request. This module relies on an
 installed and running `snapd` daemon to perform operations over the `snapd`
 HTTP API.
 
-Typical usage:
+:class:`SnapCache` objects can be used to install or modify Snap packages by name
+in a manner similar to using the `snap` command from the commandline.
+
+An example of adding Juju to the system with :class:`SnapCache` and setting a config value:
   try:
-      snap.add("charmcraft", classic=True)
-  except SnapError as e:
+      cache = snap.SnapCache()
+      juju = cache["juju"]
+
+      if not juju.present:
+          juju.ensure(snap.SnapState.Latest, channel="beta")
+          juju.set("key", "value")
+  except snap.SnapError as e:
       logger.error(f"An exception occurred when installing charmcraft. Reason: {e.message}")
+
+In addition, the `snap` module provides "bare" methods which can act on Snap packages as
+simple function calls. :meth:`add`, :meth:`remove`, and :meth:`ensure` are provided, as
+well as :meth:`add_local` for installing directly from a local `.snap` file. These return
+:class:`Snap` objects.
+
+As an example of installing several Snaps and checking details:
+    try:
+        nextcloud, charmcraft = snap.add(["nextcloud", "charmcraft"])
+        if nextcloud.get("mode") != "production":
+            nextcloud.set("mode", "production")
+  except snap.SnapError as e:
+      logger.error(f"An exception occurred when installing snaps. Reason: {e.message}")
 """
 
 import http.client
