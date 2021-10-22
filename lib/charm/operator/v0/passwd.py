@@ -14,19 +14,29 @@
 
 """Representations of the system's users and groups, and abstractions around managing them.
 
+The `passwd` module provides convenience methods and abstractions around users and
+groups on a Linux system, in order to make adding and managing users and groups easy.
 In the `passwd` module, :class:`Passwd` creates dictionaries of :class:`User` and
 :class:`Group` objects accessible by plain :str: keys, and exposed as properties on
-`Passwd.groups` and `Passwd.users`. Users and groups are fully populated, referencing
-the object types of both
+`Passwd.groups` and `Passwd.users`.
+
+Users and groups are fully populated, referencing the object types of both. A :class:`User`
+object has a `groups` property which references :class:`Group` objects, and a :class:`Group`
+object has a `users` property which references :class:`User` objects. In order to make
+using this easier, :class:`Passwd` is provided which handled the initialization of both.
 
 Typical usage:
   import passwd
   try:
-      passwd.add_user("test", )
+      passwd.add_user(
+          "test",
+          group=Group("test", gid=1001),
+      )
   except UserError as e:
       logger.error(e.message)
 
   ##############################
+
   try:
       snap_user = passwd.Passwd().users["snap"]
       snap_user.ensure(passwd.UserState.NoLogin)
