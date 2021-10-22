@@ -19,13 +19,37 @@ repositories and their properties (available groups, baseuri. gpg key). This cla
 add, disable, or manipulate repositories. Items can be retrieved as :class:`DebianRepository`
 objects.
 
-Typical usage example:
+In order add a new repository with explicit details for fields, a new :class:`DebianRepository`
+can be added to :class:`RepositoryMapping`
+
+:class:`RepositoryMapping` provides an abstraction around the existing repositories on the system,
+and can be accessed and iterated over like any :class:`Mapping` object, to retrieve values by key,
+iterate, or perform other operations.
+
+Keys are constructed as `{repo_type}-{}-{release}` in order to uniquely identify a repository.
+
+Repositories can be added with explicit values through a Python constructor.
+
+Example:
 
     repositories = apt.RepositoryMapping()
-    repositories.add(DebianRepository(
-    enabled=True, repotype="deb", uri="https://example.com", release="focal",
-    groups=["universe"]
-    ))
+
+    if "deb-example.com-focal" not in repositories:
+        repositories.add(DebianRepository(
+        enabled=True, repotype="deb", uri="https://example.com", release="focal",
+        groups=["universe"]
+        ))
+
+Alternatively, any valid `sources.list` line may be used to construct a new :class:`DebianRepository`.
+
+Example:
+
+    repositories = apt.RepositoryMapping()
+
+    if "deb-us.archive.ubuntu.com-xenial" not in repositories:
+        repo = DebianRepository.from_repo_line("deb http://us.archive.ubuntu.com/ubuntu xenial main restricted")
+        repositories.add(repo)
+
 """
 
 import fileinput
@@ -139,10 +163,8 @@ class DebianRepository:
         """Returns the path to the GPG key for this repository."""
         return self._gpg_key_filename
 
-    @classmethod
-    def from_repo_line(
-        cls, repo_line: str, write_file: Optional[bool] = True
-    ) -> "DebianRepository":
+    @staticmethod
+    def from_repo_line(repo_line: str, write_file: Optional[bool] = True) -> "DebianRepository":
         """Instantiate a new :class:`DebianRepository` a `sources.list` entry line.
 
         Args:
