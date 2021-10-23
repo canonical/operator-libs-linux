@@ -20,10 +20,16 @@ mechanism for adding packages and/or repositories to systems for use in machine
 charms.
 
 A sane default configuration is attainable through nothing more than instantiation
-of the appropriate classes.
+of the appropriate classes. :class:`DebianPackage` objects provide information
+about the architecture, version, name, and status of a package.
 
-Typical usage example:
+:class:`DebianPackage` will try to look up a package either from `dpkg -L` or from
+`apt-cache` when provided with a string indicating the package name. If it cannot
+be located, :class:`PackageNotFoundError` will be returned, as `apt` and `dpkg`
+otherwise return `100` for all errors, and a meaningful error message if the package
+is not known is desirable.
 
+To install packages with convenience methods:
     try:
         # Run `apt-get update`
         apt.update()
@@ -33,6 +39,23 @@ Typical usage example:
         logger.error("A specified package not found in package cache or on system")
     except PackageError as e:
         logger.error(f"Could not install package. Reason: {e.message}")
+
+To find details of a specific package:
+    try:
+        vim = apt.DebianPackage.from_system("vim")
+
+        # To find from the apt cache only
+        # apt.DebianPackage.from_apt_cache("vim")
+        # To find from installed packages only
+        # apt.DebianPackage.from_installed_package("vim")
+
+        vim.ensure(PackageState.Latest)
+        logger.info(f"Updated vim to {vim.fullversion}")
+    except PackageNotFoundError:
+        logger.error("A specified package not found in package cache or on system")
+    except PackageError as e:
+        logger.error(f"Could not install package. Reason: {e.message}")
+
 """
 
 import logging
