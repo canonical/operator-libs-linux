@@ -4,7 +4,7 @@
 import subprocess
 import unittest
 from unittest.mock import patch
-from lib.charm.operator.v0 import apt
+from lib.charm.operator_libs_linux.v0 import apt
 
 dpkg_output_zsh = """Desired=Unknown/Install/Remove/Purge/Hold
 | Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
@@ -132,7 +132,7 @@ Description-md5: e7f99df3aa92cf870d335784e155ec33
 
 
 class TestApt(unittest.TestCase):
-    @patch("lib.charm.operator.v0.apt.check_output")
+    @patch("lib.charm.operator_libs_linux.v0.apt.check_output")
     def test_can_load_from_dpkg(self, mock_subprocess):
         mock_subprocess.side_effect = ["amd64", dpkg_output_vim]
 
@@ -142,7 +142,7 @@ class TestApt(unittest.TestCase):
         self.assertEqual(vim.fullversion, "2:8.1.2269-1ubuntu5.amd64")
         self.assertEqual(str(vim.version), "2:8.1.2269-1ubuntu5")
 
-    @patch("lib.charm.operator.v0.apt.check_output")
+    @patch("lib.charm.operator_libs_linux.v0.apt.check_output")
     def test_can_load_from_dpkg_with_version(self, mock_subprocess):
         mock_subprocess.side_effect = ["amd64", dpkg_output_zsh]
 
@@ -152,14 +152,14 @@ class TestApt(unittest.TestCase):
         self.assertEqual(zsh.fullversion, "5.8-3ubuntu1.amd64")
         self.assertEqual(str(zsh.version), "5.8-3ubuntu1")
 
-    @patch("lib.charm.operator.v0.apt.check_output")
+    @patch("lib.charm.operator_libs_linux.v0.apt.check_output")
     def test_will_not_load_from_system_with_bad_version(self, mock_subprocess):
         mock_subprocess.side_effect = ["amd64", dpkg_output_zsh]
 
         with self.assertRaises(apt.PackageNotFoundError) as ctx:
             d = apt.DebianPackage.from_installed_package("zsh", version="1.2-3")
 
-    @patch("lib.charm.operator.v0.apt.check_output")
+    @patch("lib.charm.operator_libs_linux.v0.apt.check_output")
     def test_can_load_from_dpkg_with_arch(self, mock_subprocess):
         mock_subprocess.side_effect = ["amd64", dpkg_output_zsh]
 
@@ -169,7 +169,7 @@ class TestApt(unittest.TestCase):
         self.assertEqual(zsh.fullversion, "5.8-3ubuntu1.amd64")
         self.assertEqual(str(zsh.version), "5.8-3ubuntu1")
 
-    @patch("lib.charm.operator.v0.apt.check_output")
+    @patch("lib.charm.operator_libs_linux.v0.apt.check_output")
     def test_can_load_from_dpkg_multi_arch(self, mock_subprocess):
         mock_subprocess.side_effect = ["amd64", dpkg_output_multi_arch]
 
@@ -179,7 +179,7 @@ class TestApt(unittest.TestCase):
         self.assertEqual(vim.fullversion, "2:8.1.2269-1ubuntu5.i386")
         self.assertEqual(str(vim.version), "2:8.1.2269-1ubuntu5")
 
-    @patch("lib.charm.operator.v0.apt.check_output")
+    @patch("lib.charm.operator_libs_linux.v0.apt.check_output")
     def test_can_load_from_apt_cache(self, mock_subprocess):
         mock_subprocess.side_effect = ["amd64", apt_cache_mocktester]
 
@@ -189,7 +189,7 @@ class TestApt(unittest.TestCase):
         self.assertEqual(tester.fullversion, "1:1.2.3-4.amd64")
         self.assertEqual(str(tester.version), "1:1.2.3-4")
 
-    @patch("lib.charm.operator.v0.apt.check_output")
+    @patch("lib.charm.operator_libs_linux.v0.apt.check_output")
     def test_can_load_from_apt_cache_multi_arch(self, mock_subprocess):
         mock_subprocess.side_effect = ["amd64", apt_cache_mocktester_multi]
 
@@ -199,8 +199,8 @@ class TestApt(unittest.TestCase):
         self.assertEqual(tester.fullversion, "1:1.2.3-4.i386")
         self.assertEqual(str(tester.version), "1:1.2.3-4")
 
-    @patch("lib.charm.operator.v0.apt.check_output")
-    @patch("lib.charm.operator.v0.apt.subprocess.check_call")
+    @patch("lib.charm.operator_libs_linux.v0.apt.check_output")
+    @patch("lib.charm.operator_libs_linux.v0.apt.subprocess.check_call")
     def test_can_run_apt_commands(self, mock_subprocess_call, mock_subprocess_output):
         mock_subprocess_call.return_value = 0
         mock_subprocess_output.side_effect = [
@@ -232,8 +232,8 @@ class TestApt(unittest.TestCase):
             ["apt-get", "-y", "remove", "mocktester=1:1.2.3-4"]
         )
 
-    @patch("lib.charm.operator.v0.apt.check_output")
-    @patch("lib.charm.operator.v0.apt.subprocess.check_call")
+    @patch("lib.charm.operator_libs_linux.v0.apt.check_output")
+    @patch("lib.charm.operator_libs_linux.v0.apt.subprocess.check_call")
     def test_will_throw_apt_errors(self, mock_subprocess_call, mock_subprocess_output):
         mock_subprocess_call.side_effect = subprocess.CalledProcessError(
             returncode=1, cmd=["apt-get", "-y", "install"]
@@ -251,7 +251,7 @@ class TestApt(unittest.TestCase):
         with self.assertRaises(apt.PackageError) as ctx:
             pkg.ensure(apt.PackageState.Latest)
 
-        self.assertEqual("<lib.charm.operator.v0.apt.PackageError>", ctx.exception.name)
+        self.assertEqual("<lib.charm.operator_libs_linux.v0.apt.PackageError>", ctx.exception.name)
         self.assertIn("Could not install package", ctx.exception.message)
 
     def test_can_compare_versions(self):
@@ -276,8 +276,8 @@ class TestApt(unittest.TestCase):
 
 
 class TestAptBareMethods(unittest.TestCase):
-    @patch("lib.charm.operator.v0.apt.check_output")
-    @patch("lib.charm.operator.v0.apt.subprocess.check_call")
+    @patch("lib.charm.operator_libs_linux.v0.apt.check_output")
+    @patch("lib.charm.operator_libs_linux.v0.apt.subprocess.check_call")
     def test_can_run_bare_changes_on_single_package(self, mock_subprocess, mock_subprocess_output):
         mock_subprocess.return_value = 0
         mock_subprocess_output.side_effect = [
@@ -305,8 +305,8 @@ class TestAptBareMethods(unittest.TestCase):
         mock_subprocess.assert_called_with(["apt-get", "-y", "remove", "zsh=5.8-3ubuntu1"])
         self.assertEqual(bar.present, False)
 
-    @patch("lib.charm.operator.v0.apt.check_output")
-    @patch("lib.charm.operator.v0.apt.subprocess.check_call")
+    @patch("lib.charm.operator_libs_linux.v0.apt.check_output")
+    @patch("lib.charm.operator_libs_linux.v0.apt.subprocess.check_call")
     def test_can_run_bare_changes_on_multiple_packages(
         self, mock_subprocess, mock_subprocess_output
     ):
@@ -351,8 +351,8 @@ class TestAptBareMethods(unittest.TestCase):
         self.assertEqual(bar[0].present, False)
         self.assertEqual(bar[1].present, False)
 
-    @patch("lib.charm.operator.v0.apt.check_output")
-    @patch("lib.charm.operator.v0.apt.subprocess.check_call")
+    @patch("lib.charm.operator_libs_linux.v0.apt.check_output")
+    @patch("lib.charm.operator_libs_linux.v0.apt.subprocess.check_call")
     def test_refreshes_apt_cache_if_not_found(self, mock_subprocess, mock_subprocess_output):
         mock_subprocess.return_value = 0
         mock_subprocess_output.side_effect = [
@@ -370,8 +370,8 @@ class TestAptBareMethods(unittest.TestCase):
         self.assertEqual(pkg.name, "aisleriot")
         self.assertEqual(pkg.present, True)
 
-    @patch("lib.charm.operator.v0.apt.check_output")
-    @patch("lib.charm.operator.v0.apt.subprocess.check_call")
+    @patch("lib.charm.operator_libs_linux.v0.apt.check_output")
+    @patch("lib.charm.operator_libs_linux.v0.apt.subprocess.check_call")
     def test_raises_package_not_found_error(self, mock_subprocess, mock_subprocess_output):
         mock_subprocess.return_value = 0
         mock_subprocess_output.side_effect = [
@@ -383,5 +383,5 @@ class TestAptBareMethods(unittest.TestCase):
         with self.assertRaises(apt.PackageError) as ctx:
             apt.add_package("nothere")
         mock_subprocess.assert_any_call(["apt-get", "update"])
-        self.assertEqual("<lib.charm.operator.v0.apt.PackageError>", ctx.exception.name)
+        self.assertEqual("<lib.charm.operator_libs_linux.v0.apt.PackageError>", ctx.exception.name)
         self.assertIn("Failed to install packages: nothere", ctx.exception.message)
