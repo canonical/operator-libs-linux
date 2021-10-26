@@ -1,7 +1,7 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-from lib.charm.operator.v0 import passwd
+from lib.charm.operator_libs_linux.v0 import passwd
 from pyfakefs.fake_filesystem_unittest import TestCase
 from unittest.mock import patch
 
@@ -49,7 +49,9 @@ class TestPasswd(TestCase):
         with self.assertRaises(passwd.GroupNotFoundError) as ctx:
             t = p.groups["nothere"]
 
-        self.assertEqual("<lib.charm.operator.v0.passwd.GroupNotFoundError>", ctx.exception.name)
+        self.assertEqual(
+            "<lib.charm.operator_libs_linux.v0.passwd.GroupNotFoundError>", ctx.exception.name
+        )
         self.assertIn("Group 'nothere' not found", ctx.exception.message)
 
     def test_can_load_users(self):
@@ -73,10 +75,12 @@ class TestPasswd(TestCase):
         with self.assertRaises(passwd.UserNotFoundError) as ctx:
             t = p.users["nothere"]
 
-        self.assertEqual("<lib.charm.operator.v0.passwd.UserNotFoundError>", ctx.exception.name)
+        self.assertEqual(
+            "<lib.charm.operator_libs_linux.v0.passwd.UserNotFoundError>", ctx.exception.name
+        )
         self.assertIn("User 'nothere' not found", ctx.exception.message)
 
-    @patch("lib.charm.operator.v0.passwd.subprocess.check_call")
+    @patch("lib.charm.operator_libs_linux.v0.passwd.subprocess.check_call")
     def test_can_ensure_user_state(self, mock_subprocess):
         mock_subprocess.return_value = 0
         p = passwd.Passwd()
@@ -91,7 +95,7 @@ class TestPasswd(TestCase):
         v.ensure_state(passwd.UserState.NoLogin)
         mock_subprocess.assert_called_with(["usermod", "-s", "/sbin/nologin", v.name])
 
-    @patch("lib.charm.operator.v0.passwd.subprocess.check_call")
+    @patch("lib.charm.operator_libs_linux.v0.passwd.subprocess.check_call")
     def test_can_add_users_and_groups(self, mock_subprocess):
         mock_subprocess.return_value = 0
         p = passwd.Passwd()

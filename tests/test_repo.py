@@ -6,7 +6,7 @@ import subprocess
 from pyfakefs.fake_filesystem_unittest import TestCase
 from unittest.mock import patch
 
-from lib.charm.operator.v0 import apt
+from lib.charm.operator_libs_linux.v0 import apt
 
 sources_list = """deb http://us.archive.ubuntu.com/ubuntu focal main restricted universe multiverse
 deb http://us.archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
@@ -61,7 +61,9 @@ class TestRepositoryMapping(TestCase):
         with self.assertRaises(apt.InvalidSourceError) as ctx:
             r.load("/tmp/bad.list")
 
-        self.assertEqual("<lib.charm.operator.v0.apt.InvalidSourceError>", ctx.exception.name)
+        self.assertEqual(
+            "<lib.charm.operator_libs_linux.v0.apt.InvalidSourceError>", ctx.exception.name
+        )
         self.assertIn("An invalid sources line", ctx.exception.message)
 
     def test_can_disable_repositories(self):
