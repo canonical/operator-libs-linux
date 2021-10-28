@@ -31,11 +31,6 @@ copyright-check = "True"
 copyright-author = "Canonical Ltd."
 copyright-regexp = "Copyright\\s\\d{4}([-,]\\d{4})*\\s+%(author)s"
 
-# Ignore libraries that do not have type hint nor stubs
-[[tool.mypy.overrides]]
-module = ["ops.*", "lightkube.*"]
-ignore_missing_imports = true
-
 [tool.pytest.ini_options]
 minversion = "6.0"
 log_cli_level = "INFO"
