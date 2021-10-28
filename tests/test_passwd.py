@@ -1,9 +1,10 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-from lib.charm.operator_libs_linux.v0 import passwd
-from pyfakefs.fake_filesystem_unittest import TestCase
 from unittest.mock import patch
+
+from charms.operator_libs_linux.v0 import passwd
+from pyfakefs.fake_filesystem_unittest import TestCase
 
 etc_passwd = """systemd-coredump:x:999:999:systemd Core Dumper:/:/usr/sbin/nologin
 testuser:x:1000:1000::/home/testuser:/usr/bin/bash
@@ -47,10 +48,10 @@ class TestPasswd(TestCase):
         p = passwd.Passwd()
 
         with self.assertRaises(passwd.GroupNotFoundError) as ctx:
-            t = p.groups["nothere"]
+            p.groups["nothere"]
 
         self.assertEqual(
-            "<lib.charm.operator_libs_linux.v0.passwd.GroupNotFoundError>", ctx.exception.name
+            "<charms.operator_libs_linux.v0.passwd.GroupNotFoundError>", ctx.exception.name
         )
         self.assertIn("Group 'nothere' not found", ctx.exception.message)
 
@@ -73,14 +74,14 @@ class TestPasswd(TestCase):
         p = passwd.Passwd()
 
         with self.assertRaises(passwd.UserNotFoundError) as ctx:
-            t = p.users["nothere"]
+            p.users["nothere"]
 
         self.assertEqual(
-            "<lib.charm.operator_libs_linux.v0.passwd.UserNotFoundError>", ctx.exception.name
+            "<charms.operator_libs_linux.v0.passwd.UserNotFoundError>", ctx.exception.name
         )
         self.assertIn("User 'nothere' not found", ctx.exception.message)
 
-    @patch("lib.charm.operator_libs_linux.v0.passwd.subprocess.check_call")
+    @patch("charms.operator_libs_linux.v0.passwd.subprocess.check_call")
     def test_can_ensure_user_state(self, mock_subprocess):
         mock_subprocess.return_value = 0
         p = passwd.Passwd()
@@ -95,7 +96,7 @@ class TestPasswd(TestCase):
         v.ensure_state(passwd.UserState.NoLogin)
         mock_subprocess.assert_called_with(["usermod", "-s", "/sbin/nologin", v.name])
 
-    @patch("lib.charm.operator_libs_linux.v0.passwd.subprocess.check_call")
+    @patch("charms.operator_libs_linux.v0.passwd.subprocess.check_call")
     def test_can_add_users_and_groups(self, mock_subprocess):
         mock_subprocess.return_value = 0
         p = passwd.Passwd()

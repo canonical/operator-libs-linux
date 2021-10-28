@@ -12,22 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Representations of the system's Debian/Ubuntu package information and repositories.
+"""Abstractions for the system's Debian/Ubuntu package information and repositories.
 
-The `apt` module contains abstractions and wrappers around Debian/Ubuntu-style
-repositories and packages, in order to easily provide an idiomatic and Pythonic
-mechanism for adding packages and/or repositories to systems for use in machine
-charms.
+This module contains abstractions and wrappers around Debian/Ubuntu-style repositories and
+packages, in order to easily provide an idiomatic and Pythonic mechanism for adding packages and/or
+repositories to systems for use in machine charms.
 
-A sane default configuration is attainable through nothing more than instantiation
-of the appropriate classes. :class:`DebianPackage` objects provide information
-about the architecture, version, name, and status of a package.
+A sane default configuration is attainable through nothing more than instantiation of the
+appropriate classes. :class:`DebianPackage` objects provide information about the architecture,
+version, name, and status of a package.
 
-:class:`DebianPackage` will try to look up a package either from `dpkg -L` or from
-`apt-cache` when provided with a string indicating the package name. If it cannot
-be located, :class:`PackageNotFoundError` will be returned, as `apt` and `dpkg`
-otherwise return `100` for all errors, and a meaningful error message if the package
-is not known is desirable.
+:class:`DebianPackage` will try to look up a package either from `dpkg -L` or from `apt-cache` when
+provided with a string indicating the package name. If it cannot be located,
+:class:`PackageNotFoundError` will be returned, as `apt` and `dpkg` otherwise return `100` for all
+errors, and a meaningful error message if the package is not known is desirable.
 
 To install packages with convenience methods:
     try:
@@ -57,13 +55,12 @@ To find details of a specific package:
         logger.error(f"Could not install package. Reason: {e.message}")
 
 
-:class:`RepositoryMapping` will return a dict-like object containing enabled system
-repositories and their properties (available groups, baseuri. gpg key). This class can
-add, disable, or manipulate repositories. Items can be retrieved as :class:`DebianRepository`
-objects.
+:class:`RepositoryMapping` will return a dict-like object containing enabled system repositories
+and their properties (available groups, baseuri. gpg key). This class can add, disable, or
+manipulate repositories. Items can be retrieved as :class:`DebianRepository` objects.
 
-In order add a new repository with explicit details for fields, a new :class:`DebianRepository`
-can be added to :class:`RepositoryMapping`
+In order add a new repository with explicit details for fields, a new :class:`DebianRepository` can
+be added to :class:`RepositoryMapping`
 
 :class:`RepositoryMapping` provides an abstraction around the existing repositories on the system,
 and can be accessed and iterated over like any :class:`Mapping` object, to retrieve values by key,
@@ -83,14 +80,16 @@ Example:
         groups=["universe"]
         ))
 
-Alternatively, any valid `sources.list` line may be used to construct a new :class:`DebianRepository`.
+Alternatively, any valid `sources.list` line may be used to construct a new
+:class:`DebianRepository`.
 
 Example:
 
     repositories = apt.RepositoryMapping()
 
     if "deb-us.archive.ubuntu.com-xenial" not in repositories:
-        repo = DebianRepository.from_repo_line("deb http://us.archive.ubuntu.com/ubuntu xenial main restricted")
+        repo = DebianRepository.from_repo_line(
+            "deb http://us.archive.ubuntu.com/ubuntu xenial main restricted")
         repositories.add(repo)
 """
 
@@ -100,15 +99,24 @@ import logging
 import os
 import re
 import subprocess
-
 from collections.abc import Mapping
 from enum import Enum
-from subprocess import check_output, CalledProcessError
+from subprocess import CalledProcessError, check_output
 from typing import Iterable, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
-
 logger = logging.getLogger(__name__)
+
+# The unique Charmhub library identifier, never change it
+LIBID = "7c3dbc9c2ad44a47bd6fcb25caa270e5"
+
+# Increment this major API version when introducing breaking changes
+LIBAPI = 0
+
+# Increment this PATCH version before using `charmcraft publish-lib` or reset
+# to 0 if you are raising the major API version
+LIBPATCH = 1
+
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
 
@@ -117,6 +125,7 @@ class Error(Exception):
     """Base class of most errors raised by this library."""
 
     def __repr__(self):
+        """String representation of Error."""
         return f"<{type(self).__module__}.{type(self).__name__} {self.args}>"
 
     @property
@@ -224,7 +233,7 @@ class DebianPackage:
         package_names: Union[str, List],
         optargs: Optional[List[str]] = None,
     ) -> None:
-        """Wrap package management commands for Debian/Ubuntu systems
+        """Wrap package management commands for Debian/Ubuntu systems.
 
         Args:
           command: the command given to `apt-get`
@@ -345,7 +354,8 @@ class DebianPackage:
         Args:
             package: a string representing the package
             version: an optional string if a specific version isr equested
-            arch: an optional architecture, defaulting to `dpkg --print-architecture`. If an architecture is not specified, this will be used for selection.
+            arch: an optional architecture, defaulting to `dpkg --print-architecture`. If an
+                architecture is not specified, this will be used for selection.
 
         """
         try:
@@ -360,8 +370,8 @@ class DebianPackage:
             return DebianPackage.from_apt_cache(package, version, arch)
         except (PackageNotFoundError, PackageError):
             # If we get here, it's not known to the systems.
-            # This seems unnecessary, but virtually all `apt` commands have a return code of `100`, and
-            # providing meaningful error messages without this is ugly.
+            # This seems unnecessary, but virtually all `apt` commands have a return code of `100`,
+            # and providing meaningful error messages without this is ugly.
             raise PackageNotFoundError(
                 f"Package '{package}{f'.{arch}' if arch else ''}' could not be found on the system or in the apt cache!"
             ) from None
@@ -375,7 +385,8 @@ class DebianPackage:
         Args:
             package: a string representing the package
             version: an optional string if a specific version isr equested
-            arch: an optional architecture, defaulting to `dpkg --print-architecture`. If an architecture is not specified, this will be used for selection.
+            arch: an optional architecture, defaulting to `dpkg --print-architecture`.
+                If an architecture is not specified, this will be used for selection.
         """
         system_arch = check_output(
             ["dpkg", "--print-architecture"], universal_newlines=True
@@ -432,7 +443,8 @@ class DebianPackage:
         Args:
             package: a string representing the package
             version: an optional string if a specific version isr equested
-            arch: an optional architecture, defaulting to `dpkg --print-architecture`. If an architecture is not specified, this will be used for selection.
+            arch: an optional architecture, defaulting to `dpkg --print-architecture`.
+                If an architecture is not specified, this will be used for selection.
         """
         system_arch = check_output(
             ["dpkg", "--print-architecture"], universal_newlines=True
@@ -477,10 +489,10 @@ class DebianPackage:
 
 
 class Version:
-    """An abstraction around package versions. This seems like it should
-    be strictly unnecessary, except that `apt_pkg` is not usable inside a
-    venv, and wedging version comparisions into :class:`DebianPackage` would
-    overcomplicate it.
+    """An abstraction around package versions.
+
+    This seems like it should be strictly unnecessary, except that `apt_pkg` is not usable inside a
+    venv, and wedging version comparisions into :class:`DebianPackage` would overcomplicate it.
 
     This class implements the algorithm found here:
     https://www.debian.org/doc/debian-policy/ch-controlfields.html#version
@@ -536,8 +548,7 @@ class Version:
         return result
 
     def _get_alphas(self, revision: str) -> Tuple[str, str]:
-        """Return a tuple of the first non-digit characters of a revision (which
-        may be empty) and the remainder."""
+        """Return a tuple of the first non-digit characters of a revision."""
         # get the index of the first digit
         for i, char in enumerate(revision):
             if char.isdigit():
@@ -548,8 +559,7 @@ class Version:
         return revision, ""
 
     def _get_digits(self, revision: str) -> Tuple[int, str]:
-        """Return a tuple of the first integer characters of a revision (which
-        may be empty) and the remainder."""
+        """Return a tuple of the first integer characters of a revision."""
         # If the string is empty, return (0,'')
         if not revision:
             return 0, ""
@@ -562,14 +572,13 @@ class Version:
         # string is entirely digits
         return int(revision), ""
 
-    def _dstringcmp(self, a, b):
+    def _dstringcmp(self, a, b):  # noqa: C901
         """Debian package version string section lexical sort algorithm.
 
         The lexical comparison is a comparison of ASCII values modified so
         that all the letters sort earlier than all the non-letters and so that
         a tilde sorts before anything, even the end of a part.
         """
-
         if a == b:
             return 0
         try:
@@ -602,7 +611,7 @@ class Version:
             return 1
         return -1
 
-    def _compare_revision_strings(self, first: str, second: str):
+    def _compare_revision_strings(self, first: str, second: str):  # noqa: C901
         """Compare two debian revision strings."""
         if first == second:
             return 0
@@ -666,21 +675,27 @@ class Version:
         return 0
 
     def __lt__(self, other) -> bool:
+        """Less than magic method impl."""
         return self._compare_version(other) < 0
 
     def __eq__(self, other) -> bool:
+        """Equality magic method impl."""
         return self._compare_version(other) == 0
 
     def __gt__(self, other) -> bool:
+        """Greater than magic method impl."""
         return self._compare_version(other) > 0
 
     def __le__(self, other) -> bool:
+        """Less than or equal to magic method impl."""
         return self.__eq__(other) or self.__lt__(other)
 
     def __ge__(self, other) -> bool:
+        """Greater than or equal to magic method impl."""
         return self.__gt__(other) or self.__eq__(other)
 
     def __ne__(self, other) -> bool:
+        """Not equal to magic method impl."""
         return not self.__eq__(other)
 
 
@@ -691,11 +706,13 @@ def add_package(
     update_cache: Optional[bool] = False,
 ) -> Union[DebianPackage, List[DebianPackage]]:
     """Add a package or list of packages to the system.
+
     Args:
         name: the name(s) of the package(s)
         version: an (Optional) version as a string. Defaults to the latest known
         arch: an optional architecture for the package
         update_cache: whether or not to run `apt-get update` prior to operating
+
     Raises:
         PackageNotFoundError if the package is not in the cache.
     """
@@ -746,6 +763,7 @@ def _add(
     arch: Optional[str] = "",
 ) -> Tuple[Union[DebianPackage, str], bool]:
     """Adds a package.
+
     Args:
         name: the name(s) of the package(s)
         version: an (Optional) version as a string. Defaults to the latest known
@@ -768,7 +786,8 @@ def remove_package(
     """Removes a package from the system.
 
     Args:
-        name: the name of a package
+        package_names: the name of a package
+
     Raises:
         PackageNotFoundError if the package is not found.
     """
@@ -876,6 +895,7 @@ class DebianRepository:
 
         Args:
             repo_line: a string representing a repository entry
+            write_file: boolean to enable writing the new repo to disk
         """
         repo = RepositoryMapping._parse(repo_line, "UserInput")
         fname = f"{urlparse(repo.uri).path.lstrip('/').replace('/', '-')}-{repo.release}.list"
@@ -892,8 +912,12 @@ class DebianRepository:
         return repo
 
     def disable(self) -> None:
-        """Remove this repository from consideration. Disable it instead of removing from the repository file."""
-        searcher = f"{self.repotype} {f'[signed-by={self.gpg_key}]' if self.gpg_key else ''}{self.uri} {self.release}"
+        """Remove this repository from consideration.
+
+        Disable it instead of removing from the repository file.
+        """
+        gpg_part = f"[signed-by={self.gpg_key}]" if self.gpg_key else ""
+        searcher = f"{self.repotype} {gpg_part}{self.uri} {self.release}"
         for line in fileinput.input(self._filename, inplace=True):
             if re.match(rf"^{re.escape(searcher)}\s", line):
                 print(f"# {line}", end="")
@@ -902,6 +926,7 @@ class DebianRepository:
 
     def import_key(self, key: str) -> None:
         """Import an ASCII Armor key.
+
         A Radix64 format keyid is also supported for backwards
         compatibility. In this case Ubuntu keyserver will be
         queried for a key via HTTPS by its keyid. This method
@@ -956,6 +981,7 @@ class DebianRepository:
     @staticmethod
     def _get_keyid_by_gpg_key(key_material: bytes) -> str:
         """Get a GPG key fingerprint by GPG key material.
+
         Gets a GPG key fingerprint (40-digit, 160-bit) by the ASCII armor-encoded
         or binary GPG key material. Can be used, for example, to generate file
         names for keys passed via charm options.
@@ -978,6 +1004,7 @@ class DebianRepository:
     @staticmethod
     def _get_key_by_keyid(keyid: str) -> str:
         """Get a key via HTTPS from the Ubuntu keyserver.
+
         Different key ID formats are supported by SKS keyservers (the longer ones
         are more secure, see "dead beef attack" and https://evil32.com/). Since
         HTTPS is used, if SSLBump-like HTTPS proxies are in place, they will
@@ -1085,12 +1112,15 @@ class RepositoryMapping(Mapping):
             self.load(file)
 
     def __contains__(self, key: str) -> bool:
+        """Magic method for checking presence of repo in mapping."""
         return key in self._repository_map
 
     def __len__(self) -> int:
+        """Return number of repositories in map."""
         return len(self._repository_map)
 
     def __iter__(self) -> Iterable[DebianRepository]:
+        """Iterator magic method for RepositoryMapping."""
         return iter(self._repository_map.values())
 
     def __getitem__(self, repository_uri: str) -> DebianRepository:
@@ -1132,7 +1162,7 @@ class RepositoryMapping(Mapping):
             enabled = False
             line = line[1:]
 
-        # Check for another "#" in the line and treat a part after it as a comment, then strip it off.
+        # Check for "#" in the line and treat a part after it as a comment then strip it off.
         i = line.find("#")
         if i > 0:
             line = line[:i]

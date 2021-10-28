@@ -3,13 +3,13 @@
 
 import json
 import unittest
-
 from unittest.mock import MagicMock, mock_open, patch
+
+from charms.operator_libs_linux.v0 import snap
 
 import tests.fake_snapd as fake_snapd
 
-patch("lib.charm.operator_libs_linux.v0.snap._cache_init", lambda x: x).start()
-from lib.charm.operator_libs_linux.v0 import snap
+patch("charms.operator_libs_linux.v0.snap._cache_init", lambda x: x).start()
 
 lazy_load_result = r"""
 {
@@ -238,9 +238,7 @@ class TestSnapCache(unittest.TestCase):
         )
         with self.assertRaises(snap.SnapAPIError) as ctx:
             s._load_installed_snaps()
-        self.assertEqual(
-            "<lib.charm.operator_libs_linux.v0.snap.SnapAPIError>", ctx.exception.name
-        )
+        self.assertEqual("<charms.operator_libs_linux.v0.snap.SnapAPIError>", ctx.exception.name)
         self.assertIn("snapd is not running", ctx.exception.message)
 
     def test_can_compare_snap_equality(self):
@@ -248,7 +246,7 @@ class TestSnapCache(unittest.TestCase):
         foo2 = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
         self.assertEqual(foo1, foo2)
 
-    @patch("lib.charm.operator_libs_linux.v0.snap.subprocess.check_output")
+    @patch("charms.operator_libs_linux.v0.snap.subprocess.check_output")
     def test_can_run_snap_commands(self, mock_subprocess):
         mock_subprocess.return_value = 0
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
@@ -299,7 +297,7 @@ class TestSnapBareMethods(unittest.TestCase):
         snap._Cache.cache._load_installed_snaps()
         snap._Cache.cache._load_available_snaps()
 
-    @patch("lib.charm.operator_libs_linux.v0.snap.subprocess.check_output")
+    @patch("charms.operator_libs_linux.v0.snap.subprocess.check_output")
     def test_can_run_bare_changes(self, mock_subprocess):
         mock_subprocess.return_value = 0
         foo = snap.add("curl", classic=True, channel="latest")
@@ -312,7 +310,7 @@ class TestSnapBareMethods(unittest.TestCase):
         mock_subprocess.assert_called_with(["snap", "remove", "curl"], universal_newlines=True)
         self.assertEqual(bar.present, False)
 
-    @patch("lib.charm.operator_libs_linux.v0.snap.subprocess.check_output")
+    @patch("charms.operator_libs_linux.v0.snap.subprocess.check_output")
     def test_can_ensure_states(self, mock_subprocess):
         mock_subprocess.return_value = 0
         foo = snap.ensure("curl", "latest", classic=True, channel="latest/test")
@@ -329,5 +327,5 @@ class TestSnapBareMethods(unittest.TestCase):
     def test_raises_snap_not_found_error(self):
         with self.assertRaises(snap.SnapError) as ctx:
             snap.add("nothere")
-        self.assertEqual("<lib.charm.operator_libs_linux.v0.snap.SnapError>", ctx.exception.name)
+        self.assertEqual("<charms.operator_libs_linux.v0.snap.SnapError>", ctx.exception.name)
         self.assertIn("Failed to install or refresh snap(s): nothere", ctx.exception.message)

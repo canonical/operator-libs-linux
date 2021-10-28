@@ -44,24 +44,33 @@ Typical usage:
       logger.error("User snap not found!")
 """
 
-import os
 import logging
+import os
 import re
 import subprocess
-
 from collections import UserDict
 from enum import Enum
 from subprocess import CalledProcessError
 from typing import List, Optional, Union
 
-
 logger = logging.getLogger(__name__)
+
+# The unique Charmhub library identifier, never change it
+LIBID = "cf7655b2bf914d67ac963f72b930f6bb"
+
+# Increment this major API version when introducing breaking changes
+LIBAPI = 0
+
+# Increment this PATCH version before using `charmcraft publish-lib` or reset
+# to 0 if you are raising the major API version
+LIBPATCH = 1
 
 
 class Error(Exception):
     """Base class of most errors raised by this library."""
 
     def __repr__(self):
+        """String representation of the Error class."""
         return f"<{type(self).__module__}.{type(self).__name__} {self.args}>"
 
     @property
@@ -219,10 +228,11 @@ class User(object):
         try:
             if self.present:
                 return
-        except UserNotFoundError as e:
+        except UserNotFoundError:
             logger.debug("User {} not found, adding", self.name)
 
-        argbuilder = lambda x, y: [x, y] if y else []
+        def argbuilder(x, y):
+            return [x, y] if y else []
 
         try:
             args = []
@@ -285,7 +295,8 @@ class User(object):
         """Ensures a user is present in /etc/passwd.
 
         Args:
-            add_if_absent: an (Optional) boolean for whether the user should be added if not found. Default `false`.
+            add_if_absent: an (Optional) boolean for whether the user should be added if not found.
+                Default `false`.
         """
         matcher = (
             rf"{self.name}:{'!' if self.state is UserState.Disabled else 'x'}:{self.uid}:"
@@ -351,6 +362,7 @@ class Group(object):
         return f"<{self.__class__.__name__}: {self._name}-{self._gid} -- {self._users}>"
 
     def __eq__(self, other):
+        """Equality magic method for Group class."""
         return (self._name, self._gid) == (other.name, other.gid)
 
     @property
@@ -466,8 +478,10 @@ class Passwd:
     @classmethod
     def group_by_gid(cls, gid: int) -> Group:
         """Look up a group by group id.
+
         Args:
             gid: an `int` representing the groupid
+
         Raises:
             GroupNotFoundError
         """
@@ -491,7 +505,6 @@ class Passwd:
     @classmethod
     def _load_groups(cls) -> None:
         """Parse /etc/group to get information about available groups."""
-
         if not os.path.isfile("/etc/group"):
             raise GroupError("/etc/group not found on the system!")
 
