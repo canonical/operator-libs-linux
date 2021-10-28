@@ -238,9 +238,7 @@ class TestSnapCache(unittest.TestCase):
         )
         with self.assertRaises(snap.SnapAPIError) as ctx:
             s._load_installed_snaps()
-        self.assertEqual(
-            "<charms.operator_libs_linux.v0.snap.SnapAPIError>", ctx.exception.name
-        )
+        self.assertEqual("<charms.operator_libs_linux.v0.snap.SnapAPIError>", ctx.exception.name)
         self.assertIn("snapd is not running", ctx.exception.message)
 
     def test_can_compare_snap_equality(self):

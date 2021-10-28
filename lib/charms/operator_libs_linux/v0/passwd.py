@@ -230,7 +230,8 @@ class User(object):
         except UserNotFoundError as e:
             logger.debug("User {} not found, adding", self.name)
 
-        def argbuilder(x, y): return [x, y] if y else []
+        def argbuilder(x, y):
+            return [x, y] if y else []
 
         try:
             args = []
