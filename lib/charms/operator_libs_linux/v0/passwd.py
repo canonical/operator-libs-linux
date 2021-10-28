@@ -44,18 +44,26 @@ Typical usage:
       logger.error("User snap not found!")
 """
 
-import os
 import logging
+import os
 import re
 import subprocess
-
 from collections import UserDict
 from enum import Enum
 from subprocess import CalledProcessError
 from typing import List, Optional, Union
 
-
 logger = logging.getLogger(__name__)
+
+# The unique Charmhub library identifier, never change it
+LIBID = "cf7655b2bf914d67ac963f72b930f6bb"
+
+# Increment this major API version when introducing breaking changes
+LIBAPI = 0
+
+# Increment this PATCH version before using `charmcraft publish-lib` or reset
+# to 0 if you are raising the major API version
+LIBPATCH = 1
 
 
 class Error(Exception):
@@ -222,7 +230,7 @@ class User(object):
         except UserNotFoundError as e:
             logger.debug("User {} not found, adding", self.name)
 
-        argbuilder = lambda x, y: [x, y] if y else []
+        def argbuilder(x, y): return [x, y] if y else []
 
         try:
             args = []

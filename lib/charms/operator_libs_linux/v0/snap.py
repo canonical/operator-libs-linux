@@ -54,22 +54,30 @@ As an example of installing several Snaps and checking details:
 
 import http.client
 import json
-import os
 import logging
+import os
 import socket
 import subprocess
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-
 from collections.abc import Mapping
 from enum import Enum
 from subprocess import CalledProcessError
 from typing import Dict, Iterable, List, Optional, Union
 
-
 logger = logging.getLogger(__name__)
+
+# The unique Charmhub library identifier, never change it
+LIBID = "05394e5893f94f2d90feb7cbe6b633cd"
+
+# Increment this major API version when introducing breaking changes
+LIBAPI = 0
+
+# Increment this PATCH version before using `charmcraft publish-lib` or reset
+# to 0 if you are raising the major API version
+LIBPATCH = 1
 
 
 def _cache_init(func):

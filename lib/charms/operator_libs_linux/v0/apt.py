@@ -100,15 +100,24 @@ import logging
 import os
 import re
 import subprocess
-
 from collections.abc import Mapping
 from enum import Enum
-from subprocess import check_output, CalledProcessError
+from subprocess import CalledProcessError, check_output
 from typing import Iterable, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
-
 logger = logging.getLogger(__name__)
+
+# The unique Charmhub library identifier, never change it
+LIBID = "7c3dbc9c2ad44a47bd6fcb25caa270e5"
+
+# Increment this major API version when introducing breaking changes
+LIBAPI = 0
+
+# Increment this PATCH version before using `charmcraft publish-lib` or reset
+# to 0 if you are raising the major API version
+LIBPATCH = 1
+
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
 
