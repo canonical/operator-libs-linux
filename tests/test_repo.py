@@ -1,12 +1,8 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import subprocess
-
+from charms.operator_libs_linux.v0 import apt
 from pyfakefs.fake_filesystem_unittest import TestCase
-from unittest.mock import patch
-
-from lib.charm.operator_libs_linux.v0 import apt
 
 sources_list = """deb http://us.archive.ubuntu.com/ubuntu focal main restricted universe multiverse
 deb http://us.archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
@@ -62,7 +58,7 @@ class TestRepositoryMapping(TestCase):
             r.load("/tmp/bad.list")
 
         self.assertEqual(
-            "<lib.charm.operator_libs_linux.v0.apt.InvalidSourceError>", ctx.exception.name
+            "<charms.operator_libs_linux.v0.apt.InvalidSourceError>", ctx.exception.name
         )
         self.assertIn("An invalid sources line", ctx.exception.message)
 

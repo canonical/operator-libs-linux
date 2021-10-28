@@ -1,0 +1,15 @@
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: operator-libs-linux
+description: |
+  A placeholder charm that contains helpful charm libraries curated by the
+  Operator Framework team for use when authoring 'machine charms' that need
+  to manipulate packages, users, services, etc.
+summary: Collection of Charm Libraries for authoring machine charms.
+containers:
+  placeholder:
+    resource: placeholder-image
+resources:
+  placeholder-image:
+    type: oci-image
+    description: OCI image for placeholder

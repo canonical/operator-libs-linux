@@ -1,6 +1,10 @@
-.idea
-__pycache__
-.venv
+venv/
+build/
+*.charm
+*.orig
 .coverage
-venv
-.tox
+**/__pycache__/
+*.py[cod]
+.idea/
+.tox/
+.mypy_cache
