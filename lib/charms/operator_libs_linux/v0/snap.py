@@ -90,15 +90,20 @@ def _cache_init(func):
 
 
 class MetaCache(type):
+    """MetaCache class used for initialising the snap cache."""
+
     @property
     def cache(cls) -> "SnapCache":
+        """Property for returning the snap cache."""
         return cls._cache
 
     @cache.setter
     def cache(cls, cache: "SnapCache") -> None:
+        """Setter for the snap cache."""
         cls._cache = cache
 
     def __getitem__(cls, name) -> "Snap":
+        """Snap cache getter."""
         return cls._cache[name]
 
 
@@ -110,6 +115,7 @@ class Error(Exception):
     """Base class of most errors raised by this library."""
 
     def __repr__(self):
+        """String representation of the Error class."""
         return f"<{type(self).__module__}.{type(self).__name__} {self.args}>"
 
     @property
@@ -135,6 +141,7 @@ class SnapAPIError(Error):
         self._message = message
 
     def __repr__(self):
+        """String representation of the SnapAPIError class."""
         return "APIError({!r}, {!r}, {!r}, {!r})".format(
             self.body, self.code, self.status, self._message
         )
@@ -396,10 +403,11 @@ class SnapClient:
         """Initialize a client instance.
 
         Args:
-            socket_path: a path to the socket on the filesystem
-            opener:
-        Defaults to using a Unix socket at socket_path (which must be specified
-        unless a custom opener is provided).
+            socket_path: a path to the socket on the filesystem. Defaults to /run/snap/snapd.socket
+            opener: specifies an opener for unix socket, if unspecified a default is used
+            base_url: base url for making requests to the snap client. Defaults to
+                http://localhost/v2/
+            timeout: timeout in seconds to use when making requests to the API. Default is 5.0s.
         """
         if opener is None:
             opener = self._get_default_opener(socket_path)
@@ -425,6 +433,7 @@ class SnapClient:
         body: Dict = None,
     ) -> Dict:
         """Make a JSON request to the Snapd server with the given HTTP method and path.
+
         If query dict is provided, it is encoded and appended as a query string
         to the URL. If body dict is provided, it is serialied as JSON and used
         as the HTTP body (with Content-Type: "application/json"). The resulting
@@ -475,12 +484,10 @@ class SnapClient:
 
     def get_installed_snaps(self) -> Dict:
         """Get information about currently installed snaps."""
-
         return self._request("GET", "snaps")
 
     def get_snap_information(self, name: str) -> Dict:
         """Query the snap server for information about single snap."""
-
         return self._request("GET", "find", {"name": name})[0]
 
 
@@ -500,12 +507,15 @@ class SnapCache(Mapping):
         self._load_installed_snaps()
 
     def __contains__(self, key: str) -> bool:
+        """Magic method to ease checking if a given snap is in the cache."""
         return key in self._snap_map
 
     def __len__(self) -> int:
+        """Returns number of items in the snap cache."""
         return len(self._snap_map)
 
     def __iter__(self) -> Iterable["Snap"]:
+        """Magic method to provide an iterator for the snap cache."""
         return iter(self._snap_map.values())
 
     def __getitem__(self, snap_name: str) -> Snap:
@@ -522,7 +532,10 @@ class SnapCache(Mapping):
         return self._snap_map[snap_name]
 
     def _load_available_snaps(self) -> None:
-        """Load the list of available snaps from disk. Leave them empty and lazily load later if asked for."""
+        """Load the list of available snaps from disk.
+
+        Leave them empty and lazily load later if asked for.
+        """
         if not os.path.isfile("/var/cache/snapd/names"):
             logger.warning(
                 "The snap cache has not been populated or is not in the default location"
@@ -552,7 +565,7 @@ class SnapCache(Mapping):
         """Load info for snaps which are not installed if requested.
 
         Args:
-          name: a string representing the name of the snap
+            name: a string representing the name of the snap
         """
         info = self._snap_client.get_snap_information(name)
 
@@ -576,9 +589,11 @@ def add(
 
     Args:
         snap_names: the name or names of the snaps to install
-        state: a string or :class:`SnapState` representation of the desired state, one of [`Present` or `Latest`]
+        state: a string or :class:`SnapState` representation of the desired state, one of
+            [`Present` or `Latest`]
         channel: an (Optional) channel as a string. Defaults to 'latest'
-        classic: an (Optional) boolean specifying whether it should be added with classic confinement. Default `False`
+        classic: an (Optional) boolean specifying whether it should be added with classic
+            confinement. Default `False`
 
     Raises:
         SnapError if some snaps failed to install or were not found.
@@ -623,7 +638,8 @@ def ensure(
         name: the name(s) of the snaps to operate on
         state: a string representation of the desired state, from :class:`SnapState`
         channel: an (Optional) channel as a string. Defaults to 'latest'
-        classic: an (Optional) boolean specifying whether it should be added with classic confinement. Default `False`
+        classic: an (Optional) boolean specifying whether it should be added with classic
+            confinement. Default `False`
 
     Raises:
         SnapError if the snap is not in the cache.
