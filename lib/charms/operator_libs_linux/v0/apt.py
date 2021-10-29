@@ -45,14 +45,14 @@ To find details of a specific package:
 
 ```python
 try:
-    vim = apt.DebianPackage.from_system("vim")
-    
+    vim = apt.DebianPackage.from_system("vim"
+
     # To find from the apt cache only
     # apt.DebianPackage.from_apt_cache("vim")
-    
+
     # To find from installed packages only
     # apt.DebianPackage.from_installed_package("vim")
-    
+
     vim.ensure(PackageState.Latest)
     logger.info(f"Updated vim to {vim.fullversion}")
 except PackageNotFoundError:
@@ -96,7 +96,8 @@ Example:
 repositories = apt.RepositoryMapping()
 
 if "deb-us.archive.ubuntu.com-xenial" not in repositories:
-    repo = DebianRepository.from_repo_line("deb http://us.archive.ubuntu.com/ubuntu xenial main restricted")
+    line = "deb http://us.archive.ubuntu.com/ubuntu xenial main restricted"
+    repo = DebianRepository.from_repo_line(line)
     repositories.add(repo)
 ```
 """
