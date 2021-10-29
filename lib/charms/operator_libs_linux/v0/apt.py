@@ -19,51 +19,58 @@ packages, in order to easily provide an idiomatic and Pythonic mechanism for add
 repositories to systems for use in machine charms.
 
 A sane default configuration is attainable through nothing more than instantiation of the
-appropriate classes. :class:`DebianPackage` objects provide information about the architecture,
-version, name, and status of a package.
+appropriate classes. `DebianPackage` objects provide information about the architecture, version,
+name, and status of a package.
 
-:class:`DebianPackage` will try to look up a package either from `dpkg -L` or from `apt-cache` when
-provided with a string indicating the package name. If it cannot be located,
-:class:`PackageNotFoundError` will be returned, as `apt` and `dpkg` otherwise return `100` for all
-errors, and a meaningful error message if the package is not known is desirable.
+`DebianPackage` will try to look up a package either from `dpkg -L` or from `apt-cache` when
+provided with a string indicating the package name. If it cannot be located, `PackageNotFoundError`
+will be returned, as `apt` and `dpkg` otherwise return `100` for all errors, and a meaningful error
+message if the package is not known is desirable.
 
 To install packages with convenience methods:
-    try:
-        # Run `apt-get update`
-        apt.update()
-        apt.add_package("zsh")
-        apt.add_package(["vim", "htop", "wget"])
-    except PackageNotFoundError:
-        logger.error("A specified package not found in package cache or on system")
-    except PackageError as e:
-        logger.error(f"Could not install package. Reason: {e.message}")
+
+```python
+try:
+    # Run `apt-get update`
+    apt.update()
+    apt.add_package("zsh")
+    apt.add_package(["vim", "htop", "wget"])
+except PackageNotFoundError:
+    logger.error("A specified package not found in package cache or on system")
+except PackageError as e:
+    logger.error(f"Could not install package. Reason: {e.message}")
+````
 
 To find details of a specific package:
-    try:
-        vim = apt.DebianPackage.from_system("vim")
 
-        # To find from the apt cache only
-        # apt.DebianPackage.from_apt_cache("vim")
-        # To find from installed packages only
-        # apt.DebianPackage.from_installed_package("vim")
+```python
+try:
+    vim = apt.DebianPackage.from_system("vim")
+    
+    # To find from the apt cache only
+    # apt.DebianPackage.from_apt_cache("vim")
+    
+    # To find from installed packages only
+    # apt.DebianPackage.from_installed_package("vim")
+    
+    vim.ensure(PackageState.Latest)
+    logger.info(f"Updated vim to {vim.fullversion}")
+except PackageNotFoundError:
+    logger.error("A specified package not found in package cache or on system")
+except PackageError as e:
+    logger.error(f"Could not install package. Reason: {e.message}")
+```
 
-        vim.ensure(PackageState.Latest)
-        logger.info(f"Updated vim to {vim.fullversion}")
-    except PackageNotFoundError:
-        logger.error("A specified package not found in package cache or on system")
-    except PackageError as e:
-        logger.error(f"Could not install package. Reason: {e.message}")
 
-
-:class:`RepositoryMapping` will return a dict-like object containing enabled system repositories
+`RepositoryMapping` will return a dict-like object containing enabled system repositories
 and their properties (available groups, baseuri. gpg key). This class can add, disable, or
-manipulate repositories. Items can be retrieved as :class:`DebianRepository` objects.
+manipulate repositories. Items can be retrieved as `DebianRepository` objects.
 
-In order add a new repository with explicit details for fields, a new :class:`DebianRepository` can
-be added to :class:`RepositoryMapping`
+In order add a new repository with explicit details for fields, a new `DebianRepository` can
+be added to `RepositoryMapping`
 
-:class:`RepositoryMapping` provides an abstraction around the existing repositories on the system,
-and can be accessed and iterated over like any :class:`Mapping` object, to retrieve values by key,
+`RepositoryMapping` provides an abstraction around the existing repositories on the system,
+and can be accessed and iterated over like any `Mapping` object, to retrieve values by key,
 iterate, or perform other operations.
 
 Keys are constructed as `{repo_type}-{}-{release}` in order to uniquely identify a repository.
@@ -72,25 +79,26 @@ Repositories can be added with explicit values through a Python constructor.
 
 Example:
 
-    repositories = apt.RepositoryMapping()
+```python
+repositories = apt.RepositoryMapping()
 
-    if "deb-example.com-focal" not in repositories:
-        repositories.add(DebianRepository(
-        enabled=True, repotype="deb", uri="https://example.com", release="focal",
-        groups=["universe"]
-        ))
+if "deb-example.com-focal" not in repositories:
+    repositories.add(DebianRepository(enabled=True, repotype="deb",
+                     uri="https://example.com", release="focal", groups=["universe"]))
+```
 
 Alternatively, any valid `sources.list` line may be used to construct a new
-:class:`DebianRepository`.
+`DebianRepository`.
 
 Example:
 
-    repositories = apt.RepositoryMapping()
+```python
+repositories = apt.RepositoryMapping()
 
-    if "deb-us.archive.ubuntu.com-xenial" not in repositories:
-        repo = DebianRepository.from_repo_line(
-            "deb http://us.archive.ubuntu.com/ubuntu xenial main restricted")
-        repositories.add(repo)
+if "deb-us.archive.ubuntu.com-xenial" not in repositories:
+    repo = DebianRepository.from_repo_line("deb http://us.archive.ubuntu.com/ubuntu xenial main restricted")
+    repositories.add(repo)
+```
 """
 
 import fileinput
@@ -115,7 +123,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
@@ -159,28 +167,24 @@ class PackageState(Enum):
 class DebianPackage:
     """Represents a traditional Debian package and its utility functions.
 
-    :class:`DebianPackage` wraps information and functionality around a known
-      package, whether installed or available. The version, epoch, name, and
-      architecture can be easily queried and compared against other
-      :class:`DebianPackage` objects to determine the latest version or to
-      install a specific version.
+    `DebianPackage` wraps information and functionality around a known package, whether installed
+    or available. The version, epoch, name, and architecture can be easily queried and compared
+    against other `DebianPackage` objects to determine the latest version or to install a specific
+    version.
 
-      The representation of this object as a string mimics the output from
-      `dpkg` for familiarity.
+    The representation of this object as a string mimics the output from `dpkg` for familiarity.
 
-      Installation and removal of packages is handled through the `state` property
-      or `ensure` method, with the following options:
+    Installation and removal of packages is handled through the `state` property or `ensure`
+    method, with the following options:
 
         apt.PackageState.Absent
         apt.PackageState.Available
         apt.PackageState.Present
         apt.PackageState.Latest
 
-      When :class:`DebianPackage` is initialized, the state of a given
-      :class:`DebianPackage` object will be set to `Available`, `Present`, or
-      `Latest`, with `Absent` implemented as a convenience for removal (though it
-      operates essentially the same as `Available`).
-
+    When `DebianPackage` is initialized, the state of a given `DebianPackage` object will be set to
+    `Available`, `Present`, or `Latest`, with `Absent` implemented as a convenience for removal
+    (though it operates essentially the same as `Available`).
     """
 
     def __init__(
@@ -195,7 +199,7 @@ class DebianPackage:
         """Equality for comparison.
 
         Args:
-          other: a :class:`DebianPackage` object for comparison
+          other: a `DebianPackage` object for comparison
 
         Returns:
           A boolean reflecting equality
@@ -275,7 +279,7 @@ class DebianPackage:
         """Ensures that a package is in a given state.
 
         Args:
-          state: a :class:`PackageState` to reconcile the package to
+          state: a `PackageState` to reconcile the package to
 
         Raises:
           PackageError from the underlying call to apt
@@ -307,7 +311,7 @@ class DebianPackage:
         """Sets the package state to a given value.
 
         Args:
-          state: a :class:`PackageState` to reconcile the package to
+          state: a `PackageState` to reconcile the package to
 
         Raises:
           PackageError from the underlying call to apt
@@ -492,7 +496,7 @@ class Version:
     """An abstraction around package versions.
 
     This seems like it should be strictly unnecessary, except that `apt_pkg` is not usable inside a
-    venv, and wedging version comparisions into :class:`DebianPackage` would overcomplicate it.
+    venv, and wedging version comparisions into `DebianPackage` would overcomplicate it.
 
     This class implements the algorithm found here:
     https://www.debian.org/doc/debian-policy/ch-controlfields.html#version
@@ -769,7 +773,7 @@ def _add(
         version: an (Optional) version as a string. Defaults to the latest known
         arch: an optional architecture for the package
 
-    Returns: a tuple of :class:`DebianPackage` if found, or a :str: if it is not, and
+    Returns: a tuple of `DebianPackage` if found, or a :str: if it is not, and
         a boolean indicating success
     """
     try:
@@ -891,7 +895,7 @@ class DebianRepository:
 
     @staticmethod
     def from_repo_line(repo_line: str, write_file: Optional[bool] = True) -> "DebianRepository":
-        """Instantiate a new :class:`DebianRepository` a `sources.list` entry line.
+        """Instantiate a new `DebianRepository` a `sources.list` entry line.
 
         Args:
             repo_line: a string representing a repository entry
@@ -1086,16 +1090,17 @@ class DebianRepository:
 class RepositoryMapping(Mapping):
     """An representation of known repositories.
 
-    Instantiation of :class:`RepositoryMapping` will iterate through the
+    Instantiation of `RepositoryMapping` will iterate through the
     filesystem, parse out repository files in `/etc/apt/...`, and create
-    :class:`DebianRepository` objects in this list.
+    `DebianRepository` objects in this list.
 
     Typical usage:
-      repositories = dpkg.RepositoryMapping()
-      repositories.add(DebianRepository(
-        enabled=True, repotype="deb", uri="https://example.com", release="focal",
-        groups=["universe"]
-      ))
+
+        repositories = dpkg.RepositoryMapping()
+        repositories.add(DebianRepository(
+            enabled=True, repotype="deb", uri="https://example.com", release="focal",
+            groups=["universe"]
+        ))
     """
 
     def __init__(self):
@@ -1124,11 +1129,11 @@ class RepositoryMapping(Mapping):
         return iter(self._repository_map.values())
 
     def __getitem__(self, repository_uri: str) -> DebianRepository:
-        """Return a given :class:`DebianRepository`."""
+        """Return a given `DebianRepository`."""
         return self._repository_map[repository_uri]
 
     def __setitem__(self, repository_uri: str, repository: DebianRepository) -> None:
-        """Add a :class:`DebianRepository` to the cache."""
+        """Add a `DebianRepository` to the cache."""
         self._repository_map[repository_uri] = repository
 
     def load(self, file: str):
@@ -1187,7 +1192,7 @@ class RepositoryMapping(Mapping):
         """Add a new repository to the system.
 
         Args:
-          repo: a :class:`DebianRepository` object
+          repo: a `DebianRepository` object
           default_filename: an (Optional) filename if the default is not desirable
         """
         if repo.filename and default_filename:
@@ -1215,7 +1220,7 @@ class RepositoryMapping(Mapping):
         """Remove a repository. Disable by default.
 
         Args:
-          repo: a :class:`DebianRepository` to disable
+          repo: a `DebianRepository` to disable
         """
         searcher = f"{repo.repotype} {f'[signed-by={repo.gpg_key}]' if repo.gpg_key else ''} {repo.uri} {repo.release}"
 

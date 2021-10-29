@@ -14,34 +14,35 @@
 
 """Representations of the system's users and groups, and abstractions around managing them.
 
-The `passwd` module provides convenience methods and abstractions around users and
-groups on a Linux system, in order to make adding and managing users and groups easy.
-In the `passwd` module, :class:`Passwd` creates dictionaries of :class:`User` and
-:class:`Group` objects accessible by plain :str: keys, and exposed as properties on
-`Passwd.groups` and `Passwd.users`.
+The `passwd` module provides convenience methods and abstractions around users and groups on a
+Linux system, in order to make adding and managing users and groups easy. In the `passwd` module,
+`Passwd` creates dictionaries of `User` and `Group` objects accessible by plain `str` keys, and
+exposed as properties on `Passwd.groups` and `Passwd.users`.
 
-Users and groups are fully populated, referencing the object types of both. A :class:`User`
-object has a `groups` property which references :class:`Group` objects, and a :class:`Group`
-object has a `users` property which references :class:`User` objects. In order to make
-using this easier, :class:`Passwd` is provided which handled the initialization of both.
+Users and groups are fully populated, referencing the object types of both. A `User` object has a
+`groups` property which references `Group` objects, and a `Group` object has a `users` property
+which references `User` objects. In order to make using this easier, `Passwd` is provided which
+handled the initialization of both.
 
-Typical usage:
-  import passwd
-  try:
-      passwd.add_user(
-          "test",
-          group=Group("test", gid=1001),
-      )
-  except UserError as e:
-      logger.error(e.message)
+Example of adding a user named 'test':
 
-  ##############################
+```python
+import passwd
+try:
+    passwd.add_user("test", group=Group("test", gid=1001))
+except UserError as e:
+    logger.error(e.message)
+```
 
-  try:
-      snap_user = passwd.Passwd().users["snap"]
-      snap_user.ensure(passwd.UserState.NoLogin)
-  except UserNotFoundError:
-      logger.error("User snap not found!")
+And another example of looking up an existing using, then changing its state:
+
+```python
+try:
+    snap_user = passwd.Passwd().users["snap"]
+    snap_user.ensure(passwd.UserState.NoLogin)
+except UserNotFoundError:
+    logger.error("User snap not found!")
+```
 """
 
 import logging
@@ -63,7 +64,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 
 class Error(Exception):
@@ -112,14 +113,14 @@ class GroupNotFoundError(Error):
 class User(object):
     """Represents a user and its properties.
 
-    :class:`User` exposes the following properties about a user:
+    `User` exposes the following properties about a user:
       - name: the username of a user
       - uid: an `int` representing a useruid
       - gid: an `int` representing a group
-      - group: a :class:`Group` representing a user's group
+      - group: a `Group` representing a user's group
       - homedir: a user's homedir
       - shell: a user's shell
-      - state: a :class:`UserState` represnding a user's state
+      - state: a `UserState` represnding a user's state
       - gecos: an (Optional) comment describing user information
     """
 
@@ -210,7 +211,7 @@ class User(object):
         """Ensures that a user is in a given state.
 
         Args:
-          state: a :class:`UserState` to reconcile to.
+          state: a `UserState` to reconcile to.
 
         Raises:
           UserError if an error is encountered
@@ -331,7 +332,7 @@ class User(object):
         """Sets the user state to a given value.
 
         Args:
-          state: a :class:`UserState` to reconcile the user to.
+          state: a `UserState` to reconcile the user to.
 
         Raises:
           UserError if an error is encountered
@@ -344,7 +345,7 @@ class User(object):
 class Group(object):
     """Represents a group and its properties.
 
-    :class:`Group` exposes the following properties about a group:
+    `Group` exposes the following properties about a group:
         - name: the username of a user
         - gid: an `int` representing a group
         - users: a list of user IDs belonging to the group
@@ -407,7 +408,7 @@ class Users(UserDict):
     """A very small wrapper so __getitem__ returns nice errors."""
 
     def __getitem__(self, key: str) -> User:
-        """Return a :class:`UserNotFoundError` if it isn't there."""
+        """Return a `UserNotFoundError` if it isn't there."""
         try:
             return super().__getitem__(key)
         except KeyError:
@@ -418,7 +419,7 @@ class Groups(UserDict):
     """A very small wrapper so __getitem__ returns nice errors."""
 
     def __getitem__(self, key: str) -> Group:
-        """Return a :class:`GroupNotFoundError` if it isn't there."""
+        """Return a `GroupNotFoundError` if it isn't there."""
         try:
             return super().__getitem__(key)
         except KeyError:
@@ -428,7 +429,7 @@ class Groups(UserDict):
 class Passwd:
     """An abstraction to represent users and groups present on the system.
 
-    When instantiated, :class:`Passwd` parses out /etc/group and /etc/passwd
+    When instantiated, `Passwd` parses out /etc/group and /etc/passwd
     to create abstracted objects.
     """
 
@@ -463,7 +464,7 @@ class Passwd:
                     self._users[user.name] = user
 
     def _parse_passwd_line(self, line) -> User:
-        """Get values out of /etc/passwd and turn them into a :class:`User` object to cache."""
+        """Get values out of /etc/passwd and turn them into a `User` object to cache."""
         fields = line.split(":")
         name = fields[0]
         uid = int(fields[2])
@@ -516,7 +517,7 @@ class Passwd:
 
     @classmethod
     def _parse_groups_line(cls, line) -> Group:
-        """Get values out of /etc/group and turn them into a :class:`Group` object to cache."""
+        """Get values out of /etc/group and turn them into a `Group` object to cache."""
         fields = line.split(":")
         name = fields[0]
         gid = int(fields[2])
@@ -524,7 +525,7 @@ class Passwd:
         return Group(name, usernames, gid=gid)
 
     def _realize_users(self) -> None:
-        """Map user strings to :class:`User` objects for coherency."""
+        """Map user strings to `User` objects for coherency."""
         for k, v in self._groups.items():
             v._users = [
                 self._users[uname] if type(uname) is not User else uname for uname in v.users
@@ -535,7 +536,7 @@ class Passwd:
         """Adds a group to the system.
 
         Args:
-            group: a :class:`Group` object to add
+            group: a `Group` object to add
 
         Raises:
             CalledProcessError
@@ -550,6 +551,6 @@ class Passwd:
         """Adds a user to the system.
 
         Args:
-            user: a :class:`User` object to add
+            user: a `User` object to add
         """
         user.ensure(state=UserState.Present)

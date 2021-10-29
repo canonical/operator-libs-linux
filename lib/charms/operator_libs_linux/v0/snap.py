@@ -14,42 +14,46 @@
 
 """Representations of the system's Snaps, and abstractions around managing them.
 
-The `snap` module provides convenience methods for listing, installing, refreshing,
-and removing Snap packages, in addition to setting and getting configuration
-options for them.
+The `snap` module provides convenience methods for listing, installing, refreshing, and removing
+Snap packages, in addition to setting and getting configuration options for them.
 
-In the `snap` module, :class:`SnapCache` creates a dict-like mapping of
-:class:`Snap` objects at when instantiated. Installed snaps are fully populated,
-and available snaps are lazily-loaded upon request. This module relies on an
-installed and running `snapd` daemon to perform operations over the `snapd`
-HTTP API.
+In the `snap` module, `SnapCache` creates a dict-like mapping of `Snap` objects at when
+instantiated. Installed snaps are fully populated, and available snaps are lazily-loaded upon
+request. This module relies on an installed and running `snapd` daemon to perform operations over
+the `snapd` HTTP API.
 
-:class:`SnapCache` objects can be used to install or modify Snap packages by name
-in a manner similar to using the `snap` command from the commandline.
+`SnapCache` objects can be used to install or modify Snap packages by name in a manner similar to
+using the `snap` command from the commandline.
 
-An example of adding Juju to the system with :class:`SnapCache` and setting a config value:
-  try:
-      cache = snap.SnapCache()
-      juju = cache["juju"]
+An example of adding Juju to the system with `SnapCache` and setting a config value:
 
-      if not juju.present:
-          juju.ensure(snap.SnapState.Latest, channel="beta")
-          juju.set("key", "value")
-  except snap.SnapError as e:
-      logger.error(f"An exception occurred when installing charmcraft. Reason: {e.message}")
+```python
+try:
+    cache = snap.SnapCache()
+    juju = cache["juju"]
+
+    if not juju.present:
+        juju.ensure(snap.SnapState.Latest, channel="beta")
+        juju.set("key", "value")
+except snap.SnapError as e:
+    logger.error(f"An exception occurred when installing charmcraft. Reason: {e.message}")
+```
 
 In addition, the `snap` module provides "bare" methods which can act on Snap packages as
 simple function calls. :meth:`add`, :meth:`remove`, and :meth:`ensure` are provided, as
 well as :meth:`add_local` for installing directly from a local `.snap` file. These return
-:class:`Snap` objects.
+`Snap` objects.
 
 As an example of installing several Snaps and checking details:
-    try:
-        nextcloud, charmcraft = snap.add(["nextcloud", "charmcraft"])
-        if nextcloud.get("mode") != "production":
-            nextcloud.set("mode", "production")
-  except snap.SnapError as e:
-      logger.error(f"An exception occurred when installing snaps. Reason: {e.message}")
+
+```python
+try:
+    nextcloud, charmcraft = snap.add(["nextcloud", "charmcraft"])
+    if nextcloud.get("mode") != "production":
+        nextcloud.set("mode", "production")
+except snap.SnapError as e:
+    logger.error(f"An exception occurred when installing snaps. Reason: {e.message}")
+```
 """
 
 import http.client
@@ -77,7 +81,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 
 def _cache_init(func):
@@ -167,9 +171,9 @@ class SnapNotFoundError(Error):
 class Snap(object):
     """Represents a snap package and its properties.
 
-    :class:`Snap` exposes the following properties about a snap:
+    `Snap` exposes the following properties about a snap:
       - name: the name of the snap
-      - state: a :class:`SnapState` representation of its install status
+      - state: a `SnapState` representation of its install status
       - channel: "stable", "candidate", "beta", and "edge" are common
       - revision: a string representing the snap's revision
       - confinement: "classic" or "strict"
@@ -293,7 +297,7 @@ class Snap(object):
         """Ensures that a snap is in a given state.
 
         Args:
-          state: a :class:`SnapState` to reconcile to.
+          state: a `SnapState` to reconcile to.
           classic: an (Optional) boolean indicating whether classic confinement should be used
           channel: the channel to install from
 
@@ -328,7 +332,7 @@ class Snap(object):
         """Sets the snap state to a given value.
 
         Args:
-          state: a :class:`SnapState` to reconcile the snap to.
+          state: a `SnapState` to reconcile the snap to.
 
         Raises:
           SnapError if an error is encountered
@@ -494,7 +498,7 @@ class SnapClient:
 class SnapCache(Mapping):
     """An abstraction to represent installed/available packages.
 
-    When instantiated, :class:`SnapCache` iterates through the list of installed
+    When instantiated, `SnapCache` iterates through the list of installed
     snaps using the `snapd` HTTP API, and a list of available snaps by reading
     the filesystem to populate the cache. Information about available snaps is lazily-loaded
     from the `snapd` API when requested.
@@ -589,7 +593,7 @@ def add(
 
     Args:
         snap_names: the name or names of the snaps to install
-        state: a string or :class:`SnapState` representation of the desired state, one of
+        state: a string or `SnapState` representation of the desired state, one of
             [`Present` or `Latest`]
         channel: an (Optional) channel as a string. Defaults to 'latest'
         classic: an (Optional) boolean specifying whether it should be added with classic
@@ -636,7 +640,7 @@ def ensure(
 
     Args:
         name: the name(s) of the snaps to operate on
-        state: a string representation of the desired state, from :class:`SnapState`
+        state: a string representation of the desired state, from `SnapState`
         channel: an (Optional) channel as a string. Defaults to 'latest'
         classic: an (Optional) boolean specifying whether it should be added with classic
             confinement. Default `False`
