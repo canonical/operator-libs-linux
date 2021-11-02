@@ -1168,9 +1168,16 @@ class RepositoryMapping(Mapping):
           file: the path to the repository file
         """
         f = open(file, "r")
+        parsed_any = False
         for n, line in enumerate(f):
-            repo = self._parse(line, file)
-            self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo
+            try:
+                repo = self._parse(line, file)
+                self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo
+                parsed_any = True
+            except InvalidSourceError:
+                logger.debug("Skipping invalid line {} in {}".format(line, file))
+        if not parsed_any:
+            raise InvalidSourceError("All repository lines in {} were invalid!".format(file))
 
     @staticmethod
     def _parse(line: str, filename: str) -> DebianRepository:
