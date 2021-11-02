@@ -838,6 +838,7 @@ class DebianRepository:
         groups: List[str],
         filename: Optional[str] = "",
         gpg_key_filename: Optional[str] = "",
+        options: Optional[dict] = None,
     ):
         self._enabled = enabled
         self._repotype = repotype
@@ -846,6 +847,7 @@ class DebianRepository:
         self._groups = groups
         self._filename = filename
         self._gpg_key_filename = gpg_key_filename
+        self._options = options
 
     @property
     def enabled(self):
@@ -894,6 +896,23 @@ class DebianRepository:
         """Returns the path to the GPG key for this repository."""
         return self._gpg_key_filename
 
+    @property
+    def options(self):
+        """Returns any additional repo options which are set."""
+        return self._options
+
+    def make_options_string(self) -> str:
+        """Generate the complete options string for a a repository.
+
+        Combining `gpg_key`, if set, and the rest of the options to find
+        a complex repo string.
+        """
+        options = self._options if self._options else {}
+        if self._gpg_key_filename:
+            options["signed-by"] = self._gpg_key_filename
+
+        return f"[{' '.join([f'{k}={v}' for k,v in options.items()])}] " if options else ""
+
     @staticmethod
     def from_repo_line(repo_line: str, write_file: Optional[bool] = True) -> "DebianRepository":
         """Instantiate a new `DebianRepository` a `sources.list` entry line.
@@ -906,12 +925,18 @@ class DebianRepository:
         fname = f"{urlparse(repo.uri).path.lstrip('/').replace('/', '-')}-{repo.release}.list"
         repo.filename = fname
 
+        options = repo.options if repo.options else {}
+        if repo.gpg_key:
+            options["signed-by"] = repo.gpg_key
+
+        options_str = f"[{' '.join([f'{k}={v}' for k,v in options.items()])}] " if options else ""
+
         if write_file:
             with open(fname, "wb") as f:
                 f.write(
                     f"{'#' if not repo.enabled else ''}"
-                    f"{f'[signed-by={repo.gpg_key}]' if repo.gpg_key else ''}{repo.repotype} "
-                    f"{repo.uri} {repo.release} {' '.join(repo.groups)}\n".encode("utf-8")
+                    f"{repo.repotype} {options_str}{repo.uri} "
+                    f"{repo.release} {' '.join(repo.groups)}\n".encode("utf-8")
                 )
 
         return repo
@@ -921,8 +946,7 @@ class DebianRepository:
 
         Disable it instead of removing from the repository file.
         """
-        gpg_part = f"[signed-by={self.gpg_key}]" if self.gpg_key else ""
-        searcher = f"{self.repotype} {gpg_part}{self.uri} {self.release}"
+        searcher = f"{self.repotype} {self.make_options_string()}{self.uri} {self.release}"
         for line in fileinput.input(self._filename, inplace=True):
             if re.match(rf"^{re.escape(searcher)}\s", line):
                 print(f"# {line}", end="")
@@ -1161,6 +1185,9 @@ class RepositoryMapping(Mapping):
         """
         enabled = True
         repotype = uri = release = gpg_key = ""
+
+        options = {}
+        options_matcher = re.compile(r"\[.*?\]")
         groups = []
 
         line = line.strip()
@@ -1176,18 +1203,27 @@ class RepositoryMapping(Mapping):
         # Split a source into substrings to initialize a new repo.
         source = line.strip()
         if source:
+            for v in re.findall(options_matcher, source):
+                opts = dict(o.split("=") for o in v.strip("[]").split())
+
+                if "signed-by" in opts:
+                    gpg_key = opts["signed-by"]
+                    del opts["signed-by"]
+                options = opts
+            if re.search(options_matcher, source):
+                source = re.sub(options_matcher, "", source)
+
             chunks = source.split()
             if chunks[0] not in VALID_SOURCE_TYPES:
                 raise InvalidSourceError("An invalid sources line was found in %s!", filename)
-            if "[signed-by" in chunks[1]:
-                gpg_key = re.sub(r"\[signed-by=(.*?)]", r"\1", chunks[1])
-                del chunks[1]
             repotype = chunks[0]
             uri = chunks[1]
             release = chunks[2]
             groups = chunks[3:]
 
-        return DebianRepository(enabled, repotype, uri, release, groups, filename, gpg_key)
+        return DebianRepository(
+            enabled, repotype, uri, release, groups, filename, gpg_key, options
+        )
 
     def add(self, repo: DebianRepository, default_filename: Optional[bool] = True) -> None:
         """Add a new repository to the system.
@@ -1208,11 +1244,15 @@ class RepositoryMapping(Mapping):
 
         fname = repo.filename or new_filename
 
+        options = repo.options if repo.options else {}
+        if repo.gpg_key:
+            options["signed-by"] = repo.gpg_key
+
         with open(fname, "wb") as f:
             f.write(
                 f"{'#' if not repo.enabled else ''}"
-                f"{f'[signed-by={repo.gpg_key}]' if repo.gpg_key else ''}{repo.repotype} "
-                f"{repo.uri} {repo.release} {' '.join(repo.groups)}\n".encode("utf-8")
+                f"{repo.repotype} {repo.make_options_string()}{repo.uri} "
+                f"{repo.release} {' '.join(repo.groups)}\n".encode("utf-8")
             )
 
         self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo
@@ -1223,7 +1263,7 @@ class RepositoryMapping(Mapping):
         Args:
           repo: a `DebianRepository` to disable
         """
-        searcher = f"{repo.repotype} {f'[signed-by={repo.gpg_key}]' if repo.gpg_key else ''} {repo.uri} {repo.release}"
+        searcher = f"{repo.repotype} {repo.make_options_string()}{repo.uri} {repo.release}"
 
         for line in fileinput.input(repo.filename, inplace=True):
             if re.match(rf"^{re.escape(searcher)}\s", line):

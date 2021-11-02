@@ -107,3 +107,20 @@ class TestRepositoryMapping(TestCase):
             "deb https://example.com/foo focal bar baz\n",
             open(d.filename).readlines(),
         )
+
+    def test_can_add_repositories_from_string_with_options(self):
+        d = apt.DebianRepository.from_repo_line(
+            "deb [signed-by=/foo/gpg.key arch=amd64] https://example.com/foo focal bar baz"
+        )
+        self.assertEqual(d.enabled, True)
+        self.assertEqual(d.repotype, "deb")
+        self.assertEqual(d.uri, "https://example.com/foo")
+        self.assertEqual(d.release, "focal")
+        self.assertEqual(d.groups, ["bar", "baz"])
+        self.assertEqual(d.filename, "foo-focal.list")
+        self.assertEqual(d.gpg_key, "/foo/gpg.key")
+        self.assertEqual(d.options["arch"], "amd64")
+        self.assertIn(
+            "deb [arch=amd64 signed-by=/foo/gpg.key] https://example.com/foo focal bar baz\n",
+            open(d.filename).readlines(),
+        )
