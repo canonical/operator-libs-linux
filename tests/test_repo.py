@@ -6,7 +6,9 @@ from pyfakefs.fake_filesystem_unittest import TestCase
 
 sources_list = """## This is a comment which should be ignored!
 deb http://us.archive.ubuntu.com/ubuntu focal main restricted universe multiverse
+
 deb http://us.archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
+
 # deb http://us.archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse
 """
 
@@ -61,7 +63,9 @@ class TestRepositoryMapping(TestCase):
         self.assertEqual(
             "<charms.operator_libs_linux.v0.apt.InvalidSourceError>", ctx.exception.name
         )
-        self.assertIn("All repository lines in /tmp/bad.list", ctx.exception.message)
+        self.assertIn(
+            "all repository lines in '/tmp/bad.list' were invalid!", ctx.exception.message
+        )
 
     def test_can_disable_repositories(self):
         r = apt.RepositoryMapping()
