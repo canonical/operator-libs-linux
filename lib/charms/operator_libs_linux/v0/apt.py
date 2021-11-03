@@ -36,9 +36,9 @@ try:
     apt.add_package("zsh")
     apt.add_package(["vim", "htop", "wget"])
 except PackageNotFoundError:
-    logger.error("A specified package not found in package cache or on system")
+    logger.error("a specified package not found in package cache or on system")
 except PackageError as e:
-    logger.error(f"Could not install package. Reason: {e.message}")
+    logger.error("could not install package. Reason: %s", e.message)
 ````
 
 To find details of a specific package:
@@ -54,11 +54,11 @@ try:
     # apt.DebianPackage.from_installed_package("vim")
 
     vim.ensure(PackageState.Latest)
-    logger.info(f"Updated vim to {vim.fullversion}")
+    logger.info("updated vim to version: %s", vim.fullversion)
 except PackageNotFoundError:
-    logger.error("A specified package not found in package cache or on system")
+    logger.error("a specified package not found in package cache or on system")
 except PackageError as e:
-    logger.error(f"Could not install package. Reason: {e.message}")
+    logger.error("could not install package. Reason: %s", e.message)
 ```
 
 
@@ -128,6 +128,7 @@ LIBPATCH = 2
 
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
+OPTIONS_MATCHER = re.compile(r"\[.*?\]")
 
 
 class Error(Exception):
@@ -367,7 +368,7 @@ class DebianPackage:
             return DebianPackage.from_installed_package(package, version, arch)
         except PackageNotFoundError:
             logger.debug(
-                f"Package {package} is not currently installed or has the wrong architecture."
+                "package '%s' is not currently installed or has the wrong architecture.", package
             )
 
         # Ok, try `apt-cache ...`
@@ -434,7 +435,7 @@ class DebianPackage:
                 if pkg.arch == arch and (version == "" or str(pkg.version) == version):
                     return pkg
             except AttributeError:
-                logger.warning(f"dpkg matcher could not parse line: {line}")
+                logger.warning("dpkg matcher could not parse line: %s", line)
 
         # If we didn't find it, fail through
         raise PackageNotFoundError(f"Package {package}.{arch} is not installed!")
@@ -742,11 +743,11 @@ def add_package(
         if success:
             packages["success"].append(pkg)
         else:
-            logger.warning(f"Failed to locate and install/update {pkg}!")
+            logger.warning("failed to locate and install/update '%s'", pkg)
             packages["retry"].append(p)
 
     if packages["retry"] and not cache_refreshed:
-        logger.info("Updating the apt-cache and retrying installation of failed packages.")
+        logger.info("updating the apt-cache and retrying installation of failed packages.")
         update()
 
         for p in packages["retry"]:
@@ -808,7 +809,7 @@ def remove_package(
             pkg.ensure(state=PackageState.Absent)
             packages.append(pkg)
         except PackageNotFoundError:
-            logger.info(f"Package {p} was requested for removal, but it was not installed.")
+            logger.info("package '%s' was requested for removal, but it was not installed.", p)
 
     return packages if len(packages) > 1 else packages[0]
 
@@ -838,6 +839,7 @@ class DebianRepository:
         groups: List[str],
         filename: Optional[str] = "",
         gpg_key_filename: Optional[str] = "",
+        options: Optional[dict] = None,
     ):
         self._enabled = enabled
         self._repotype = repotype
@@ -846,6 +848,7 @@ class DebianRepository:
         self._groups = groups
         self._filename = filename
         self._gpg_key_filename = gpg_key_filename
+        self._options = options
 
     @property
     def enabled(self):
@@ -894,6 +897,23 @@ class DebianRepository:
         """Returns the path to the GPG key for this repository."""
         return self._gpg_key_filename
 
+    @property
+    def options(self):
+        """Returns any additional repo options which are set."""
+        return self._options
+
+    def make_options_string(self) -> str:
+        """Generate the complete options string for a a repository.
+
+        Combining `gpg_key`, if set, and the rest of the options to find
+        a complex repo string.
+        """
+        options = self._options if self._options else {}
+        if self._gpg_key_filename:
+            options["signed-by"] = self._gpg_key_filename
+
+        return f"[{' '.join([f'{k}={v}' for k,v in options.items()])}] " if options else ""
+
     @staticmethod
     def from_repo_line(repo_line: str, write_file: Optional[bool] = True) -> "DebianRepository":
         """Instantiate a new `DebianRepository` a `sources.list` entry line.
@@ -906,12 +926,18 @@ class DebianRepository:
         fname = f"{urlparse(repo.uri).path.lstrip('/').replace('/', '-')}-{repo.release}.list"
         repo.filename = fname
 
+        options = repo.options if repo.options else {}
+        if repo.gpg_key:
+            options["signed-by"] = repo.gpg_key
+
+        options_str = f"[{' '.join([f'{k}={v}' for k,v in options.items()])}] " if options else ""
+
         if write_file:
             with open(fname, "wb") as f:
                 f.write(
                     f"{'#' if not repo.enabled else ''}"
-                    f"{f'[signed-by={repo.gpg_key}]' if repo.gpg_key else ''}{repo.repotype} "
-                    f"{repo.uri} {repo.release} {' '.join(repo.groups)}\n".encode("utf-8")
+                    f"{repo.repotype} {options_str}{repo.uri} "
+                    f"{repo.release} {' '.join(repo.groups)}\n".encode("utf-8")
                 )
 
         return repo
@@ -921,8 +947,7 @@ class DebianRepository:
 
         Disable it instead of removing from the repository file.
         """
-        gpg_part = f"[signed-by={self.gpg_key}]" if self.gpg_key else ""
-        searcher = f"{self.repotype} {gpg_part}{self.uri} {self.release}"
+        searcher = f"{self.repotype} {self.make_options_string()}{self.uri} {self.release}"
         for line in fileinput.input(self._filename, inplace=True):
             if re.match(rf"^{re.escape(searcher)}\s", line):
                 print(f"# {line}", end="")
@@ -1137,16 +1162,34 @@ class RepositoryMapping(Mapping):
         """Add a `DebianRepository` to the cache."""
         self._repository_map[repository_uri] = repository
 
-    def load(self, file: str):
+    def load(self, filename: str):
         """Load a repository source file into the cache.
 
         Args:
-          file: the path to the repository file
+          filename: the path to the repository file
         """
-        f = open(file, "r")
-        for n, line in enumerate(f):
-            repo = self._parse(line, file)
-            self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo
+        parsed = []
+        skipped = []
+        with open(filename, "r") as f:
+            for n, line in enumerate(f):
+                try:
+                    repo = self._parse(line, filename)
+                except InvalidSourceError:
+                    skipped.append(n)
+                else:
+                    repo_identifier = f"{repo.repotype}-{repo.uri}-{repo.release}"
+                    self._repository_map[repo_identifier] = repo
+                    parsed.append(n)
+                    logger.debug("parsed repo: '%s'", repo_identifier)
+
+        if skipped:
+            skip_list = ", ".join(str(s) for s in skipped)
+            logger.debug("skipped the following lines in file '%s': %s", filename, skip_list)
+
+        if parsed:
+            logger.info("parsed %d apt package repositories", len(parsed))
+        else:
+            raise InvalidSourceError("all repository lines in '{}' were invalid!".format(filename))
 
     @staticmethod
     def _parse(line: str, filename: str) -> DebianRepository:
@@ -1157,10 +1200,11 @@ class RepositoryMapping(Mapping):
           filename: the filename being read
 
         Raises:
-          InvalidSoureError if the source type is unknown
+          InvalidSourceError if the source type is unknown
         """
         enabled = True
         repotype = uri = release = gpg_key = ""
+        options = {}
         groups = []
 
         line = line.strip()
@@ -1176,18 +1220,31 @@ class RepositoryMapping(Mapping):
         # Split a source into substrings to initialize a new repo.
         source = line.strip()
         if source:
+            # Match any repo options, and get a dict representation.
+            for v in re.findall(OPTIONS_MATCHER, source):
+                opts = dict(o.split("=") for o in v.strip("[]").split())
+                # Extract the 'signed-by' option for the gpg_key
+                gpg_key = opts.pop("signed-by", "")
+                options = opts
+
+            # Remove any options from the source string and split the string into chunks
+            source = re.sub(OPTIONS_MATCHER, "", source)
             chunks = source.split()
-            if chunks[0] not in VALID_SOURCE_TYPES:
+
+            # Check we've got a valid list of chunks
+            if len(chunks) < 3 or chunks[0] not in VALID_SOURCE_TYPES:
                 raise InvalidSourceError("An invalid sources line was found in %s!", filename)
-            if "[signed-by" in chunks[1]:
-                gpg_key = re.sub(r"\[signed-by=(.*?)]", r"\1", chunks[1])
-                del chunks[1]
+
             repotype = chunks[0]
             uri = chunks[1]
             release = chunks[2]
             groups = chunks[3:]
 
-        return DebianRepository(enabled, repotype, uri, release, groups, filename, gpg_key)
+            return DebianRepository(
+                enabled, repotype, uri, release, groups, filename, gpg_key, options
+            )
+        else:
+            raise InvalidSourceError("An invalid sources line was found in %s!", filename)
 
     def add(self, repo: DebianRepository, default_filename: Optional[bool] = True) -> None:
         """Add a new repository to the system.
@@ -1198,7 +1255,7 @@ class RepositoryMapping(Mapping):
         """
         if repo.filename and default_filename:
             logger.error(
-                "Cannot add a repository with a default filename and a "
+                "cannot add a repository with a default filename and a "
                 "filename set in the `DebianRepository` object"
             )
 
@@ -1208,11 +1265,15 @@ class RepositoryMapping(Mapping):
 
         fname = repo.filename or new_filename
 
+        options = repo.options if repo.options else {}
+        if repo.gpg_key:
+            options["signed-by"] = repo.gpg_key
+
         with open(fname, "wb") as f:
             f.write(
                 f"{'#' if not repo.enabled else ''}"
-                f"{f'[signed-by={repo.gpg_key}]' if repo.gpg_key else ''}{repo.repotype} "
-                f"{repo.uri} {repo.release} {' '.join(repo.groups)}\n".encode("utf-8")
+                f"{repo.repotype} {repo.make_options_string()}{repo.uri} "
+                f"{repo.release} {' '.join(repo.groups)}\n".encode("utf-8")
             )
 
         self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo
@@ -1223,7 +1284,7 @@ class RepositoryMapping(Mapping):
         Args:
           repo: a `DebianRepository` to disable
         """
-        searcher = f"{repo.repotype} {f'[signed-by={repo.gpg_key}]' if repo.gpg_key else ''} {repo.uri} {repo.release}"
+        searcher = f"{repo.repotype} {repo.make_options_string()}{repo.uri} {repo.release}"
 
         for line in fileinput.input(repo.filename, inplace=True):
             if re.match(rf"^{re.escape(searcher)}\s", line):

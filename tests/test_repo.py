@@ -4,8 +4,11 @@
 from charms.operator_libs_linux.v0 import apt
 from pyfakefs.fake_filesystem_unittest import TestCase
 
-sources_list = """deb http://us.archive.ubuntu.com/ubuntu focal main restricted universe multiverse
+sources_list = """## This is a comment which should be ignored!
+deb http://us.archive.ubuntu.com/ubuntu focal main restricted universe multiverse
+
 deb http://us.archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
+
 # deb http://us.archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse
 """
 
@@ -60,7 +63,9 @@ class TestRepositoryMapping(TestCase):
         self.assertEqual(
             "<charms.operator_libs_linux.v0.apt.InvalidSourceError>", ctx.exception.name
         )
-        self.assertIn("An invalid sources line", ctx.exception.message)
+        self.assertIn(
+            "all repository lines in '/tmp/bad.list' were invalid!", ctx.exception.message
+        )
 
     def test_can_disable_repositories(self):
         r = apt.RepositoryMapping()
@@ -105,5 +110,22 @@ class TestRepositoryMapping(TestCase):
         self.assertEqual(d.filename, "foo-focal.list")
         self.assertIn(
             "deb https://example.com/foo focal bar baz\n",
+            open(d.filename).readlines(),
+        )
+
+    def test_can_add_repositories_from_string_with_options(self):
+        d = apt.DebianRepository.from_repo_line(
+            "deb [signed-by=/foo/gpg.key arch=amd64] https://example.com/foo focal bar baz"
+        )
+        self.assertEqual(d.enabled, True)
+        self.assertEqual(d.repotype, "deb")
+        self.assertEqual(d.uri, "https://example.com/foo")
+        self.assertEqual(d.release, "focal")
+        self.assertEqual(d.groups, ["bar", "baz"])
+        self.assertEqual(d.filename, "foo-focal.list")
+        self.assertEqual(d.gpg_key, "/foo/gpg.key")
+        self.assertEqual(d.options["arch"], "amd64")
+        self.assertIn(
+            "deb [arch=amd64 signed-by=/foo/gpg.key] https://example.com/foo focal bar baz\n",
             open(d.filename).readlines(),
         )
