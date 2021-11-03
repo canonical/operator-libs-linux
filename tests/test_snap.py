@@ -191,7 +191,7 @@ class TestSnapCache(unittest.TestCase):
     @patch("os.path.isfile")
     def test_can_load_snap_cache(self, mock_exists, m):
         m.return_value.__iter__ = lambda self: self
-        m.return_value.__next__ = lambda self: next(iter(self.readline, ''))
+        m.return_value.__next__ = lambda self: next(iter(self.readline, ""))
         mock_exists.return_value = True
         s = SnapCacheTester()
         s._load_available_snaps()
@@ -202,7 +202,7 @@ class TestSnapCache(unittest.TestCase):
     @patch("os.path.isfile")
     def test_can_lazy_load_snap_info(self, mock_exists, m):
         m.return_value.__iter__ = lambda self: self
-        m.return_value.__next__ = lambda self: next(iter(self.readline, ''))
+        m.return_value.__next__ = lambda self: next(iter(self.readline, ""))
         mock_exists.return_value = True
         s = SnapCacheTester()
         s._snap_client.get_snap_information.return_value = json.loads(lazy_load_result)["result"][
@@ -296,7 +296,7 @@ class TestSnapBareMethods(unittest.TestCase):
     @patch("os.path.isfile")
     def setUp(self, mock_exists, m):
         m.return_value.__iter__ = lambda self: self
-        m.return_value.__next__ = lambda self: next(iter(self.readline, ''))
+        m.return_value.__next__ = lambda self: next(iter(self.readline, ""))
         mock_exists.return_value = True
         snap._Cache.cache = SnapCacheTester()
         snap._Cache.cache._snap_client.get_installed_snaps.return_value = json.loads(
