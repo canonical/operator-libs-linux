@@ -28,7 +28,7 @@ SYSTEMD_SYSTEM = "/run/systemd/system"
 logger = logging.getLogger(__name__)
 
 
-def _is_trusty() -> dict:
+def _is_trusty() -> bool:
     """Check to see if we are running in trusty."""
     d = {}
     with open("/etc/os-release", "r") as os_release:
@@ -41,7 +41,7 @@ def _is_trusty() -> dict:
     return d["VERSION_CODENAME"] == "trusty"
 
 
-def service_running(service_name: str, **kwargs) -> str:
+def service_running(service_name: str, **kwargs) -> bool:
     """Determine whether a system service is running.
 
     :param service_name: the name of the service
@@ -79,7 +79,7 @@ def service_running(service_name: str, **kwargs) -> str:
         return False
 
 
-def init_is_systemd(service_name=None):
+def init_is_systemd(service_name=None) -> bool:
     """Returns whether the host uses systemd for the specified service.
 
     @param Optional[str] service_name: specific name of service
