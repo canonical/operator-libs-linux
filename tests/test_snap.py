@@ -230,6 +230,15 @@ class TestSnapCache(unittest.TestCase):
         self.assertEqual(s["charmcraft"].revision, "603")
 
     @patch("os.path.isfile")
+    def test_raises_error_if_snap_not_installed(self, mock_exists):
+        mock_exists.return_value = False
+        s = SnapCacheTester()
+        with self.assertRaises(snap.SnapError) as ctx:
+            s["snapcraft"]
+        self.assertEqual("<charms.operator_libs_linux.v0.snap.SnapError>", ctx.exception.name)
+        self.assertIn("snapd is not installed", ctx.exception.message)
+
+    @patch("os.path.isfile")
     def test_raises_error_if_snap_not_running(self, mock_exists):
         mock_exists.return_value = False
         s = SnapCacheTester()
