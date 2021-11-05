@@ -16,7 +16,7 @@
 """Abstractions for stopping, starting and managing system services via systemd.
 
 This library assumes that your charm is running on a platform that uses systemd. E.g.,
-Centos 7 or later, Ubuntu Xenial (18.04) or later.
+Centos 7 or later, Ubuntu Xenial (16.04) or later.
 
 For the most part, we transparently provide an interface to a commonly used selection of
 systemd commands, with a few shortcuts baked in. For example, service_pause and
