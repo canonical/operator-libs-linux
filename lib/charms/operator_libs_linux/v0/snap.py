@@ -505,10 +505,13 @@ class SnapCache(Mapping):
     """
 
     def __init__(self):
+        if not self.snapd_installed:
+            raise SnapError("snapd is not installed or not in /usr/bin") from None
         self._snap_client = SnapClient()
         self._snap_map = {}
-        self._load_available_snaps()
-        self._load_installed_snaps()
+        if self.snapd_installed:
+            self._load_available_snaps()
+            self._load_installed_snaps()
 
     def __contains__(self, key: str) -> bool:
         """Magic method to ease checking if a given snap is in the cache."""
@@ -524,16 +527,29 @@ class SnapCache(Mapping):
 
     def __getitem__(self, snap_name: str) -> Snap:
         """Return either the installed version or latest version for a given snap."""
+        snap = None
         try:
             snap = self._snap_map[snap_name]
         except KeyError:
-            raise SnapNotFoundError(f"Snap '{snap_name}' not found in cache!")
+            # The snap catalog may not be populated yet. Try to fetch info
+            # blindly
+            logger.warning(
+                "Snap '{}' not found in the snap cache. "
+                "The catalog may not be populated by snapd yet".format(snap_name)
+            )
 
         if snap is None:
-            self._snap_map[snap_name] = self._load_info(snap_name)
-            return self._snap_map[snap_name]
+            try:
+                self._snap_map[snap_name] = self._load_info(snap_name)
+            except SnapAPIError:
+                raise SnapNotFoundError(f"Snap '{snap_name}' not found!")
 
         return self._snap_map[snap_name]
+
+    @property
+    def snapd_installed(self) -> bool:
+        """Check whether snapd has been installled on the system."""
+        return os.path.isfile("/usr/bin/snap")
 
     def _load_available_snaps(self) -> None:
         """Load the list of available snaps from disk.
