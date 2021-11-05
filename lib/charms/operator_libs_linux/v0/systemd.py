@@ -65,7 +65,7 @@ def service(action: str, service_name: str) -> bool:
     :param service_name: the name of the service to perform th action on
     """
     cmd = ["systemctl", action, service_name]
-    if action != "is_active":
+    if action != "is-active":
         logger.debug("Attempting to {} '{}' with command {}.".format(action, service_name, cmd))
     else:
         logger.debug("Checking if '{}' is active".format(service_name))
