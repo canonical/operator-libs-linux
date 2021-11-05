@@ -915,6 +915,15 @@ class DebianRepository:
         return f"[{' '.join([f'{k}={v}' for k,v in options.items()])}] " if options else ""
 
     @staticmethod
+    def prefix_from_uri(uri: str) -> str:
+        """Get a repo list prefix from the uri, depending on whether a path is set."""
+        uridetails = urlparse(uri)
+        path = (
+            uridetails.path.lstrip("/").replace("/", "-") if uridetails.path else uridetails.netloc
+        )
+        return f"/etc/apt/sources.list.d/{path}"
+
+    @staticmethod
     def from_repo_line(repo_line: str, write_file: Optional[bool] = True) -> "DebianRepository":
         """Instantiate a new `DebianRepository` a `sources.list` entry line.
 
@@ -923,7 +932,7 @@ class DebianRepository:
             write_file: boolean to enable writing the new repo to disk
         """
         repo = RepositoryMapping._parse(repo_line, "UserInput")
-        fname = f"{urlparse(repo.uri).path.lstrip('/').replace('/', '-')}-{repo.release}.list"
+        fname = f"{DebianRepository.prefix_from_uri(repo.uri)}-{repo.release}.list"
         repo.filename = fname
 
         options = repo.options if repo.options else {}
@@ -988,7 +997,7 @@ class DebianRepository:
                 key_name = self._get_keyid_by_gpg_key(key_bytes)
                 key_gpg = self._dearmor_gpg_key(key_bytes)
                 self._gpg_key_filename = f"/etc/apt/trusted.gpg.d/{key_name}.gpg"
-                self._write_apt_gpg_keyfile(key_name=key_name, key_material=key_gpg)
+                self._write_apt_gpg_keyfile(key_name=self._gpg_key_filename, key_material=key_gpg)
             else:
                 raise GPGKeyError("ASCII armor markers missing from GPG key")
         else:
@@ -1018,14 +1027,13 @@ class DebianRepository:
         """
         # Use the same gpg command for both Xenial and Bionic
         cmd = ["gpg", "--with-colons", "--with-fingerprint"]
-        ps = subprocess.Popen(
+        ps = subprocess.run(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            stdin=subprocess.PIPE,
-            universal_newlines=True,
+            input=key_material,
         )
-        out, err = ps.communicate(input=str(key_material))
+        out, err = ps.stdout.decode(), ps.stderr.decode()
         if "gpg: no valid OpenPGP data found." in err:
             raise GPGKeyError("Invalid GPG key material provided")
         # from gnupg2 docs: fpr :: Fingerprint (fingerprint is in field 10)
@@ -1069,10 +1077,10 @@ class DebianRepository:
         )
         curl_cmd = ["curl", keyserver_url.format(keyid)]
         # use proxy server settings in order to retrieve the key
-        return check_output(curl_cmd)
+        return check_output(curl_cmd).decode()
 
     @staticmethod
-    def _dearmor_gpg_key(key_asc: bytes) -> str:
+    def _dearmor_gpg_key(key_asc: bytes) -> bytes:
         """Converts a GPG key in the ASCII armor format to the binary format.
 
         Args:
@@ -1084,14 +1092,10 @@ class DebianRepository:
         Raises:
           GPGKeyError
         """
-        ps = subprocess.Popen(
-            ["gpg", "--dearmor"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            stdin=subprocess.PIPE,
-            universal_newlines=True,
+        ps = subprocess.run(
+            ["gpg", "--dearmor"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, input=key_asc
         )
-        out, err = ps.communicate(input=str(key_asc))
+        out, err = ps.stdout, ps.stderr.decode()
         if "gpg: no valid OpenPGP data found." in err:
             raise GPGKeyError(
                 "Invalid GPG key material. Check your network setup"
@@ -1102,7 +1106,7 @@ class DebianRepository:
             return out
 
     @staticmethod
-    def _write_apt_gpg_keyfile(key_name: str, key_material: str) -> None:
+    def _write_apt_gpg_keyfile(key_name: str, key_material: bytes) -> None:
         """Writes GPG key material into a file at a provided path.
 
         Args:
@@ -1110,7 +1114,7 @@ class DebianRepository:
           key_material: A GPG key material (binary)
         """
         with open(key_name, "wb") as keyf:
-            keyf.write(key_material.encode("utf-8"))
+            keyf.write(key_material)
 
 
 class RepositoryMapping(Mapping):
@@ -1122,7 +1126,7 @@ class RepositoryMapping(Mapping):
 
     Typical usage:
 
-        repositories = dpkg.RepositoryMapping()
+        repositories = apt.RepositoryMapping()
         repositories.add(DebianRepository(
             enabled=True, repotype="deb", uri="https://example.com", release="focal",
             groups=["universe"]
@@ -1246,22 +1250,14 @@ class RepositoryMapping(Mapping):
         else:
             raise InvalidSourceError("An invalid sources line was found in %s!", filename)
 
-    def add(self, repo: DebianRepository, default_filename: Optional[bool] = True) -> None:
+    def add(self, repo: DebianRepository, default_filename: Optional[bool] = False) -> None:
         """Add a new repository to the system.
 
         Args:
           repo: a `DebianRepository` object
           default_filename: an (Optional) filename if the default is not desirable
         """
-        if repo.filename and default_filename:
-            logger.error(
-                "cannot add a repository with a default filename and a "
-                "filename set in the `DebianRepository` object"
-            )
-
-        new_filename = (
-            f"{urlparse(repo.uri).path.lstrip('/').replace('/', '-')}-{repo.release}.list"
-        )
+        new_filename = f"{DebianRepository.prefix_from_uri(repo.uri)}-{repo.release}.list"
 
         fname = repo.filename or new_filename
 

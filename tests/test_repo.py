@@ -107,7 +107,7 @@ class TestRepositoryMapping(TestCase):
         self.assertEqual(d.uri, "https://example.com/foo")
         self.assertEqual(d.release, "focal")
         self.assertEqual(d.groups, ["bar", "baz"])
-        self.assertEqual(d.filename, "foo-focal.list")
+        self.assertEqual(d.filename, "/etc/apt/sources.list.d/foo-focal.list")
         self.assertIn(
             "deb https://example.com/foo focal bar baz\n",
             open(d.filename).readlines(),
@@ -122,7 +122,7 @@ class TestRepositoryMapping(TestCase):
         self.assertEqual(d.uri, "https://example.com/foo")
         self.assertEqual(d.release, "focal")
         self.assertEqual(d.groups, ["bar", "baz"])
-        self.assertEqual(d.filename, "foo-focal.list")
+        self.assertEqual(d.filename, "/etc/apt/sources.list.d/foo-focal.list")
         self.assertEqual(d.gpg_key, "/foo/gpg.key")
         self.assertEqual(d.options["arch"], "amd64")
         self.assertIn(
