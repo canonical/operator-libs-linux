@@ -505,6 +505,8 @@ class SnapCache(Mapping):
     """
 
     def __init__(self):
+        if not self.snapd_installed:
+            raise SnapError("snapd is not installed or not in /usr/bin") from None
         self._snap_client = SnapClient()
         self._snap_map = {}
         if self.snapd_installed:
@@ -525,9 +527,6 @@ class SnapCache(Mapping):
 
     def __getitem__(self, snap_name: str) -> Snap:
         """Return either the installed version or latest version for a given snap."""
-        if not self.snapd_installed:
-            raise SnapError("snapd is not installed or not in /usr/bin") from None
-
         snap = None
         try:
             snap = self._snap_map[snap_name]
