@@ -1,0 +1,6 @@
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+apt-install:
+apt-install-external-repo:
+snap-install:
+snap-install-bare:

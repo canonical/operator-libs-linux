@@ -1,0 +1,11 @@
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+type: charm
+bases:
+  - name: "ubuntu"
+    channel: "20.04"
+parts:
+  charm:
+    charm-entrypoint: ./charm.py
+    build-packages:
+      - git

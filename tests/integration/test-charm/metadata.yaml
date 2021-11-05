@@ -1,0 +1,6 @@
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: tester
+description: charm for integration testing only
+summary: charm for integration testing only
+series: ["focal"]

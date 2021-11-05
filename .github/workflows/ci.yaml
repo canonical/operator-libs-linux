@@ -22,3 +22,15 @@ jobs:
         run: python -m pip install tox
       - name: Run tests
         run: tox -vve unit
+  integration-test:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup operator environment
+        uses: charmed-kubernetes/actions-operator@main
+        with:
+          provider: lxd
+      - name: Run integration tests
+        run: tox -vve integration
