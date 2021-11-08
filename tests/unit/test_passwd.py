@@ -34,7 +34,7 @@ class TestPasswd(TestCase):
         p = passwd.Passwd()
         self.assertIn("testuser", p.groups)
         self.assertEqual(len(p.groups), 4)
-    
+
     def test_lookup_group_by_gid(self):
         p = passwd.Passwd()
         lxd_group = passwd.Passwd.lookup_group(118)
@@ -44,7 +44,7 @@ class TestPasswd(TestCase):
         p = passwd.Passwd()
         lxd_group = passwd.Passwd.lookup_group("lxd")
         self.assertEqual(p.groups["lxd"], lxd_group)
-    
+
     def test_lookup_group_raises_type_error(self):
         invalid = [False, passwd.Group("foo", []), 37.55]
         for x in invalid:
@@ -84,7 +84,7 @@ class TestPasswd(TestCase):
         self.assertEqual(u.shell, "/usr/sbin/nologin")
         self.assertEqual(u.homedir, "/")
         self.assertEqual(u.state, passwd.UserState.NoLogin)
-    
+
     def test_lookup_user_by_uid(self):
         p = passwd.Passwd()
         lxd_user = passwd.Passwd.lookup_user(998)
@@ -94,7 +94,7 @@ class TestPasswd(TestCase):
         p = passwd.Passwd()
         lxd_user = passwd.Passwd.lookup_user("lxd")
         self.assertEqual(p.users["lxd"], lxd_user)
-    
+
     def test_lookup_user_raises_type_error(self):
         invalid = [False, passwd.Group("foo", []), 37.55]
         for x in invalid:
@@ -145,5 +145,16 @@ class TestPasswd(TestCase):
         )
         u.ensure_state(u.state)
         mock_subprocess.assert_called_with(
-            ["useradd", "-g", "1001", "-s", "/usr/bin/bash", "-d", "/home/foo", "-u", "1001", "foo"]
+            [
+                "useradd",
+                "-g",
+                "1001",
+                "-s",
+                "/usr/bin/bash",
+                "-d",
+                "/home/foo",
+                "-u",
+                "1001",
+                "foo",
+            ]
         )
