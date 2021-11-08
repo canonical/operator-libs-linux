@@ -33,6 +33,10 @@ class TesterCharm(CharmBase):
         self.framework.observe(self.on.add_user_action, self._on_add_user_action)
         self.framework.observe(
             self.on.add_user_with_params_action, self._on_add_user_with_params_action)
+        self.framework.observe(self.on.add_group_action, self._on_add_group_action)
+        self.framework.observe(
+            self.on.add_group_with_gid_action, self._on_add_group_with_gid_action)
+        self.framework.observe(self.on.remove_group_action, self._on_remove_group_action)
 
     def _on_start(self, _: StartEvent):
         self.unit.status = ActiveStatus()
@@ -88,11 +92,11 @@ class TesterCharm(CharmBase):
         p = passwd.Passwd()
         user = passwd.User(name="test-user-0", state=passwd.UserState.Present)
         p.add_user(user)
-
-        with open("/etc/passwd", "r") as f:
-            lines = f.readlines()
+        event.set_results({
+            "created-user": self._get_last_line_in_file("/etc/passwd"),
+            "created-group": self._get_last_line_in_file("/etc/group"),
+        })
         
-        event.set_results({"created": lines[-1]})
 
     def _on_add_user_with_params_action(self, event: ActionEvent):
         p = passwd.Passwd()
@@ -103,14 +107,31 @@ class TesterCharm(CharmBase):
             group="admin"
         )
         p.add_user(user)
+        event.set_results({"created-user": self._get_last_line_in_file("/etc/passwd")})
 
-        with open("/etc/passwd", "r") as f:
-            lines = f.readlines()
-        
-        event.set_results({"created": lines[-1]})
+    def _on_add_group_action(self, event: ActionEvent):
+        group = passwd.Group(name="test-group", users=[]).add()
+        event.set_results({"created-group": self._get_last_line_in_file("/etc/group")})
+
+    def _on_add_group_with_gid_action(self, event: ActionEvent):
+        group = passwd.Group(name="test-group-1099", users=[], gid=1099).add()
+        event.set_results({"created-group": self._get_last_line_in_file("/etc/group")})
+    
+    def _on_remove_group_action(self, event: ActionEvent):
+        group = passwd.Group(name="test-group-1099", users=[], gid=1099).remove()
+        event.set_results({"last-group": self._get_last_line_in_file("/etc/group")})
+
+    #
+    # Helpers
+    #
 
     def _get_command_path(self, command):
         return check_output(["which", command]).decode().strip()
+    
+    def _get_last_line_in_file(self, filename):
+        with open(filename, "r") as f:
+            lines = f.readlines()
+        return lines[-1].strip()
 
 
 if __name__ == "__main__":

@@ -76,18 +76,49 @@ async def test_snap_install_bare(ops_test: OpsTest):
 async def test_add_user(ops_test: OpsTest):
     unit = ops_test.model.applications["tester"].units[0]
 
-    action = await unit.run_action("add_user_with_params")
+    action = await unit.run_action("add-user")
     action = await action.wait()
 
     assert action.results["Code"] == "0"
-    assert action.results["created"] == "test-user-0:x:1001:1001::/home/test-user-0:/bin/sh"
+    assert action.results["created-user"] == "test-user-0:x:1001:1001::/home/test-user-0:/bin/sh"
+    assert action.results["created-group"] == "test-user-0:x:1001:"
 
 @pytest.mark.abort_on_fail
 async def test_add_user_with_params(ops_test: OpsTest):
     unit = ops_test.model.applications["tester"].units[0]
 
-    action = await unit.run_action("add_user_with_params")
+    action = await unit.run_action("add-user-with-params")
     action = await action.wait()
 
     assert action.results["Code"] == "0"
-    assert action.results["created"] == "test-user-1:x:1002:116::/home/test-user-1:/bin/bash"
+    assert action.results["created-user"] == "test-user-1:x:1002:116::/home/test-user-1:/bin/bash"
+
+@pytest.mark.abort_on_fail
+async def test_add_group(ops_test: OpsTest):
+    unit = ops_test.model.applications["tester"].units[0]
+
+    action = await unit.run_action("add-group")
+    action = await action.wait()
+
+    assert action.results["Code"] == "0"
+    assert action.results["created-group"] == "test-group:x:1002:"
+
+@pytest.mark.abort_on_fail
+async def test_add_group_with_gid(ops_test: OpsTest):
+    unit = ops_test.model.applications["tester"].units[0]
+
+    action = await unit.run_action("add-group-with-gid")
+    action = await action.wait()
+
+    assert action.results["Code"] == "0"
+    assert action.results["created-group"] == "test-group-1099:x:1099:"
+
+@pytest.mark.abort_on_fail
+async def test_remove_group(ops_test: OpsTest):
+    unit = ops_test.model.applications["tester"].units[0]
+
+    action = await unit.run_action("remove-group")
+    action = await action.wait()
+
+    assert action.results["Code"] == "0"
+    assert action.results["last-group"] != "test-group-1099:x:1099:"
