@@ -31,6 +31,8 @@ class TesterCharm(CharmBase):
 
         # User and group management actions
         self.framework.observe(self.on.add_user_action, self._on_add_user_action)
+        self.framework.observe(
+            self.on.add_user_with_params_action, self._on_add_user_with_params_action)
 
     def _on_start(self, _: StartEvent):
         self.unit.status = ActiveStatus()
@@ -84,13 +86,28 @@ class TesterCharm(CharmBase):
     
     def _on_add_user_action(self, event: ActionEvent):
         p = passwd.Passwd()
+        user = passwd.User(name="test-user-0", state=passwd.UserState.Present)
+        p.add_user(user)
+
+        with open("/etc/passwd", "r") as f:
+            lines = f.readlines()
+        
+        event.set_results({"created": lines[-1]})
+
+    def _on_add_user_with_params_action(self, event: ActionEvent):
+        p = passwd.Passwd()
         user = passwd.User(
-            name="test-user", 
+            name="test-user-1", 
             state=passwd.UserState.Present, 
             shell="/bin/bash",
             group="admin"
         )
         p.add_user(user)
+
+        with open("/etc/passwd", "r") as f:
+            lines = f.readlines()
+        
+        event.set_results({"created": lines[-1]})
 
     def _get_command_path(self, command):
         return check_output(["which", command]).decode().strip()

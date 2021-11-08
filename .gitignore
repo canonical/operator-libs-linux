@@ -8,3 +8,4 @@ build/
 .idea/
 .tox/
 .mypy_cache
+tests/integration/test-charm/lib/

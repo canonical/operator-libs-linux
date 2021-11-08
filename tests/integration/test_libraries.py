@@ -71,3 +71,23 @@ async def test_snap_install_bare(ops_test: OpsTest):
 
     assert action.results["Code"] == "0"
     assert action.results["installed"] == "['/snap/bin/charmcraft']"
+
+@pytest.mark.abort_on_fail
+async def test_add_user(ops_test: OpsTest):
+    unit = ops_test.model.applications["tester"].units[0]
+
+    action = await unit.run_action("add_user_with_params")
+    action = await action.wait()
+
+    assert action.results["Code"] == "0"
+    assert action.results["created"] == "test-user-0:x:1001:1001::/home/test-user-0:/bin/sh"
+
+@pytest.mark.abort_on_fail
+async def test_add_user_with_params(ops_test: OpsTest):
+    unit = ops_test.model.applications["tester"].units[0]
+
+    action = await unit.run_action("add_user_with_params")
+    action = await action.wait()
+
+    assert action.results["Code"] == "0"
+    assert action.results["created"] == "test-user-1:x:1002:116::/home/test-user-1:/bin/bash"
