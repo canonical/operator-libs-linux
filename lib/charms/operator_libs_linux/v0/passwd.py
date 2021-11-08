@@ -159,7 +159,7 @@ class User(object):
         else:
 
             self._primary_group = None
-        
+
         self._groups = (
             [g if type(g) is Group else Passwd.lookup_group(g) for g in groups] if groups else []
         )
@@ -468,7 +468,7 @@ class Passwd:
     def groups(self) -> Groups:
         """Return a mapping of the groups on the system."""
         return self._groups
-    
+
     def add_group(self, group: Group) -> None:
         """Adds a group to the system.
 
@@ -480,7 +480,8 @@ class Passwd:
         """
         if type(group) is not Group:
             raise TypeError(
-                f"invalid type '{type(group)}' for parameter 'group'. Expected 'Group'.")
+                f"invalid type '{type(group)}' for parameter 'group'. Expected 'Group'."
+            )
 
         try:
             args = ["-g", group.gid] if group.gid else []
@@ -497,11 +498,11 @@ class Passwd:
         if type(user) is not User:
             raise TypeError(f"invalid type '{type(user)}' for parameter 'user'. Expected 'User'.")
         user.ensure_state(state=UserState.Present)
-        
+
     @classmethod
-    def lookup_group(cls, group: Union[str,int]) -> Group:
+    def lookup_group(cls, group: Union[str, int]) -> Group:
         """Lookup a group by either numeric GID or group name.
-        
+
         Arguments:
             group: a `str` or `int` representing group name or GID.
         """
@@ -514,26 +515,10 @@ class Passwd:
         else:
             raise TypeError("group argument should be of type str or int")
 
-        try:
-            args = ["-g", group.gid] if group.gid else []
-            subprocess.check_call(["groupadd", *args, group.name])
-        except CalledProcessError as e:
-            raise GroupError(f"Could not add group {self.name}! Reason: {e.output}")
-
-    def add_user(self, user: User) -> None:
-        """Adds a user to the system.
-
-        Args:
-            user: a `User` object to add
-        """
-        if type(user) is not User:
-            raise TypeError(f"invalid type '{type(user)}' for parameter 'user'. Expected 'User'.")
-        user.ensure_state(state=UserState.Present)
-        
     @classmethod
-    def lookup_user(cls, user: Union[str,int]) -> User:
+    def lookup_user(cls, user: Union[str, int]) -> User:
         """Lookup a user by either numeric UID or user name.
-        
+
         Arguments:
             user: a `str` or `int` representing user name or UID.
         """
@@ -543,22 +528,6 @@ class Passwd:
             return cls._user_by_uid(user)
         else:
             raise TypeError("user argument should be of type str or int")
-
-    @classmethod
-    def lookup_group(cls, group: Union[str,int]) -> Group:
-        """Lookup a group by either numeric GID or group name.
-        
-        Arguments:
-            group: a `str` or `int` representing group name or GID.
-        """
-        cls._fetch_groups_for_user()
-
-        if type(group) is str:
-            return cls._group_by_name(group)
-        elif type(group) is int:
-            return cls._group_by_gid(group)
-        else:
-            raise TypeError("group argument should be of type str or int")
 
     @classmethod
     def _load_users(cls) -> None:
@@ -585,7 +554,7 @@ class Passwd:
 
         state = UserState.NoLogin if shell == "/usr/sbin/nologin" else UserState.Present
         return User(name, state, homedir=homedir, shell=shell, uid=uid, group=gid, gecos=gecos)
-        
+
     @classmethod
     def _group_by_gid(cls, gid: int) -> Group:
         """Look up a group by group id.
