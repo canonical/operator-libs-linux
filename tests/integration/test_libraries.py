@@ -40,15 +40,15 @@ async def test_apt_install(ops_test: OpsTest):
     assert action.results["installed"] == "['/usr/bin/zsh', '/usr/bin/cfssl', '/usr/bin/jq']"
 
 
-# @pytest.mark.abort_on_fail
-# async def test_apt_install_external_repo(ops_test: OpsTest):
-#     unit = ops_test.model.applications["tester"].units[0]
+@pytest.mark.abort_on_fail
+async def test_apt_install_external_repo(ops_test: OpsTest):
+    unit = ops_test.model.applications["tester"].units[0]
 
-#     action = await unit.run_action("apt-install-external-repo")
-#     action = await action.wait()
+    action = await unit.run_action("apt-install-external-repo")
+    action = await action.wait()
 
-#     assert action.results["Code"] == "0"
-#     assert action.results["installed"] == "['/usr/bin/terraform']"
+    assert action.results["Code"] == "0"
+    assert action.results["installed"] == "['/usr/bin/terraform']"
 
 
 @pytest.mark.abort_on_fail

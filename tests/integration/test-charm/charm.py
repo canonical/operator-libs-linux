@@ -50,7 +50,6 @@ class TesterCharm(CharmBase):
         # Add the hashicorp repository if it doesn't already exist
         if "deb-apt.releases.hashicorp.com-focal" not in repositories:
             line = "deb [arch=amd64] https://apt.releases.hashicorp.com focal main"
-            # line = "deb https://apt.releases.hashicorp.com focal main"
             repo = apt.DebianRepository.from_repo_line(line)
             # Import the repository's key
             repo.import_key(key)
