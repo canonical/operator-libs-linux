@@ -18,7 +18,7 @@ class TesterCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.framework.observe(self.on.start, self._on_start)
-        
+
         # Debian packaging actions
         self.framework.observe(self.on.apt_install_action, self._on_apt_install_action)
         self.framework.observe(
@@ -32,10 +32,12 @@ class TesterCharm(CharmBase):
         # User and group management actions
         self.framework.observe(self.on.add_user_action, self._on_add_user_action)
         self.framework.observe(
-            self.on.add_user_with_params_action, self._on_add_user_with_params_action)
+            self.on.add_user_with_params_action, self._on_add_user_with_params_action
+        )
         self.framework.observe(self.on.add_group_action, self._on_add_group_action)
         self.framework.observe(
-            self.on.add_group_with_gid_action, self._on_add_group_with_gid_action)
+            self.on.add_group_with_gid_action, self._on_add_group_with_gid_action
+        )
         self.framework.observe(self.on.remove_group_action, self._on_remove_group_action)
 
     def _on_start(self, _: StartEvent):
@@ -87,38 +89,36 @@ class TesterCharm(CharmBase):
     def _on_snap_install_bare_action(self, event: ActionEvent):
         snap.add(["charmcraft"], state=snap.SnapState.Latest, classic=True, channel="candidate")
         event.set_results({"installed": [self._get_command_path("charmcraft")]})
-    
+
     def _on_add_user_action(self, event: ActionEvent):
         p = passwd.Passwd()
         user = passwd.User(name="test-user-0", state=passwd.UserState.Present)
         p.add_user(user)
-        event.set_results({
-            "created-user": self._get_last_line_in_file("/etc/passwd"),
-            "created-group": self._get_last_line_in_file("/etc/group"),
-        })
-        
+        event.set_results(
+            {
+                "created-user": self._get_last_line_in_file("/etc/passwd"),
+                "created-group": self._get_last_line_in_file("/etc/group"),
+            }
+        )
 
     def _on_add_user_with_params_action(self, event: ActionEvent):
         p = passwd.Passwd()
         user = passwd.User(
-            name="test-user-1", 
-            state=passwd.UserState.Present, 
-            shell="/bin/bash",
-            group="admin"
+            name="test-user-1", state=passwd.UserState.Present, shell="/bin/bash", group="admin"
         )
         p.add_user(user)
         event.set_results({"created-user": self._get_last_line_in_file("/etc/passwd")})
 
     def _on_add_group_action(self, event: ActionEvent):
-        group = passwd.Group(name="test-group", users=[]).add()
+        passwd.Group(name="test-group", users=[]).add()
         event.set_results({"created-group": self._get_last_line_in_file("/etc/group")})
 
     def _on_add_group_with_gid_action(self, event: ActionEvent):
-        group = passwd.Group(name="test-group-1099", users=[], gid=1099).add()
+        passwd.Group(name="test-group-1099", users=[], gid=1099).add()
         event.set_results({"created-group": self._get_last_line_in_file("/etc/group")})
-    
+
     def _on_remove_group_action(self, event: ActionEvent):
-        group = passwd.Group(name="test-group-1099", users=[], gid=1099).remove()
+        passwd.Group(name="test-group-1099", users=[], gid=1099).remove()
         event.set_results({"last-group": self._get_last_line_in_file("/etc/group")})
 
     #
@@ -127,7 +127,7 @@ class TesterCharm(CharmBase):
 
     def _get_command_path(self, command):
         return check_output(["which", command]).decode().strip()
-    
+
     def _get_last_line_in_file(self, filename):
         with open(filename, "r") as f:
             lines = f.readlines()

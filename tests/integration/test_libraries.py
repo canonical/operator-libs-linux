@@ -72,6 +72,7 @@ async def test_snap_install_bare(ops_test: OpsTest):
     assert action.results["Code"] == "0"
     assert action.results["installed"] == "['/snap/bin/charmcraft']"
 
+
 @pytest.mark.abort_on_fail
 async def test_add_user(ops_test: OpsTest):
     unit = ops_test.model.applications["tester"].units[0]
@@ -83,6 +84,7 @@ async def test_add_user(ops_test: OpsTest):
     assert action.results["created-user"] == "test-user-0:x:1001:1001::/home/test-user-0:/bin/sh"
     assert action.results["created-group"] == "test-user-0:x:1001:"
 
+
 @pytest.mark.abort_on_fail
 async def test_add_user_with_params(ops_test: OpsTest):
     unit = ops_test.model.applications["tester"].units[0]
@@ -92,6 +94,7 @@ async def test_add_user_with_params(ops_test: OpsTest):
 
     assert action.results["Code"] == "0"
     assert action.results["created-user"] == "test-user-1:x:1002:116::/home/test-user-1:/bin/bash"
+
 
 @pytest.mark.abort_on_fail
 async def test_add_group(ops_test: OpsTest):
@@ -103,6 +106,7 @@ async def test_add_group(ops_test: OpsTest):
     assert action.results["Code"] == "0"
     assert action.results["created-group"] == "test-group:x:1002:"
 
+
 @pytest.mark.abort_on_fail
 async def test_add_group_with_gid(ops_test: OpsTest):
     unit = ops_test.model.applications["tester"].units[0]
@@ -112,6 +116,7 @@ async def test_add_group_with_gid(ops_test: OpsTest):
 
     assert action.results["Code"] == "0"
     assert action.results["created-group"] == "test-group-1099:x:1099:"
+
 
 @pytest.mark.abort_on_fail
 async def test_remove_group(ops_test: OpsTest):
