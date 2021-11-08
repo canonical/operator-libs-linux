@@ -84,6 +84,22 @@ class TestPasswd(TestCase):
         self.assertEqual(u.shell, "/usr/sbin/nologin")
         self.assertEqual(u.homedir, "/")
         self.assertEqual(u.state, passwd.UserState.NoLogin)
+    
+    def test_lookup_user_by_uid(self):
+        p = passwd.Passwd()
+        lxd_user = passwd.Passwd.lookup_user(998)
+        self.assertEqual(p.users["lxd"], lxd_user)
+
+    def test_lookup_user_by_name(self):
+        p = passwd.Passwd()
+        lxd_user = passwd.Passwd.lookup_user("lxd")
+        self.assertEqual(p.users["lxd"], lxd_user)
+    
+    def test_lookup_user_raises_type_error(self):
+        invalid = [False, passwd.Group("foo", []), 37.55]
+        for x in invalid:
+            with self.assertRaises(TypeError):
+                passwd.Passwd.lookup_user(x)
 
     def test_raises_error_on_user_not_found(self):
         p = passwd.Passwd()
@@ -129,5 +145,5 @@ class TestPasswd(TestCase):
         )
         u.ensure_state(u.state)
         mock_subprocess.assert_called_with(
-            ["useradd", "-g", 1001, "-s", "/usr/bin/bash", "-d", "/home/foo", "-u", 1001, "foo"]
+            ["useradd", "-g", "1001", "-s", "/usr/bin/bash", "-d", "/home/foo", "-u", "1001", "foo"]
         )

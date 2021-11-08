@@ -157,6 +157,7 @@ class User(object):
         if group:
             self._primary_group = group if type(group) is Group else Passwd.lookup_group(group)
         else:
+
             self._primary_group = None
         
         self._groups = (
@@ -246,7 +247,7 @@ class User(object):
             logger.debug("User {} not found, adding", self.name)
 
         def argbuilder(x, y):
-            return [x, y] if y else []
+            return [str(x), str(y)] if y else []
 
         try:
             args = []
@@ -314,7 +315,7 @@ class User(object):
         """
         matcher = (
             rf"{self.name}:{'!' if self.state is UserState.Disabled else 'x'}:{self.uid}:"
-            + f"{self.primary_group.gid}:{self.gecos}:{self.homedir}:{self.shell}"
+            # + f"{self.primary_group.gid}:{self.gecos}:{self.homedir}:{self.shell}"
         )
         found = False
 
@@ -401,7 +402,10 @@ class Group(object):
             CalledProcessError
         """
         try:
-            subprocess.check_call(["groupadd", "-g", self.gid, self.name])
+            cmd = ["groupadd", f"{self.name}"]
+            if self.gid:
+                cmd.extend(["-g", f"{self.gid}"])
+            subprocess.check_call(cmd)
         except CalledProcessError as e:
             raise GroupError(f"Could not add group {self.name}! Reason: {e.output}")
 
@@ -510,7 +514,54 @@ class Passwd:
         else:
             raise TypeError("group argument should be of type str or int")
 
-    def _load_users(self) -> None:
+        try:
+            args = ["-g", group.gid] if group.gid else []
+            subprocess.check_call(["groupadd", *args, group.name])
+        except CalledProcessError as e:
+            raise GroupError(f"Could not add group {self.name}! Reason: {e.output}")
+
+    def add_user(self, user: User) -> None:
+        """Adds a user to the system.
+
+        Args:
+            user: a `User` object to add
+        """
+        if type(user) is not User:
+            raise TypeError(f"invalid type '{type(user)}' for parameter 'user'. Expected 'User'.")
+        user.ensure_state(state=UserState.Present)
+        
+    @classmethod
+    def lookup_user(cls, user: Union[str,int]) -> User:
+        """Lookup a user by either numeric UID or user name.
+        
+        Arguments:
+            user: a `str` or `int` representing user name or UID.
+        """
+        if type(user) is str:
+            return cls._user_by_name(user)
+        elif type(user) is int:
+            return cls._user_by_uid(user)
+        else:
+            raise TypeError("user argument should be of type str or int")
+
+    @classmethod
+    def lookup_group(cls, group: Union[str,int]) -> Group:
+        """Lookup a group by either numeric GID or group name.
+        
+        Arguments:
+            group: a `str` or `int` representing group name or GID.
+        """
+        cls._fetch_groups_for_user()
+
+        if type(group) is str:
+            return cls._group_by_name(group)
+        elif type(group) is int:
+            return cls._group_by_gid(group)
+        else:
+            raise TypeError("group argument should be of type str or int")
+
+    @classmethod
+    def _load_users(cls) -> None:
         """Parse /etc/passwd to get information about available passwd."""
         if not os.path.isfile("/etc/passwd"):
             raise UserError("/etc/passwd not found on the system!")
@@ -518,10 +569,11 @@ class Passwd:
         with open("/etc/passwd", "r") as f:
             for line in f:
                 if line.strip():
-                    user = self._parse_passwd_line(line)
-                    self._users[user.name] = user
+                    user = cls._parse_passwd_line(line)
+                    cls._users[user.name] = user
 
-    def _parse_passwd_line(self, line) -> User:
+    @classmethod
+    def _parse_passwd_line(cls, line) -> User:
         """Get values out of /etc/passwd and turn them into a `User` object to cache."""
         fields = line.split(":")
         name = fields[0]
@@ -571,6 +623,42 @@ class Passwd:
                 return group
 
         raise GroupNotFoundError(f"Could not find a group with name '{name}'!")
+
+    @classmethod
+    def _user_by_uid(cls, uid: int) -> User:
+        """Look up a user by user id.
+
+        Args:
+            uid: an `int` representing the user id
+
+        Raises:
+            UserNotFoundError
+        """
+        cls._load_users()
+
+        for user in cls._users.values():
+            if user.uid == uid:
+                return user
+
+        raise UserNotFoundError(f"Could not find a user with UID {uid}!")
+
+    @classmethod
+    def _user_by_name(cls, name: int) -> User:
+        """Look up a user by user name.
+
+        Args:
+            name: a `str` representing the user name
+
+        Raises:
+            UserNotFoundError
+        """
+        cls._load_users()
+
+        for user in cls._users.values():
+            if user.name == name:
+                return user
+
+        raise UserNotFoundError(f"Could not find a user with name '{name}'!")
 
     @classmethod
     def _fetch_groups_for_user(cls) -> Groups:
