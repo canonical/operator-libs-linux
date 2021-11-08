@@ -29,7 +29,7 @@ Example of adding a user named 'test':
 ```python
 import passwd
 try:
-    passwd.add_user("test", group=Group("test", gid=1001))
+    passwd.Passwd().add_user(passwd.User("test", group=Group("test", gid=1001)))
 except UserError as e:
     logger.error(e.message)
 ```
@@ -114,27 +114,39 @@ class User(object):
     """Represents a user and its properties.
 
     `User` exposes the following properties about a user:
-      - name: the username of a user
+      - name: a `str` representing the username
       - uid: an `int` representing a useruid
       - gid: an `int` representing a group
       - group: a `Group` representing a user's group
-      - homedir: a user's homedir
-      - shell: a user's shell
+      - homedir: a `str`, path to the user's homedir
+      - shell: a `str`, path to the user's shell
       - state: a `UserState` represnding a user's state
-      - gecos: an (Optional) comment describing user information
+      - gecos: a `str`, optional comment describing user information
     """
 
     def __init__(
         self,
         name,
         state: "UserState",
-        group: Optional[Union[int, "Group"]] = None,
+        group: Optional[Union[int, str, "Group"]] = None,
         homedir: Optional[str] = "",
         shell: Optional[str] = "",
         uid: Optional[int] = None,
         gecos: Optional[str] = "",
-        groups: Optional[List[Union["str", "Group"]]] = None,
+        groups: Optional[List[Union[int, str, "Group"]]] = None,
     ) -> None:
+        """Constructor for a User object.
+
+        Arguments:
+            name: a `str` representing the username
+            state: a `UserState` represnding a user's state
+            group: a `str` (group name), `int` (GID) or `Group` representing the user's group
+            homedir: a `str`, path to the user's homedir
+            shell: a `str`, path to the user's shell
+            uid: an `int`, optionally set a user id
+            gecos: a `str`, optional comment describing user information
+            groups: a list of `str` group names, `int` GIDs or `Groups` to add user to
+        """
         self._name = name
         self._uid = uid
         self._homedir = homedir
@@ -143,11 +155,12 @@ class User(object):
         self._gecos = gecos
 
         if group:
-            self._primary_group = group if type(group) is Group else Passwd.group_by_gid(group)
+            self._primary_group = group if type(group) is Group else Passwd.lookup_group(group)
         else:
             self._primary_group = None
+        
         self._groups = (
-            [g if type(g) is Group else Passwd.group_by_gid(g) for g in groups] if groups else []
+            [g if type(g) is Group else Passwd.lookup_group(g) for g in groups] if groups else []
         )
 
     def __hash__(self):
@@ -451,6 +464,51 @@ class Passwd:
     def groups(self) -> Groups:
         """Return a mapping of the groups on the system."""
         return self._groups
+    
+    def add_group(self, group: Group) -> None:
+        """Adds a group to the system.
+
+        Args:
+            group: a `Group` object to add
+
+        Raises:
+            CalledProcessError
+        """
+        if type(group) is not Group:
+            raise TypeError(
+                f"invalid type '{type(group)}' for parameter 'group'. Expected 'Group'.")
+
+        try:
+            args = ["-g", group.gid] if group.gid else []
+            subprocess.check_call(["groupadd", *args, group.name])
+        except CalledProcessError as e:
+            raise GroupError(f"Could not add group {self.name}! Reason: {e.output}")
+
+    def add_user(self, user: User) -> None:
+        """Adds a user to the system.
+
+        Args:
+            user: a `User` object to add
+        """
+        if type(user) is not User:
+            raise TypeError(f"invalid type '{type(user)}' for parameter 'user'. Expected 'User'.")
+        user.ensure_state(state=UserState.Present)
+        
+    @classmethod
+    def lookup_group(cls, group: Union[str,int]) -> Group:
+        """Lookup a group by either numeric GID or group name.
+        
+        Arguments:
+            group: a `str` or `int` representing group name or GID.
+        """
+        cls._fetch_groups_for_user()
+
+        if type(group) is str:
+            return cls._group_by_name(group)
+        elif type(group) is int:
+            return cls._group_by_gid(group)
+        else:
+            raise TypeError("group argument should be of type str or int")
 
     def _load_users(self) -> None:
         """Parse /etc/passwd to get information about available passwd."""
@@ -475,9 +533,9 @@ class Passwd:
 
         state = UserState.NoLogin if shell == "/usr/sbin/nologin" else UserState.Present
         return User(name, state, homedir=homedir, shell=shell, uid=uid, group=gid, gecos=gecos)
-
+        
     @classmethod
-    def group_by_gid(cls, gid: int) -> Group:
+    def _group_by_gid(cls, gid: int) -> Group:
         """Look up a group by group id.
 
         Args:
@@ -494,6 +552,25 @@ class Passwd:
                 return group
 
         raise GroupNotFoundError(f"Could not find a group with GID {gid}!")
+
+    @classmethod
+    def _group_by_name(cls, name: int) -> Group:
+        """Look up a group by group name.
+
+        Args:
+            name: a `str` representing the group name
+
+        Raises:
+            GroupNotFoundError
+        """
+        # Make sure we know about groups
+        cls._fetch_groups_for_user()
+
+        for group in cls._groups.values():
+            if group.name == name:
+                return group
+
+        raise GroupNotFoundError(f"Could not find a group with name '{name}'!")
 
     @classmethod
     def _fetch_groups_for_user(cls) -> Groups:
@@ -531,26 +608,3 @@ class Passwd:
                 self._users[uname] if type(uname) is not User else uname for uname in v.users
             ]
             self._groups[k] = v
-
-    def add_group(self, group: Group) -> None:
-        """Adds a group to the system.
-
-        Args:
-            group: a `Group` object to add
-
-        Raises:
-            CalledProcessError
-        """
-        try:
-            args = ["-g", group.gid] if group.gid else []
-            subprocess.check_call(["groupadd", *args, group.name])
-        except CalledProcessError as e:
-            raise GroupError(f"Could not add group {self.name}! Reason: {e.output}")
-
-    def add_user(self, user: User) -> None:
-        """Adds a user to the system.
-
-        Args:
-            user: a `User` object to add
-        """
-        user.ensure(state=UserState.Present)
