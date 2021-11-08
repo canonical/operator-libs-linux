@@ -32,9 +32,24 @@ class TestPasswd(TestCase):
 
     def test_can_load_groups(self):
         p = passwd.Passwd()
-
         self.assertIn("testuser", p.groups)
         self.assertEqual(len(p.groups), 4)
+    
+    def test_lookup_group_by_gid(self):
+        p = passwd.Passwd()
+        lxd_group = passwd.Passwd.lookup_group(118)
+        self.assertEqual(p.groups["lxd"], lxd_group)
+
+    def test_lookup_group_by_name(self):
+        p = passwd.Passwd()
+        lxd_group = passwd.Passwd.lookup_group("lxd")
+        self.assertEqual(p.groups["lxd"], lxd_group)
+    
+    def test_lookup_group_raises_type_error(self):
+        invalid = [False, passwd.Group("foo", []), 37.55]
+        for x in invalid:
+            with self.assertRaises(TypeError):
+                passwd.Passwd.lookup_group(x)
 
     def test_can_get_group_details(self):
         p = passwd.Passwd()
