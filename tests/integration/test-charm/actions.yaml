@@ -4,3 +4,4 @@ apt-install:
 apt-install-external-repo:
 snap-install:
 snap-install-bare:
+add-user:
