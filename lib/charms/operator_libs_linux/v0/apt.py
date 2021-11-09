@@ -110,7 +110,7 @@ import re
 import subprocess
 from collections.abc import Mapping
 from enum import Enum
-from subprocess import CalledProcessError, check_output
+from subprocess import PIPE, CalledProcessError, check_call, check_output
 from typing import Iterable, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
@@ -254,7 +254,7 @@ class DebianPackage:
             package_names = [package_names]
         _cmd = ["apt-get", "-y", *optargs, command, *package_names]
         try:
-            subprocess.check_call(_cmd)
+            check_call(_cmd, stderr=PIPE, stdout=PIPE)
         except CalledProcessError as e:
             raise PackageError(
                 f"Could not {command} package(s) [{[*package_names]}]: {e.output}"
@@ -402,7 +402,7 @@ class DebianPackage:
         # Regexps are a really terrible way to do this. Thanks dpkg
         output = ""
         try:
-            output = check_output(["dpkg", "-l", package], universal_newlines=True)
+            output = check_output(["dpkg", "-l", package], stderr=PIPE, universal_newlines=True)
         except CalledProcessError:
             raise PackageNotFoundError(f"Package is not installed: {package}") from None
 
@@ -461,7 +461,9 @@ class DebianPackage:
         keys = ("Package", "Architecture", "Version")
 
         try:
-            output = check_output(["apt-cache", "show", package], universal_newlines=True)
+            output = check_output(
+                ["apt-cache", "show", package], stderr=PIPE, universal_newlines=True
+            )
         except CalledProcessError as e:
             raise PackageError(f"Could not list packages in apt-cache: {e.output}") from None
 
@@ -816,7 +818,7 @@ def remove_package(
 
 def update() -> None:
     """Updates the apt cache via `apt-get update`."""
-    subprocess.check_call(["apt-get", "update"])
+    check_call(["apt-get", "update"], stderr=PIPE, stdout=PIPE)
 
 
 class InvalidSourceError(Error):
@@ -1029,8 +1031,8 @@ class DebianRepository:
         cmd = ["gpg", "--with-colons", "--with-fingerprint"]
         ps = subprocess.run(
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=PIPE,
+            stderr=PIPE,
             input=key_material,
         )
         out, err = ps.stdout.decode(), ps.stderr.decode()
@@ -1092,9 +1094,7 @@ class DebianRepository:
         Raises:
           GPGKeyError
         """
-        ps = subprocess.run(
-            ["gpg", "--dearmor"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, input=key_asc
-        )
+        ps = subprocess.run(["gpg", "--dearmor"], stdout=PIPE, stderr=PIPE, input=key_asc)
         out, err = ps.stdout, ps.stderr.decode()
         if "gpg: no valid OpenPGP data found." in err:
             raise GPGKeyError(
