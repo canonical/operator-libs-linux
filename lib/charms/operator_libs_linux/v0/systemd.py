@@ -22,11 +22,6 @@ For the most part, we transparently provide an interface to a commonly used sele
 systemd commands, with a few shortcuts baked in. For example, service_pause and
 service_resume with run the mask/unmask and enable/disable invocations.
 
-TODO: do we want to add some magic to service_start and service_restart, so that you can
-run them without checking to see if the service is running first? E.g., service_start
-either starts or restarts a service, and service_restart either restarts or starts the
-service.
-
 Example usage:
 ```python
 from systemd import *
