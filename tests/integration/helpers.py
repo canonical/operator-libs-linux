@@ -10,3 +10,8 @@ def get_command_path(command):
         return check_output(["which", command]).decode().strip()
     except CalledProcessError:
         return ""
+
+
+def lines_in_file(filename):
+    with open(filename, "r") as f:
+        return [line.strip() for line in f.readlines()]
