@@ -5,9 +5,8 @@ import json
 import unittest
 from unittest.mock import MagicMock, mock_open, patch
 
+import fake_snapd as fake_snapd
 from charms.operator_libs_linux.v0 import snap
-
-import tests.fake_snapd as fake_snapd
 
 patch("charms.operator_libs_linux.v0.snap._cache_init", lambda x: x).start()
 
