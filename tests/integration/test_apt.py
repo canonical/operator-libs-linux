@@ -27,6 +27,17 @@ def test_install_package():
     assert get_command_path("jq") == "/usr/bin/jq"
 
 
+def test_remove_package():
+    # First ensure the package is present
+    cfssl = apt.DebianPackage.from_apt_cache("golang-cfssl")
+    if not cfssl.present:
+        apt.add_package("golang-cfssl")
+    assert get_command_path("cfssl") == "/usr/bin/cfssl"
+    # Now remove the package and check its bins disappear too
+    apt.remove_package("golang-cfssl")
+    assert get_command_path("cfssl") == ""
+
+
 def test_install_package_external_repository():
     repositories = apt.RepositoryMapping()
 
