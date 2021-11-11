@@ -45,9 +45,9 @@ except UserNotFoundError:
 ```
 """
 
+import grp
 import logging
-import os
-import re
+import pwd
 import subprocess
 from collections import UserDict
 from enum import Enum
@@ -307,23 +307,22 @@ class User(object):
             raise UserError(f"Could not enable user account {self.name}: {e.output}")
 
     def _check_if_present(self, add_if_absent: Optional[bool] = False) -> bool:
-        """Ensures a user is present in /etc/passwd.
+        """Ensures a user is present on the system.
 
         Args:
             add_if_absent: an (Optional) boolean for whether the user should be added if not found.
                 Default `false`.
         """
-        matcher = (
-            rf"{self.name}:{'!' if self.state is UserState.Disabled else 'x'}:{self.uid}:"
-            # + f"{self.primary_group.gid}:{self.gecos}:{self.homedir}:{self.shell}"
-        )
         found = False
-
-        with open("/etc/passwd", "r") as f:
-            for line in f:
-                if re.match(matcher, line.strip()):
-                    found = True
-                    break
+        try:
+            user = pwd.getpwuid(self.uid)
+            if self.state is UserState.Disabled:
+                found = True if user.pw_passwd == "!" else False
+            else:
+                found = True if user.pw_passwd == "x" else False
+        except KeyError:
+            logger.debug("User {} does not exist on the system.".format(self.name))
+            found = False
 
         if not found and add_if_absent:
             self._add()
@@ -446,7 +445,7 @@ class Groups(UserDict):
 class Passwd:
     """An abstraction to represent users and groups present on the system.
 
-    When instantiated, `Passwd` parses out /etc/group and /etc/passwd
+    When instantiated, `Passwd` parses out :module:`pwd and :module:`grp`
     to create abstracted objects.
     """
 
@@ -531,29 +530,21 @@ class Passwd:
 
     @classmethod
     def _load_users(cls) -> None:
-        """Parse /etc/passwd to get information about available passwd."""
-        if not os.path.isfile("/etc/passwd"):
-            raise UserError("/etc/passwd not found on the system!")
+        """Parse :module:`pwd` to get information about available users."""
+        if not pwd.getpwall():
+            raise UserError("Cannot fetch users from 'pwd.getpwall()'!")
 
-        with open("/etc/passwd", "r") as f:
-            for line in f:
-                if line.strip():
-                    user = cls._parse_passwd_line(line)
-                    cls._users[user.name] = user
-
-    @classmethod
-    def _parse_passwd_line(cls, line) -> User:
-        """Get values out of /etc/passwd and turn them into a `User` object to cache."""
-        fields = line.split(":")
-        name = fields[0]
-        uid = int(fields[2])
-        gid = int(fields[3])
-        gecos = fields[4]
-        homedir = fields[5]
-        shell = fields[6].strip()
-
-        state = UserState.NoLogin if shell == "/usr/sbin/nologin" else UserState.Present
-        return User(name, state, homedir=homedir, shell=shell, uid=uid, group=gid, gecos=gecos)
+        for u in pwd.getpwall():
+            user = User(
+                u.pw_name,
+                UserState.NoLogin if u.pw_shell == "/usr/sbin/nologin" else UserState.Present,
+                homedir=u.pw_dir,
+                shell=u.pw_shell,
+                uid=int(u.pw_uid),
+                group=int(u.pw_gid),
+                gecos=u.pw_gecos,
+            )
+            cls._users[user.name] = user
 
     @classmethod
     def _group_by_gid(cls, gid: int) -> Group:
@@ -639,24 +630,17 @@ class Passwd:
 
     @classmethod
     def _load_groups(cls) -> None:
-        """Parse /etc/group to get information about available groups."""
-        if not os.path.isfile("/etc/group"):
-            raise GroupError("/etc/group not found on the system!")
+        """Parse :module:`grp` to get information about available groups."""
+        if not grp.getgrall():
+            raise GroupError("No groups returned from 'grp.getgrall()'!")
 
-        with open("/etc/group", "r") as f:
-            for line in f:
-                if line.strip():
-                    group = cls._parse_groups_line(line)
-                    cls._groups[group.name] = group
-
-    @classmethod
-    def _parse_groups_line(cls, line) -> Group:
-        """Get values out of /etc/group and turn them into a `Group` object to cache."""
-        fields = line.split(":")
-        name = fields[0]
-        gid = int(fields[2])
-        usernames = [u for u in fields[3].strip().split(",") if u]
-        return Group(name, usernames, gid=gid)
+        for g in grp.getgrall():
+            group = Group(
+                g.gr_name,
+                g.gr_mem,
+                gid=int(g.gr_gid),
+            )
+            cls._groups[group.name] = group
 
     def _realize_users(self) -> None:
         """Map user strings to `User` objects for coherency."""
