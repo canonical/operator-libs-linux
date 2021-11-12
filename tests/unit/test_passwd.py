@@ -65,11 +65,11 @@ class TestPasswd(TestCase):
         check_output.assert_called_with(
             [
                 "useradd",
-                "--create-home",
-                "--shell",
-                shell,
                 "--password",
                 password,
+                "--shell",
+                "/bin/bash",
+                "--create-home",
                 "-g",
                 username,
                 username,
@@ -110,7 +110,7 @@ class TestPasswd(TestCase):
 
         self.assertEqual(result, new_user_pwnam)
         check_output.assert_called_with(
-            ["useradd", "--create-home", "--shell", shell, "--password", password, username],
+            ["useradd", "--password", password, "--shell", "/bin/zsh", "--create-home", username],
             stderr=-2,
         )
         getpwnam.assert_called_with(username)
@@ -141,11 +141,11 @@ class TestPasswd(TestCase):
         check_output.assert_called_with(
             [
                 "useradd",
-                "--create-home",
-                "--shell",
-                shell,
                 "--password",
                 password,
+                "--shell",
+                shell,
+                "--create-home",
                 "-g",
                 "foo",
                 "-G",
@@ -201,7 +201,18 @@ class TestPasswd(TestCase):
         passwd.add_user(user_name, uid=user_id)
 
         check_output.assert_called_with(
-            ["useradd", "--uid", str(user_id), "--system", "-g", user_name, user_name], stderr=-2
+            [
+                "useradd",
+                "--uid",
+                str(user_id),
+                "--shell",
+                "/bin/bash",
+                "--create-home",
+                "-g",
+                user_name,
+                user_name,
+            ],
+            stderr=-2,
         )
         getpwnam.assert_called_with(user_name)
         getpwuid.assert_called_with(user_id)

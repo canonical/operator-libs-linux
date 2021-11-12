@@ -4,6 +4,7 @@
 
 
 import logging
+import pwd
 import subprocess
 
 from charms.operator_libs_linux.v0 import passwd
@@ -14,70 +15,76 @@ logger = logging.getLogger(__name__)
 
 def test_add_user():
     # First check the user we're creating doesn't exist
-    expected_passwd_line = "test-user-0:x:1001:1001::/home/test-user-0:/bin/sh"
-    expected_group_line = "test-user-0:x:1001:"
-    assert expected_group_line not in lines_in_file("/etc/group")
-    assert expected_passwd_line not in lines_in_file("/etc/passwd")
+    assert passwd.user_exists("test-user-0") is None
 
-    passwd.add_user(name="test-user-0")
+    u = passwd.add_user(username="test-user-0")
 
+    expected_passwd_line = f"{u.pw_name}:x:{u.pw_uid}:{u.pw_gid}::{u.pw_dir}:{u.pw_shell}"
+    expected_group_line = f"{u.pw_name}:x:{u.pw_gid}:"
+
+    assert passwd.user_exists("test-user-0") is not None
     assert expected_group_line in lines_in_file("/etc/group")
     assert expected_passwd_line in lines_in_file("/etc/passwd")
     # clean up
-    subprocess.check_output(["userdel", "test-user-0"])
+    passwd.remove_user("test-user-0")
 
 
-# TODO: Enable this test once the feature is implemented
-# def test_remove_user():
-#     p = passwd.Passwd()
-#     user = passwd.User(name="test-user-0", state=passwd.UserState.Present)
-#     p.add_user(user)
+def test_remove_user():
+    u = passwd.add_user(username="test-user-0")
+    assert passwd.user_exists("test-user-0") is not None
 
-#     expected_passwd_line = "test-user-0:x:1001:1001::/home/test-user-0:/bin/sh"
-#     expected_group_line = "test-user-0:x:1001:"
-#     assert expected_group_line in lines_in_file("/etc/group")
-#     assert expected_passwd_line in lines_in_file("/etc/passwd")
+    passwd.remove_user("test-user-0")
 
-#     passwd.Passwd.remove_user("test-user-0")
-#     assert expected_group_line not in lines_in_file("/etc/group")
-#     assert expected_passwd_line not in lines_in_file("/etc/passwd")
+    expected_passwd_line = f"{u.pw_name}:x:{u.pw_uid}:{u.pw_gid}::{u.pw_dir}:{u.pw_shell}"
+    expected_group_line = f"{u.pw_name}:x:{u.pw_gid}:"
+
+    assert passwd.user_exists("test-user-0") is None
+    assert expected_group_line not in lines_in_file("/etc/group")
+    assert expected_passwd_line not in lines_in_file("/etc/passwd")
 
 
 def test_add_user_with_params():
-    p = passwd.Passwd()
-    user = passwd.User(
-        name="test-user-1", state=passwd.UserState.Present, shell="/bin/bash", group="admin"
-    )
-    p.add_user(user)
+    u = passwd.add_user(username="test-user-1", shell="/bin/bash", primary_group="admin")
+    expected = f"{u.pw_name}:x:{u.pw_uid}:{u.pw_gid}::{u.pw_dir}:{u.pw_shell}"
 
-    expected = "test-user-1:x:1001:116::/home/test-user-1:/bin/bash"
     assert expected in lines_in_file("/etc/passwd")
-    # clean up.
-    # TODO: user the remove user function once implemented.
-    subprocess.check_output(["userdel", "test-user-1"])
+
+    passwd.remove_user("test-user-1")
 
 
 def test_add_group():
-    passwd.Group(name="test-group", users=[]).add()
-    expected = "test-group:x:1001:"
+    assert passwd.group_exists("test-group") is None
+
+    g = passwd.add_group(group_name="test-group")
+
+    expected = f"{g.gr_name}:x:{g.gr_gid}:"
+
+    assert passwd.group_exists("test-group") is not None
     assert expected in lines_in_file("/etc/group")
-    # clean up
-    subprocess.check_output(["groupdel", "test-group"])
+
+    passwd.remove_group("test-group")
 
 
 def test_remove_group():
-    group = passwd.Group(name="test-group", users=[])
-    group.add()
-    expected = "test-group:x:1001:"
+    g = passwd.add_group(group_name="test-group")
+    assert passwd.group_exists("test-group") is not None
+
+    expected = f"{g.gr_name}:x:{g.gr_gid}:"
     assert expected in lines_in_file("/etc/group")
 
-    group.remove()
+    passwd.remove_group("test-group")
+    assert passwd.group_exists("test-group") is None
     assert expected not in lines_in_file("/etc/group")
 
 
 def test_add_group_with_gid():
-    group = passwd.Group(name="test-group-1099", users=[], gid=1099)
-    group.add()
-    expected = "test-group-1099:x:1099:"
+    assert passwd.group_exists("test-group") is None
+
+    passwd.add_group(group_name="test-group", gid=1099)
+
+    expected = "test-group:x:1099:"
+
+    assert passwd.group_exists("test-group") is not None
     assert expected in lines_in_file("/etc/group")
-    group.remove()
+
+    passwd.remove_group("test-group")
