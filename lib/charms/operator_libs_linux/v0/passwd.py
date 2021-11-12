@@ -131,10 +131,12 @@ def add_user(
             cmd.extend(["--uid", str(uid)])
         if home_dir:
             cmd.extend(["--home", str(home_dir)])
-        if system_user or password is None:
+        if password:
+            cmd.extend(["--password", password])
+        if system_user:
             cmd.append("--system")
         else:
-            cmd.extend(["--create-home", "--shell", shell, "--password", password])
+            cmd.extend(["--shell", shell, "--create-home"])
 
         if not primary_group:
             try:
