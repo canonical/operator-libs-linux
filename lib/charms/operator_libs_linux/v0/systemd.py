@@ -53,18 +53,35 @@ __all__ = [  # Don't export `service`. (It's not the intended way of using this 
 logger = logging.getLogger(__name__)
 
 
+def popen_kwargs():
+    return dict(
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=1,
+        universal_newlines=True,
+        encoding="utf-8",
+    )
+
+
 def service(action: str, service_name: str) -> bool:
     """Control a system service.
 
-    :param action: the action to take on the service
-    :param service_name: the name of the service to perform th action on
+    Args:
+        action: the action to take on the service
+        service_name: the name of the service to perform th action on
     """
     cmd = ["systemctl", action, service_name]
     if action != "is-active":
         logger.debug("Attempting to {} '{}' with command {}.".format(action, service_name, cmd))
     else:
         logger.debug("Checking if '{}' is active".format(service_name))
-    return subprocess.call(cmd) == 0
+
+    proc = subprocess.Popen(cmd, **popen_kwargs())
+    for line in iter(proc.stdout.readline, ""):
+        logger.debug(line)
+
+    proc.wait()
+    return proc.returncode == 0
 
 
 def service_running(service_name: str) -> bool:

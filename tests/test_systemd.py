@@ -2,199 +2,253 @@
 # See LICENSE file for licensing details.
 
 import unittest
-from unittest.mock import call, patch
+from unittest.mock import MagicMock, call, patch
 
 from charms.operator_libs_linux.v0 import systemd
 
 
-@patch("charms.operator_libs_linux.v0.systemd.subprocess")
-class TestSnapCache(unittest.TestCase):
-    def test_service(self, mock_subp):
-        mock_subp.call.return_value = 0
+def with_mock_subp(func):
+    """Decorator that sets up a Popen mock.
+
+    Any function that uses this decorator should take a function as an argument. When
+    called wtih a series of return codes, that function will mock out subprocess.Popen,
+    and set it to return those error codes, in order.
+
+    The function returns the mock Popen object, so that routines such as
+    assert_called_with can be called upon it, along with the return from
+    systemd.popen_kwargs, for convenience when composing call objects.
+
+    """
+
+    @patch("charms.operator_libs_linux.v0.systemd.subprocess")
+    def make_mocks_and_run(cls, mock_subp):
+        def make_mock_popen(returncodes: list[int], lines=None, stdout=None):
+            lines = lines if lines is not None else ("", "")
+
+            mock_subp.PIPE = mock_subp.STDOUT = stdout or ""
+
+            side_effects = []
+
+            for code in returncodes:
+                mock_proc = MagicMock()
+                mock_proc.wait.return_value = None
+                mock_proc.stdout.readline.side_effect = ("", "")
+                mock_proc.returncode = code
+                side_effects.append(mock_proc)
+
+            mock_popen = mock_subp.Popen
+            mock_popen.side_effect = tuple(side_effects)
+
+            return mock_popen, systemd.popen_kwargs()
+
+        func(cls, make_mock_popen)
+
+    return make_mocks_and_run
+
+
+class TestSystemD(unittest.TestCase):
+    @with_mock_subp
+    def test_service(self, make_mock):
+        mockp, kw = make_mock([0, 1])
+
         success = systemd.service("is-active", "mysql")
-        mock_subp.call.assert_called_with(["systemctl", "is-active", "mysql"])
+        mockp.assert_called_with(["systemctl", "is-active", "mysql"], **kw)
         self.assertTrue(success)
 
-        mock_subp.call.return_value = 1
         success = systemd.service("is-active", "mysql")
-        mock_subp.call.assert_called_with(["systemctl", "is-active", "mysql"])
+        mockp.assert_called_with(["systemctl", "is-active", "mysql"], **kw)
         self.assertFalse(success)
 
-    def test_service_running(self, mock_subp):
-        mock_subp.call.return_value = 0
+    @with_mock_subp
+    def test_service_running(self, make_mock):
+        mockp, kw = make_mock([0, 1])
+
         is_running = systemd.service_running("mysql")
-        mock_subp.call.assert_called_with(["systemctl", "is-active", "mysql"])
+        mockp.assert_called_with(["systemctl", "is-active", "mysql"], **kw)
         self.assertTrue(is_running)
 
-        mock_subp.call.return_value = 1
         is_running = systemd.service_running("mysql")
-        mock_subp.call.assert_called_with(["systemctl", "is-active", "mysql"])
+        mockp.assert_called_with(["systemctl", "is-active", "mysql"], **kw)
         self.assertFalse(is_running)
 
-    def test_service_start(self, mock_subp):
-        mock_subp.call.return_value = 0
+    @with_mock_subp
+    def test_service_start(self, make_mock):
+        mockp, kw = make_mock([0, 1])
+
         started = systemd.service_start("mysql")
-        mock_subp.call.assert_called_with(["systemctl", "start", "mysql"])
+        mockp.assert_called_with(["systemctl", "start", "mysql"], **kw)
         self.assertTrue(started)
 
-        mock_subp.call.return_value = 1
         started = systemd.service_start("mysql")
-        mock_subp.call.assert_called_with(["systemctl", "start", "mysql"])
+        mockp.assert_called_with(["systemctl", "start", "mysql"], **kw)
         self.assertFalse(started)
 
-    def test_service_stop(self, mock_subp):
-        mock_subp.call.return_value = 0
+    @with_mock_subp
+    def test_service_stop(self, make_mock):
+        mockp, kw = make_mock([0, 1])
+
         stopped = systemd.service_stop("mysql")
-        mock_subp.call.assert_called_with(["systemctl", "stop", "mysql"])
+        mockp.assert_called_with(["systemctl", "stop", "mysql"], **kw)
         self.assertTrue(stopped)
 
-        mock_subp.call.return_value = 1
         stopped = systemd.service_stop("mysql")
-        mock_subp.call.assert_called_with(["systemctl", "stop", "mysql"])
+        mockp.assert_called_with(["systemctl", "stop", "mysql"], **kw)
         self.assertFalse(stopped)
 
-    def test_service_restart(self, mock_subp):
-        mock_subp.call.return_value = 0
+    @with_mock_subp
+    def test_service_restart(self, make_mock):
+        mockp, kw = make_mock([0, 1])
+
         restarted = systemd.service_restart("mysql")
-        mock_subp.call.assert_called_with(["systemctl", "restart", "mysql"])
+        mockp.assert_called_with(["systemctl", "restart", "mysql"], **kw)
         self.assertTrue(restarted)
 
-        mock_subp.call.return_value = 1
         restarted = systemd.service_restart("mysql")
-        mock_subp.call.assert_called_with(["systemctl", "restart", "mysql"])
+        mockp.assert_called_with(["systemctl", "restart", "mysql"], **kw)
         self.assertFalse(restarted)
 
-    def test_service_reload(self, mock_subp):
+    @with_mock_subp
+    def test_service_reload(self, make_mock):
         # We reload succesfully.
-        mock_subp.call.return_value = 0
+        mockp, kw = make_mock([0])
         reloaded = systemd.service_reload("mysql")
-        mock_subp.call.assert_called_with(["systemctl", "reload", "mysql"])
+        mockp.assert_called_with(["systemctl", "reload", "mysql"], **kw)
         self.assertTrue(reloaded)
 
         # We can't reload, so we restart
-        mock_subp.call.side_effect = (1, 0)
+        mockp, kw = make_mock([1, 0])
         reloaded = systemd.service_reload("mysql", restart_on_failure=True)
-        mock_subp.call.assert_has_calls(
-            [call(["systemctl", "reload", "mysql"]), call(["systemctl", "restart", "mysql"])]
+        mockp.assert_has_calls(
+            [
+                call(["systemctl", "reload", "mysql"], **kw),
+                call(["systemctl", "restart", "mysql"], **kw),
+            ]
         )
         self.assertTrue(reloaded)
 
         # We should only restart if requested.
-        mock_subp.call.side_effect = (1, 0)
+        mockp, kw = make_mock([1, 0])
         reloaded = systemd.service_reload("mysql")
-        mock_subp.call.assert_called_with(["systemctl", "reload", "mysql"])
+        mockp.assert_called_with(["systemctl", "reload", "mysql"], **kw)
         self.assertFalse(reloaded)
 
         # ... and if we fail at both, we should fail.
-        mock_subp.call.side_effect = (1, 1)
+        mockp, kw = make_mock([1, 1])
         reloaded = systemd.service_reload("mysql", restart_on_failure=True)
-        mock_subp.call.assert_has_calls(
-            [call(["systemctl", "reload", "mysql"]), call(["systemctl", "restart", "mysql"])]
+        mockp.assert_has_calls(
+            [
+                call(["systemctl", "reload", "mysql"], **kw),
+                call(["systemctl", "restart", "mysql"], **kw),
+            ]
         )
         self.assertFalse(reloaded)
 
-    def test_service_pause(self, mock_subp):
+    @with_mock_subp
+    def test_service_pause(self, make_mock):
         # Service is running, so we stop and disable it.
-        mock_subp.call.side_effect = (0, 0, 0, 0)
+        mockp, kw = make_mock([0, 0, 0, 0])
+
         paused = systemd.service_pause("mysql")
-        mock_subp.call.assert_has_calls(
+        mockp.assert_has_calls(
             [
-                call(["systemctl", "is-active", "mysql"]),
-                call(["systemctl", "stop", "mysql"]),
-                call(["systemctl", "disable", "mysql"]),
-                call(["systemctl", "mask", "mysql"]),
+                call(["systemctl", "is-active", "mysql"], **kw),
+                call(["systemctl", "stop", "mysql"], **kw),
+                call(["systemctl", "disable", "mysql"], **kw),
+                call(["systemctl", "mask", "mysql"], **kw),
             ]
         )
         self.assertTrue(paused)
 
         # Service is not running.
-        mock_subp.call.side_effect = (1, 0, 0)
+        mockp, kw = make_mock([1, 0, 0])
         paused = systemd.service_pause("mysql")
-        mock_subp.call.assert_has_calls(
+        mockp.assert_has_calls(
             [
-                call(["systemctl", "is-active", "mysql"]),
-                call(["systemctl", "disable", "mysql"]),
-                call(["systemctl", "mask", "mysql"]),
+                call(["systemctl", "is-active", "mysql"], **kw),
+                call(["systemctl", "disable", "mysql"], **kw),
+                call(["systemctl", "mask", "mysql"], **kw),
             ]
         )
         self.assertTrue(paused)
 
         # Could not stop service!
-        mock_subp.call.side_effect = (0, 1, 0, 0)
+        mockp, kw = make_mock([0, 1, 0, 0])
         paused = systemd.service_pause("mysql")
-        mock_subp.call.assert_has_calls(
+        mockp.assert_has_calls(
             [
-                call(["systemctl", "is-active", "mysql"]),
-                call(["systemctl", "stop", "mysql"]),
-                call(["systemctl", "disable", "mysql"]),
-                call(["systemctl", "mask", "mysql"]),
+                call(["systemctl", "is-active", "mysql"], **kw),
+                call(["systemctl", "stop", "mysql"], **kw),
+                call(["systemctl", "disable", "mysql"], **kw),
+                call(["systemctl", "mask", "mysql"], **kw),
             ]
         )
         self.assertFalse(paused)
 
         # Failures in disable and mask aren't handled.
         # TODO: might want to log a warning in that case.
-        mock_subp.call.side_effect = (0, 0, 1, 1)
+        mockp, kw = make_mock([0, 0, 1, 1])
         paused = systemd.service_pause("mysql")
-        mock_subp.call.assert_has_calls(
+        mockp.assert_has_calls(
             [
-                call(["systemctl", "is-active", "mysql"]),
-                call(["systemctl", "stop", "mysql"]),
-                call(["systemctl", "disable", "mysql"]),
-                call(["systemctl", "mask", "mysql"]),
+                call(["systemctl", "is-active", "mysql"], **kw),
+                call(["systemctl", "stop", "mysql"], **kw),
+                call(["systemctl", "disable", "mysql"], **kw),
+                call(["systemctl", "mask", "mysql"], **kw),
             ]
         )
         self.assertTrue(paused)
 
-    def test_service_resume(self, mock_subp):
+    @with_mock_subp
+    def test_service_resume(self, make_mock):
+        mockp, kw = make_mock([0, 0, 0, 0])
+
         # Service is already running
-        mock_subp.call.side_effect = (0, 0, 0)
         resumed = systemd.service_resume("mysql")
-        mock_subp.call.assert_has_calls(
+        mockp.assert_has_calls(
             [
-                call(["systemctl", "unmask", "mysql"]),
-                call(["systemctl", "enable", "mysql"]),
-                call(["systemctl", "is-active", "mysql"]),
+                call(["systemctl", "unmask", "mysql"], **kw),
+                call(["systemctl", "enable", "mysql"], **kw),
+                call(["systemctl", "is-active", "mysql"], **kw),
             ]
         )
         self.assertTrue(resumed)
 
         # Service was stopped
-        mock_subp.call.side_effect = (0, 0, 1, 0)
+        mockp, kw = make_mock([0, 0, 1, 0])
         resumed = systemd.service_resume("mysql")
-        mock_subp.call.assert_has_calls(
+        mockp.assert_has_calls(
             [
-                call(["systemctl", "unmask", "mysql"]),
-                call(["systemctl", "enable", "mysql"]),
-                call(["systemctl", "is-active", "mysql"]),
-                call(["systemctl", "start", "mysql"]),
+                call(["systemctl", "unmask", "mysql"], **kw),
+                call(["systemctl", "enable", "mysql"], **kw),
+                call(["systemctl", "is-active", "mysql"], **kw),
+                call(["systemctl", "start", "mysql"], **kw),
             ]
         )
         self.assertTrue(resumed)
 
         # Could not start service!
-        mock_subp.call.side_effect = (0, 0, 1, 1)
+        mockp, kw = make_mock([0, 0, 1, 1])
         resumed = systemd.service_resume("mysql")
-        mock_subp.call.assert_has_calls(
+        mockp.assert_has_calls(
             [
-                call(["systemctl", "unmask", "mysql"]),
-                call(["systemctl", "enable", "mysql"]),
-                call(["systemctl", "is-active", "mysql"]),
-                call(["systemctl", "start", "mysql"]),
+                call(["systemctl", "unmask", "mysql"], **kw),
+                call(["systemctl", "enable", "mysql"], **kw),
+                call(["systemctl", "is-active", "mysql"], **kw),
+                call(["systemctl", "start", "mysql"], **kw),
             ]
         )
         self.assertFalse(resumed)
 
         # Failures in unmask and enable aren't handled.
         # TODO: might want to log a warning.
-        mock_subp.call.side_effect = (1, 1, 1, 0)
+        mockp, kw = make_mock([1, 1, 1, 0])
         resumed = systemd.service_resume("mysql")
-        mock_subp.call.assert_has_calls(
+        mockp.assert_has_calls(
             [
-                call(["systemctl", "unmask", "mysql"]),
-                call(["systemctl", "enable", "mysql"]),
-                call(["systemctl", "is-active", "mysql"]),
-                call(["systemctl", "start", "mysql"]),
+                call(["systemctl", "unmask", "mysql"], **kw),
+                call(["systemctl", "enable", "mysql"], **kw),
+                call(["systemctl", "is-active", "mysql"], **kw),
+                call(["systemctl", "start", "mysql"], **kw),
             ]
         )
         self.assertTrue(resumed)
