@@ -4,8 +4,6 @@
 
 
 import logging
-import pwd
-import subprocess
 
 from charms.operator_libs_linux.v0 import passwd
 from helpers import lines_in_file

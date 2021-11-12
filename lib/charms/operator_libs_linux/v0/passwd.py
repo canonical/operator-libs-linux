@@ -125,18 +125,16 @@ def add_user(
             logger.info("user with uid '%d' already exists", uid)
     except KeyError:
         logger.info("creating user '%s'", username)
-        cmd = ["useradd"]
+        cmd = ["useradd", "--shell", shell]
 
         if uid:
             cmd.extend(["--uid", str(uid)])
         if home_dir:
             cmd.extend(["--home", str(home_dir)])
         if password:
-            cmd.extend(["--password", password])
-        if system_user:
+            cmd.extend(["--password", password, "--create-home"])
+        if system_user or password is None:
             cmd.append("--system")
-        else:
-            cmd.extend(["--shell", shell, "--create-home"])
 
         if not primary_group:
             try:

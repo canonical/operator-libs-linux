@@ -20,7 +20,7 @@ class TestPasswd(TestCase):
         self.assertEqual("pw info", passwd.user_exists(1001))
 
     def test_user_exists_invalid_input(self):
-        with self.assertRaises(TypeError) as exc:
+        with self.assertRaises(TypeError):
             passwd.user_exists(True)
 
     @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
@@ -65,10 +65,10 @@ class TestPasswd(TestCase):
         check_output.assert_called_with(
             [
                 "useradd",
+                "--shell",
+                shell,
                 "--password",
                 password,
-                "--shell",
-                "/bin/bash",
                 "--create-home",
                 "-g",
                 username,
@@ -110,7 +110,7 @@ class TestPasswd(TestCase):
 
         self.assertEqual(result, new_user_pwnam)
         check_output.assert_called_with(
-            ["useradd", "--password", password, "--shell", "/bin/zsh", "--create-home", username],
+            ["useradd", "--shell", "/bin/zsh", "--password", password, "--create-home", username],
             stderr=-2,
         )
         getpwnam.assert_called_with(username)
@@ -141,10 +141,10 @@ class TestPasswd(TestCase):
         check_output.assert_called_with(
             [
                 "useradd",
-                "--password",
-                password,
                 "--shell",
                 shell,
+                "--password",
+                password,
                 "--create-home",
                 "-g",
                 "foo",
@@ -169,7 +169,9 @@ class TestPasswd(TestCase):
         result = passwd.add_user(username, system_user=True)
 
         self.assertEqual(result, new_user_pwnam)
-        check_output.assert_called_with(["useradd", "--system", username], stderr=-2)
+        check_output.assert_called_with(
+            ["useradd", "--shell", "/bin/bash", "--system", username], stderr=-2
+        )
         getpwnam.assert_called_with(username)
 
     @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
@@ -185,7 +187,16 @@ class TestPasswd(TestCase):
 
         self.assertEqual(result, new_user_pwnam)
         check_output.assert_called_with(
-            ["useradd", "--home", "/var/lib/johndoe", "--system", username], stderr=-2
+            [
+                "useradd",
+                "--shell",
+                "/bin/bash",
+                "--home",
+                "/var/lib/johndoe",
+                "--system",
+                username,
+            ],
+            stderr=-2,
         )
         getpwnam.assert_called_with(username)
 
@@ -203,11 +214,11 @@ class TestPasswd(TestCase):
         check_output.assert_called_with(
             [
                 "useradd",
-                "--uid",
-                str(user_id),
                 "--shell",
                 "/bin/bash",
-                "--create-home",
+                "--uid",
+                str(user_id),
+                "--system",
                 "-g",
                 user_name,
                 user_name,
@@ -346,7 +357,7 @@ class TestPasswd(TestCase):
 
     @patch("charms.operator_libs_linux.v0.passwd.group_exists")
     @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_remove_user_that_does_not_exist(self, check_output, group_exists):
+    def test_remove_group_that_does_not_exist(self, check_output, group_exists):
         group_exists.return_value = None
         groupname = "bob"
         result = passwd.remove_group(groupname)
@@ -368,7 +379,7 @@ class TestPasswd(TestCase):
 
     @patch("charms.operator_libs_linux.v0.passwd.group_exists")
     @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_remove_user_that_exists_force(self, check_output, group_exists):
+    def test_remove_group_that_exists_force(self, check_output, group_exists):
         group_exists.return_value = SimpleNamespace(gr_name="bob")
         groupname = "bob"
         result = passwd.remove_group(groupname, force=True)
