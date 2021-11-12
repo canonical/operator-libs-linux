@@ -13,12 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 def test_add_user():
-    p = passwd.Passwd()
-    user = passwd.User(name="test-user-0", state=passwd.UserState.Present)
-    p.add_user(user)
-
+    # First check the user we're creating doesn't exist
     expected_passwd_line = "test-user-0:x:1001:1001::/home/test-user-0:/bin/sh"
     expected_group_line = "test-user-0:x:1001:"
+    assert expected_group_line not in lines_in_file("/etc/group")
+    assert expected_passwd_line not in lines_in_file("/etc/passwd")
+
+    passwd.add_user(name="test-user-0")
+
     assert expected_group_line in lines_in_file("/etc/group")
     assert expected_passwd_line in lines_in_file("/etc/passwd")
     # clean up
