@@ -33,7 +33,7 @@ import grp
 import logging
 import pwd
 from subprocess import STDOUT, check_output
-from typing import List, Optional
+from typing import List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,49 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
+
+
+def user_exists(user: Union[str, int]) -> Optional[pwd.struct_passwd]:
+    """Check if a user exists.
+
+    Args:
+        user: username or gid of user whose existence to check
+
+    Raises:
+        TypeError: where neither a string or int is passed as the first argument
+    """
+    try:
+        if type(user) is int:
+            return pwd.getpwuid(user)
+        elif type(user) is str:
+            return pwd.getpwnam(user)
+        else:
+            raise TypeError("specified argument '%r' should be a string or int", user)
+    except KeyError:
+        logger.info("specified user '%s' doesn't exist", str(user))
+        return None
+
+
+def group_exists(group: Union[str, int]) -> Optional[grp.struct_group]:
+    """Check if a group exists.
+
+    Args:
+        group: username or gid of user whose existence to check
+
+    Raises:
+        TypeError: where neither a string or int is passed as the first argument
+    """
+    try:
+        if type(group) is int:
+            return grp.getgrgid(group)
+        elif type(group) is str:
+            return grp.getgrnam(group)
+        else:
+            raise TypeError("specified argument '%r' should be a string or int", group)
+    except KeyError:
+        logger.info("specified group '%s' doesn't exist", str(group))
+        return None
 
 
 def add_user(
@@ -112,42 +154,6 @@ def add_user(
     return user_info
 
 
-def user_exists(username: str) -> bool:
-    """Check if a user exists."""
-    try:
-        pwd.getpwnam(username)
-        return True
-    except KeyError:
-        return False
-
-
-def uid_exists(uid: int) -> bool:
-    """Check if a uid exists."""
-    try:
-        pwd.getpwuid(uid)
-        return True
-    except KeyError:
-        return False
-
-
-def group_exists(groupname: str) -> bool:
-    """Check if a group exists."""
-    try:
-        grp.getgrnam(groupname)
-        return True
-    except KeyError:
-        return False
-
-
-def gid_exists(gid: int) -> bool:
-    """Check if a gid exists."""
-    try:
-        grp.getgrgid(gid)
-        return True
-    except KeyError:
-        return False
-
-
 def add_group(group_name: str, system_group: bool = False, gid: int = None):
     """Add a group to the system.
 
@@ -200,3 +206,47 @@ def add_user_to_group(username: str, group: str):
     logger.info("adding user '%s' to group '%s'", username, group)
     check_output(["gpasswd", "-a", username, group], stderr=STDOUT)
     return grp.getgrnam(group)
+
+
+def remove_user(user: Union[str, int], remove_home: bool = False) -> bool:
+    """Remove a user from the system.
+
+    Args:
+        user: the username or uid of the user to remove
+        remove_home: indicates whether the user's home directory should be removed
+    """
+    u = user_exists(user)
+    if not u:
+        logger.info("user '%s' does not exist", str(u))
+        return True
+
+    cmd = ["userdel"]
+    if remove_home:
+        cmd.append("-f")
+    cmd.append(u.pw_name)
+
+    logger.info("removing user '%s'", u.pw_name)
+    check_output(cmd, stderr=STDOUT)
+    return True
+
+
+def remove_group(group: Union[str, int], force: bool = False) -> bool:
+    """Remove a user from the system.
+
+    Args:
+        group: the name or gid of the group to remove
+        force: force group removal even if it's the primary group for a user
+    """
+    g = group_exists(group)
+    if not g:
+        logger.info("group '%s' does not exist", str(g))
+        return True
+
+    cmd = ["groupdel"]
+    if force:
+        cmd.append("-f")
+    cmd.append(g.gr_name)
+
+    logger.info("removing group '%s'", g.gr_name)
+    check_output(cmd, stderr=STDOUT)
+    return True

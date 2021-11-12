@@ -1,13 +1,52 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from charms.operator_libs_linux.v0 import passwd
 
 
 class TestPasswd(TestCase):
+    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
+    def test_user_exists_true(self, getpwnam):
+        getpwnam.return_value = "pw info"
+        self.assertEqual("pw info", passwd.user_exists("bob"))
+
+    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwuid")
+    def test_user_exists_by_uid_true(self, getpwuid):
+        getpwuid.return_value = "pw info"
+        self.assertEqual("pw info", passwd.user_exists(1001))
+
+    def test_user_exists_invalid_input(self):
+        with self.assertRaises(TypeError) as exc:
+            passwd.user_exists(True)
+
+    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
+    def test_user_exists_false(self, getpwnam):
+        getpwnam.side_effect = KeyError("user not found")
+        self.assertIsNone(passwd.user_exists("bob"))
+
+    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
+    def test_group_exists_true(self, getgrnam):
+        getgrnam.return_value = "grp info"
+        self.assertEqual("grp info", passwd.group_exists("bob"))
+
+    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrgid")
+    def test_group_exists_by_gid_true(self, getgrgid):
+        getgrgid.return_value = "grp info"
+        self.assertEqual("grp info", passwd.group_exists(1001))
+
+    def test_group_exists_invalid_input(self):
+        with self.assertRaises(TypeError):
+            passwd.group_exists(True)
+
+    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
+    def test_group_exists_false(self, getgrnam):
+        getgrnam.side_effect = KeyError("group not found")
+        self.assertIsNone(passwd.group_exists("bob"))
+
     @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
     @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
     @patch("charms.operator_libs_linux.v0.passwd.check_output")
@@ -167,6 +206,39 @@ class TestPasswd(TestCase):
         getpwnam.assert_called_with(user_name)
         getpwuid.assert_called_with(user_id)
 
+    @patch("charms.operator_libs_linux.v0.passwd.user_exists")
+    @patch("charms.operator_libs_linux.v0.passwd.check_output")
+    def test_remove_user_that_does_not_exist(self, check_output, user_exists):
+        user_exists.return_value = None
+        username = "bob"
+        result = passwd.remove_user(username)
+
+        check_output.assert_not_called()
+        user_exists.assert_called_with(username)
+        self.assertTrue(result)
+
+    @patch("charms.operator_libs_linux.v0.passwd.user_exists")
+    @patch("charms.operator_libs_linux.v0.passwd.check_output")
+    def test_remove_user_that_exists(self, check_output, user_exists):
+        user_exists.return_value = SimpleNamespace(pw_name="bob")
+        username = "bob"
+        result = passwd.remove_user(username)
+
+        check_output.assert_called_with(["userdel", username], stderr=-2)
+        user_exists.assert_called_with(username)
+        self.assertTrue(result)
+
+    @patch("charms.operator_libs_linux.v0.passwd.user_exists")
+    @patch("charms.operator_libs_linux.v0.passwd.check_output")
+    def test_remove_user_that_exists_remove_homedir(self, check_output, user_exists):
+        user_exists.return_value = SimpleNamespace(pw_name="bob")
+        username = "bob"
+        result = passwd.remove_user(username, remove_home=True)
+
+        check_output.assert_called_with(["userdel", "-f", username], stderr=-2)
+        user_exists.assert_called_with(username)
+        self.assertTrue(result)
+
     @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
     @patch("charms.operator_libs_linux.v0.passwd.grp.getgrgid")
     @patch("charms.operator_libs_linux.v0.passwd.check_output")
@@ -183,16 +255,6 @@ class TestPasswd(TestCase):
         )
         getgrgid.assert_called_with(group_id)
         getgrnam.assert_called_with(group_name)
-
-    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
-    def test_user_exists_true(self, getpwnam):
-        getpwnam.side_effect = "pw info"
-        self.assertTrue(passwd.user_exists("bob"))
-
-    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
-    def test_user_exists_false(self, getpwnam):
-        getpwnam.side_effect = KeyError("user not found")
-        self.assertFalse(passwd.user_exists("bob"))
 
     @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
     @patch("charms.operator_libs_linux.v0.passwd.group_exists")
@@ -270,3 +332,36 @@ class TestPasswd(TestCase):
         self.assertEqual(result, new_group_grnam)
         check_output.assert_called_with(["addgroup", "--system", group_name], stderr=-2)
         getgrnam.assert_called_with(group_name)
+
+    @patch("charms.operator_libs_linux.v0.passwd.group_exists")
+    @patch("charms.operator_libs_linux.v0.passwd.check_output")
+    def test_remove_user_that_does_not_exist(self, check_output, group_exists):
+        group_exists.return_value = None
+        groupname = "bob"
+        result = passwd.remove_group(groupname)
+
+        check_output.assert_not_called()
+        group_exists.assert_called_with(groupname)
+        self.assertTrue(result)
+
+    @patch("charms.operator_libs_linux.v0.passwd.group_exists")
+    @patch("charms.operator_libs_linux.v0.passwd.check_output")
+    def test_remove_group_that_exists(self, check_output, group_exists):
+        group_exists.return_value = SimpleNamespace(gr_name="bob")
+        groupname = "bob"
+        result = passwd.remove_group(groupname)
+
+        check_output.assert_called_with(["groupdel", groupname], stderr=-2)
+        group_exists.assert_called_with(groupname)
+        self.assertTrue(result)
+
+    @patch("charms.operator_libs_linux.v0.passwd.group_exists")
+    @patch("charms.operator_libs_linux.v0.passwd.check_output")
+    def test_remove_user_that_exists_force(self, check_output, group_exists):
+        group_exists.return_value = SimpleNamespace(gr_name="bob")
+        groupname = "bob"
+        result = passwd.remove_group(groupname, force=True)
+
+        check_output.assert_called_with(["groupdel", "-f", groupname], stderr=-2)
+        group_exists.assert_called_with(groupname)
+        self.assertTrue(result)
