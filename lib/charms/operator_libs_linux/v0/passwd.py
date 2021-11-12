@@ -266,6 +266,7 @@ class User(object):
                 args.append("-r")
 
             subprocess.check_call(["useradd", *args, self.name])
+            self._uid = self._uid or int(pwd.getpwnam(self.name).pw_uid)
         except CalledProcessError as e:
             raise UserError(f"Could not add user '{self.name}' to the system: {e.output}")
 
@@ -320,7 +321,7 @@ class User(object):
                 found = True if user.pw_passwd == "!" else False
             else:
                 found = True if user.pw_passwd == "x" else False
-        except KeyError:
+        except (TypeError, KeyError):
             logger.debug("User {} does not exist on the system.".format(self.name))
             found = False
 
@@ -405,6 +406,7 @@ class Group(object):
             if self.gid:
                 cmd.extend(["-g", f"{self.gid}"])
             subprocess.check_call(cmd)
+            self._gid = self._gid or int(grp.getgrnam(self.name).gr_gid)
         except CalledProcessError as e:
             raise GroupError(f"Could not add group {self.name}! Reason: {e.output}")
 

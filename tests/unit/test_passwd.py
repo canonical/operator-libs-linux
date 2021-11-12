@@ -217,12 +217,14 @@ class TestPasswd(TestCase):
         v.ensure_state(passwd.UserState.NoLogin)
         mock_subprocess.assert_called_with(["usermod", "-s", "/sbin/nologin", v.name])
 
+    @patch("pwd.getpwuid")
     @patch("pwd.getpwall")
     @patch("grp.getgrall")
     @patch("charms.operator_libs_linux.v0.passwd.subprocess.check_call")
-    def test_can_add_users_and_groups(self, mock_subprocess, mock_grp, mock_pw):
+    def test_can_add_users_and_groups(self, mock_subprocess, mock_grp, mock_pw, mock_getuid):
         mock_grp.return_value = grp_getgr_return
         mock_pw.return_value = pwd_getpw_return
+        mock_getuid.side_effect = KeyError
         mock_subprocess.return_value = 0
         p = passwd.Passwd()
 
