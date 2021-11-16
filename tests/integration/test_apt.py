@@ -56,3 +56,23 @@ def test_install_package_external_repository():
     apt.add_package("terraform")
 
     assert get_command_path("terraform") == "/usr/bin/terraform"
+
+
+def test_list_file_generation_external_repository():
+    repositories = apt.RepositoryMapping()
+
+    # Get the mongo GPG key
+    key = urlopen(" https://www.mongodb.org/static/pgp/server-5.0.asc").read().decode()
+
+    # Add the mongo repository if it doesn't already exist
+    if "https://repo.mongodb.org/apt/ubuntu" not in repositories:
+        line = "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/5.0 multiverse"
+        repo = apt.DebianRepository.from_repo_line(line)
+        # Import the repository's key
+        repo.import_key(key)
+        repositories.add(repo)
+
+    apt.update()
+    apt.add_package("mongodb-org")
+
+    assert get_command_path("mongod") == "/usr/bin/mongod"

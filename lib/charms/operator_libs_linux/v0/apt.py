@@ -124,7 +124,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 4
 
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
@@ -934,7 +934,9 @@ class DebianRepository:
             write_file: boolean to enable writing the new repo to disk
         """
         repo = RepositoryMapping._parse(repo_line, "UserInput")
-        fname = f"{DebianRepository.prefix_from_uri(repo.uri)}-{repo.release}.list"
+        fname = (
+            f"{DebianRepository.prefix_from_uri(repo.uri)}-{repo.release.replace('/', '-')}.list"
+        )
         repo.filename = fname
 
         options = repo.options if repo.options else {}
@@ -1257,7 +1259,9 @@ class RepositoryMapping(Mapping):
           repo: a `DebianRepository` object
           default_filename: an (Optional) filename if the default is not desirable
         """
-        new_filename = f"{DebianRepository.prefix_from_uri(repo.uri)}-{repo.release}.list"
+        new_filename = (
+            f"{DebianRepository.prefix_from_uri(repo.uri)}-{repo.release.replace('/', '-')}.list"
+        )
 
         fname = repo.filename or new_filename
 
