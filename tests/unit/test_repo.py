@@ -1,6 +1,8 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import os
+
 from charms.operator_libs_linux.v0 import apt
 from pyfakefs.fake_filesystem_unittest import TestCase
 
@@ -108,10 +110,23 @@ class TestRepositoryMapping(TestCase):
         self.assertEqual(d.release, "focal")
         self.assertEqual(d.groups, ["bar", "baz"])
         self.assertEqual(d.filename, "/etc/apt/sources.list.d/foo-focal.list")
-        self.assertIn(
-            "deb https://example.com/foo focal bar baz\n",
-            open(d.filename).readlines(),
+        self.assertIn("deb https://example.com/foo focal bar baz\n", open(d.filename).readlines())
+
+    def test_valid_list_file(self):
+        line = "deb https://repo.example.org/fiz/baz focal/foo-bar/5.0 multiverse"
+        d = apt.DebianRepository.from_repo_line(line)
+        self.assertEqual(d.filename, "/etc/apt/sources.list.d/fiz-baz-focal-foo-bar-5.0.list")
+
+        r = apt.RepositoryMapping()
+        d = apt.DebianRepository(
+            True,
+            "deb",
+            "https://repo.example.org/fiz/baz",
+            "focal/foo-bar/5.0",
+            ["multiverse"],
         )
+        r.add(d, default_filename=False)
+        assert os.path.exists("/etc/apt/sources.list.d/fiz-baz-focal-foo-bar-5.0.list")
 
     def test_can_add_repositories_from_string_with_options(self):
         d = apt.DebianRepository.from_repo_line(
