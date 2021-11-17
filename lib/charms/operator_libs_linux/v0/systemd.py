@@ -87,7 +87,8 @@ def service(action: str, service_name: str) -> bool:
 def service_running(service_name: str) -> bool:
     """Determine whether a system service is running.
 
-    :param service_name: the name of the service
+    Args:
+        service_name: the name of the service
     """
     return service("is-active", service_name)
 
@@ -95,7 +96,8 @@ def service_running(service_name: str) -> bool:
 def service_start(service_name: str) -> bool:
     """Start a system service.
 
-    :param service_name: the name of the service to stop
+    Args:
+        service_name: the name of the service to stop
     """
     return service("start", service_name)
 
@@ -103,7 +105,8 @@ def service_start(service_name: str) -> bool:
 def service_stop(service_name: str) -> bool:
     """Stop a system service.
 
-    :param service_name: the name of the service to stop
+    Args:
+        service_name: the name of the service to stop
     """
     return service("stop", service_name)
 
@@ -111,7 +114,8 @@ def service_stop(service_name: str) -> bool:
 def service_restart(service_name: str) -> bool:
     """Restart a system service.
 
-    :param service_name: the name of the service to restart
+    Args:
+        service_name: the name of the service to restart
     """
     return service("restart", service_name)
 
@@ -119,9 +123,10 @@ def service_restart(service_name: str) -> bool:
 def service_reload(service_name: str, restart_on_failure: bool = False) -> bool:
     """Reload a system service, optionally falling back to restart if reload fails.
 
-    :param service_name: the name of the service to reload
-    :param restart_on_failure: boolean indicating whether to fallback to a
-                               restart if the reload fails.
+    Args:
+        service_name: the name of the service to reload
+        restart_on_failure: boolean indicating whether to fallback to a restart if the
+          reload fails.
     """
     service_result = service("reload", service_name)
     if not service_result and restart_on_failure:
@@ -134,7 +139,8 @@ def service_pause(service_name: str) -> bool:
 
     Stop it, and prevent it from starting again at boot.
 
-    :param service_name: the name of the service to pause
+    Args:
+        service_name: the name of the service to pause
     """
     stopped = True
     if service_running(service_name):
@@ -149,7 +155,8 @@ def service_resume(service_name: str) -> bool:
 
     Re-enable starting again at boot. Start the service.
 
-    :param service_name: the name of the service to resume
+    Args:
+        service_name: the name of the service to resume
     """
     service("unmask", service_name)
     service("enable", service_name)
