@@ -119,41 +119,41 @@ def add_user(
     """
     try:
         if uid:
-            user_info = pwd.getpwnam(username)
-            logger.info("user '%s' already exists", username)
+            user_info = pwd.getpwuid(int(uid))
+            logger.info("user '%d' already exists", uid)
             return user_info
-        user_info = pwd.getpwuid(int(uid))
-        logger.info("user with uid '%d' already exists", uid)
+        user_info = pwd.getpwnam(username)
+        logger.info("user with uid '%s' already exists", username)
         return user_info
     except KeyError:
         logger.info("creating user '%s'", username)
-        
+
     cmd = ["useradd", "--shell", shell]
 
-        if uid:
-            cmd.extend(["--uid", str(uid)])
-        if home_dir:
-            cmd.extend(["--home", str(home_dir)])
-        if password:
-            cmd.extend(["--password", password, "--create-home"])
-        if system_user or password is None:
-            cmd.append("--system")
+    if uid:
+        cmd.extend(["--uid", str(uid)])
+    if home_dir:
+        cmd.extend(["--home", str(home_dir)])
+    if password:
+        cmd.extend(["--password", password, "--create-home"])
+    if system_user or password is None:
+        cmd.append("--system")
 
-        if not primary_group:
-            try:
-                grp.getgrnam(username)
-                primary_group = username  # avoid "group exists" error
-            except KeyError:
-                pass
+    if not primary_group:
+        try:
+            grp.getgrnam(username)
+            primary_group = username  # avoid "group exists" error
+        except KeyError:
+            pass
 
-        if primary_group:
-            cmd.extend(["-g", primary_group])
-        if secondary_groups:
-            cmd.extend(["-G", ",".join(secondary_groups)])
+    if primary_group:
+        cmd.extend(["-g", primary_group])
+    if secondary_groups:
+        cmd.extend(["-G", ",".join(secondary_groups)])
 
-        cmd.append(username)
-        check_output(cmd, stderr=STDOUT)
-        user_info = pwd.getpwnam(username)
+    cmd.append(username)
+    check_output(cmd, stderr=STDOUT)
+    user_info = pwd.getpwnam(username)
     return user_info
 
 
