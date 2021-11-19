@@ -118,14 +118,17 @@ def add_user(
         The password database entry struct, as returned by `pwd.getpwnam`
     """
     try:
-        user_info = pwd.getpwnam(username)
-        logger.info("user '%s' already exists", username)
         if uid:
-            user_info = pwd.getpwuid(int(uid))
-            logger.info("user with uid '%d' already exists", uid)
+            user_info = pwd.getpwnam(username)
+            logger.info("user '%s' already exists", username)
+            return user_info
+        user_info = pwd.getpwuid(int(uid))
+        logger.info("user with uid '%d' already exists", uid)
+        return user_info
     except KeyError:
         logger.info("creating user '%s'", username)
-        cmd = ["useradd", "--shell", shell]
+        
+    cmd = ["useradd", "--shell", shell]
 
         if uid:
             cmd.extend(["--uid", str(uid)])
