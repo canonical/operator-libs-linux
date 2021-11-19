@@ -63,14 +63,20 @@ def popen_kwargs():
     )
 
 
-def service(action: str, service_name: str) -> bool:
+def service(action: str, service_name: str, now: bool = None, quiet: bool = None) -> bool:
     """Control a system service.
 
     Args:
         action: the action to take on the service
         service_name: the name of the service to perform th action on
+        now: passes the --now flag to the shell invocation.
+        quiet: passes the --quiet flag to the shell invocation.
     """
     cmd = ["systemctl", action, service_name]
+    if now is not None:
+        cmd.append("--now")
+    if quiet is not None:
+        cmd.append("--quiet")
     if action != "is-active":
         logger.debug("Attempting to {} '{}' with command {}.".format(action, service_name, cmd))
     else:
@@ -90,7 +96,7 @@ def service_running(service_name: str) -> bool:
     Args:
         service_name: the name of the service
     """
-    return service("is-active", service_name)
+    return service("is-active", service_name, quiet=True)
 
 
 def service_start(service_name: str) -> bool:
@@ -142,12 +148,9 @@ def service_pause(service_name: str) -> bool:
     Args:
         service_name: the name of the service to pause
     """
-    stopped = True
-    if service_running(service_name):
-        stopped = service_stop(service_name)
-    service("disable", service_name)
+    service("disable", service_name, now=True)
     service("mask", service_name)
-    return stopped
+    return not service_running(service_name)
 
 
 def service_resume(service_name: str) -> bool:
@@ -159,9 +162,5 @@ def service_resume(service_name: str) -> bool:
         service_name: the name of the service to resume
     """
     service("unmask", service_name)
-    service("enable", service_name)
-    started = service_running(service_name)
-
-    if not started:
-        started = service_start(service_name)
-    return started
+    service("enable", service_name, now=True)
+    return service_running(service_name)

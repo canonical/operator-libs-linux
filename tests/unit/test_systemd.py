@@ -64,11 +64,11 @@ class TestSystemD(unittest.TestCase):
         mockp, kw = make_mock([0, 1])
 
         is_running = systemd.service_running("mysql")
-        mockp.assert_called_with(["systemctl", "is-active", "mysql"], **kw)
+        mockp.assert_called_with(["systemctl", "is-active", "mysql", "--quiet"], **kw)
         self.assertTrue(is_running)
 
         is_running = systemd.service_running("mysql")
-        mockp.assert_called_with(["systemctl", "is-active", "mysql"], **kw)
+        mockp.assert_called_with(["systemctl", "is-active", "mysql", "--quiet"], **kw)
         self.assertFalse(is_running)
 
     @with_mock_subp
@@ -145,110 +145,91 @@ class TestSystemD(unittest.TestCase):
 
     @with_mock_subp
     def test_service_pause(self, make_mock):
-        # Service is running, so we stop and disable it.
-        mockp, kw = make_mock([0, 0, 0, 0])
+        # Test pause
+        mockp, kw = make_mock([0, 0, 1])
 
         paused = systemd.service_pause("mysql")
         mockp.assert_has_calls(
             [
-                call(["systemctl", "is-active", "mysql"], **kw),
-                call(["systemctl", "stop", "mysql"], **kw),
-                call(["systemctl", "disable", "mysql"], **kw),
+                call(["systemctl", "disable", "mysql", "--now"], **kw),
                 call(["systemctl", "mask", "mysql"], **kw),
-            ]
-        )
-        self.assertTrue(paused)
-
-        # Service is not running.
-        mockp, kw = make_mock([1, 0, 0])
-        paused = systemd.service_pause("mysql")
-        mockp.assert_has_calls(
-            [
-                call(["systemctl", "is-active", "mysql"], **kw),
-                call(["systemctl", "disable", "mysql"], **kw),
-                call(["systemctl", "mask", "mysql"], **kw),
+                call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
             ]
         )
         self.assertTrue(paused)
 
         # Could not stop service!
-        mockp, kw = make_mock([0, 1, 0, 0])
+        mockp, kw = make_mock([0, 0, 0])
         paused = systemd.service_pause("mysql")
         mockp.assert_has_calls(
             [
-                call(["systemctl", "is-active", "mysql"], **kw),
-                call(["systemctl", "stop", "mysql"], **kw),
-                call(["systemctl", "disable", "mysql"], **kw),
+                call(["systemctl", "disable", "mysql", "--now"], **kw),
                 call(["systemctl", "mask", "mysql"], **kw),
+                call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
             ]
         )
         self.assertFalse(paused)
 
         # Failures in disable and mask aren't handled.
-        # TODO: might want to log a warning in that case.
-        mockp, kw = make_mock([0, 0, 1, 1])
+        mockp, kw = make_mock([1, 1, 1])
         paused = systemd.service_pause("mysql")
         mockp.assert_has_calls(
             [
-                call(["systemctl", "is-active", "mysql"], **kw),
-                call(["systemctl", "stop", "mysql"], **kw),
-                call(["systemctl", "disable", "mysql"], **kw),
+                call(["systemctl", "disable", "mysql", "--now"], **kw),
                 call(["systemctl", "mask", "mysql"], **kw),
+                call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
             ]
         )
         self.assertTrue(paused)
 
     @with_mock_subp
     def test_service_resume(self, make_mock):
-        mockp, kw = make_mock([0, 0, 0, 0])
 
         # Service is already running
+        mockp, kw = make_mock([0, 0, 0])
         resumed = systemd.service_resume("mysql")
         mockp.assert_has_calls(
             [
                 call(["systemctl", "unmask", "mysql"], **kw),
-                call(["systemctl", "enable", "mysql"], **kw),
-                call(["systemctl", "is-active", "mysql"], **kw),
+                call(["systemctl", "enable", "mysql", "--now"], **kw),
+                call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
             ]
         )
         self.assertTrue(resumed)
 
         # Service was stopped
-        mockp, kw = make_mock([0, 0, 1, 0])
+        mockp, kw = make_mock([0, 0, 0])
         resumed = systemd.service_resume("mysql")
         mockp.assert_has_calls(
             [
                 call(["systemctl", "unmask", "mysql"], **kw),
-                call(["systemctl", "enable", "mysql"], **kw),
-                call(["systemctl", "is-active", "mysql"], **kw),
-                call(["systemctl", "start", "mysql"], **kw),
+                call(["systemctl", "enable", "mysql", "--now"], **kw),
+                call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
             ]
         )
         self.assertTrue(resumed)
 
         # Could not start service!
-        mockp, kw = make_mock([0, 0, 1, 1])
+        mockp, kw = make_mock([0, 0, 1])
         resumed = systemd.service_resume("mysql")
         mockp.assert_has_calls(
             [
                 call(["systemctl", "unmask", "mysql"], **kw),
-                call(["systemctl", "enable", "mysql"], **kw),
-                call(["systemctl", "is-active", "mysql"], **kw),
-                call(["systemctl", "start", "mysql"], **kw),
+                call(["systemctl", "enable", "mysql", "--now"], **kw),
+                call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
             ]
         )
         self.assertFalse(resumed)
 
         # Failures in unmask and enable aren't handled.
-        # TODO: might want to log a warning.
-        mockp, kw = make_mock([1, 1, 1, 0])
+        mockp, kw = make_mock([1, 1, 0])
+
         resumed = systemd.service_resume("mysql")
         mockp.assert_has_calls(
             [
                 call(["systemctl", "unmask", "mysql"], **kw),
-                call(["systemctl", "enable", "mysql"], **kw),
-                call(["systemctl", "is-active", "mysql"], **kw),
-                call(["systemctl", "start", "mysql"], **kw),
+                call(["systemctl", "enable", "mysql", "--now"], **kw),
+                call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
             ]
         )
         self.assertTrue(resumed)

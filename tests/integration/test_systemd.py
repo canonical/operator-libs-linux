@@ -37,3 +37,6 @@ def test_reload():
     # Verify that we can reload services that support reload.
     assert not service_reload("cron")
     assert service_reload("apparmor")
+
+    # The following is observed behavior. Not sure how happy I am about it.
+    assert service_reload("cron", restart_on_failure=True)
