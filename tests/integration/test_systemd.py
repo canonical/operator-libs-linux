@@ -1,6 +1,19 @@
+#!/usr/bin/env python3
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+
 import logging
 
-from charms.operator_libs_linux.v0.systemd import *
+from charms.operator_libs_linux.v0.systemd import (
+    service_pause,
+    service_reload,
+    service_restart,
+    service_resume,
+    service_running,
+    service_start,
+    service_stop,
+)
 
 logger = logging.getLogger(__name__)
 
