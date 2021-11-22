@@ -250,14 +250,13 @@ class Snap(object):
         """
         return self._snap("get", [key])
 
-    def set(self, **kwargs) -> str:
+    def set(self, config: dict[str:str]) -> str:
         """Sets a snap configuration value.
 
         Args:
-            key: the key to set
-            value: the value to set it to
+           config: a dictionary containing keys and values specifying the config to set.
         """
-        args = [f'{key}="{val}"' for key, val in kwargs.items()]
+        args = [f'{key}="{val}"' for key, val in config.items()]
 
         return self._snap("set", [*args])
 

@@ -46,3 +46,15 @@ def test_snap_refresh():
     cache = snap.SnapCache()
     lxd = cache["lxd"]
     lxd.ensure(snap.SnapState.Latest, classic=False, channel="latest/candidate", cohort="+")
+
+
+def test_snap_set():
+    lxd = snap.ensure(["lxd"], snap.SnapState.Latest, channel="latest/stable")
+
+    assert lxd.get("ceph.external") == "false"
+    assert lxd.get("criu.enable") == "false"
+
+    lxd.set({"ceph.external": "true", "criu.enable": "true"})
+
+    assert lxd.get("ceph.external") == "true"
+    assert lxd.get("criu.enable") == "true"
