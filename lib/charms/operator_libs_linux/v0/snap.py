@@ -250,14 +250,16 @@ class Snap(object):
         """
         return self._snap("get", [key])
 
-    def set(self, key, value) -> str:
+    def set(self, **kwargs) -> str:
         """Sets a snap configuration value.
 
         Args:
             key: the key to set
             value: the value to set it to
         """
-        return self._snap("set", [key, value])
+        args = [f'{key}={val}' for key, val in kwargs]
+            
+        return self._snap("set", *args])
 
     def unset(self, key) -> str:
         """Unsets a snap configuration value.
