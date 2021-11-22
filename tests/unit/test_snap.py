@@ -3,6 +3,7 @@
 
 import json
 import unittest
+from subprocess import CalledProcessError
 from unittest.mock import MagicMock, mock_open, patch
 
 import fake_snapd as fake_snapd
@@ -334,7 +335,15 @@ class TestSnapBareMethods(unittest.TestCase):
         mock_subprocess.assert_called_with(["snap", "remove", "curl"], universal_newlines=True)
         self.assertEqual(bar.present, False)
 
-    def test_raises_snap_not_found_error(self):
+    @patch("charms.operator_libs_linux.v0.snap.subprocess.check_output")
+    def test_raises_snap_not_found_error(self, mock_subprocess):
+        def raise_error(cmd, **kwargs):
+            # If we can't find the snap, we should raise a CalledProcessError.
+            #
+            # We do it artificially so that this test works on systems w/out snapd installed.
+            raise CalledProcessError(None, cmd)
+
+        mock_subprocess.side_effect = raise_error
         with self.assertRaises(snap.SnapError) as ctx:
             snap.add("nothere")
         self.assertEqual("<charms.operator_libs_linux.v0.snap.SnapError>", ctx.exception.name)
