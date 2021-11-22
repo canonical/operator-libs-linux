@@ -386,3 +386,20 @@ class TestSnapBareMethods(unittest.TestCase):
             snap.add("nothere")
         self.assertEqual("<charms.operator_libs_linux.v0.snap.SnapError>", ctx.exception.name)
         self.assertIn("Failed to install or refresh snap(s): nothere", ctx.exception.message)
+
+    @patch("charms.operator_libs_linux.v0.snap.subprocess.check_output")
+    def test_snap_set(self, mock_subprocess):
+
+        foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
+
+        foo.set(bar="baz")
+        mock_subprocess.assert_called_with(
+            ["snap", "set", "foo", 'bar="baz"'],
+            universal_newlines=True,
+        )
+
+        foo.set(bar="baz", qux="quux")
+        mock_subprocess.assert_called_with(
+            ["snap", "set", "foo", 'bar="baz"', 'qux="quux"'],
+            universal_newlines=True,
+        )
