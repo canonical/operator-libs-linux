@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 import unittest
+from typing import List
 from unittest.mock import MagicMock, call, patch
 
 from charms.operator_libs_linux.v0 import systemd
@@ -22,7 +23,7 @@ def with_mock_subp(func):
 
     @patch("charms.operator_libs_linux.v0.systemd.subprocess")
     def make_mocks_and_run(cls, mock_subp):
-        def make_mock_popen(returncodes: list[int], lines: list[str] = None, stdout: str = None):
+        def make_mock_popen(returncodes: List[int], lines: List[str] = None, stdout: str = None):
             lines = lines if lines is not None else ("", "")
 
             mock_subp.PIPE = mock_subp.STDOUT = stdout or ""
