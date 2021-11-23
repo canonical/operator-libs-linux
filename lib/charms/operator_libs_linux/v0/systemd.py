@@ -52,6 +52,16 @@ __all__ = [  # Don't export `service`. (It's not the intended way of using this 
 
 logger = logging.getLogger(__name__)
 
+# The unique Charmhub library identifier, never change it
+LIBID = "045b0d179f6b4514a8bb9b48aee9ebaf"
+
+# Increment this major API version when introducing breaking changes
+LIBAPI = 0
+
+# Increment this PATCH version before using `charmcraft publish-lib` or reset
+# to 0 if you are raising the major API version
+LIBPATCH = 1
+
 
 def popen_kwargs():
     return dict(

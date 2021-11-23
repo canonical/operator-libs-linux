@@ -22,7 +22,7 @@ def with_mock_subp(func):
 
     @patch("charms.operator_libs_linux.v0.systemd.subprocess")
     def make_mocks_and_run(cls, mock_subp):
-        def make_mock_popen(returncodes: list[int], lines=None, stdout=None):
+        def make_mock_popen(returncodes: list[int], lines: list[str] = None, stdout: str = None):
             lines = lines if lines is not None else ("", "")
 
             mock_subp.PIPE = mock_subp.STDOUT = stdout or ""
@@ -32,7 +32,7 @@ def with_mock_subp(func):
             for code in returncodes:
                 mock_proc = MagicMock()
                 mock_proc.wait.return_value = None
-                mock_proc.stdout.readline.side_effect = ("", "")
+                mock_proc.stdout.readline.side_effect = lines
                 mock_proc.returncode = code
                 side_effects.append(mock_proc)
 
