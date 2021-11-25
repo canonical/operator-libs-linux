@@ -63,7 +63,7 @@ LIBAPI = 0
 LIBPATCH = 1
 
 
-def popen_kwargs():
+def _popen_kwargs():
     return dict(
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -73,12 +73,12 @@ def popen_kwargs():
     )
 
 
-def service(action: str, service_name: str, now: bool = None, quiet: bool = None) -> bool:
+def _service(action: str, service_name: str, now: bool = None, quiet: bool = None) -> bool:
     """Control a system service.
 
     Args:
         action: the action to take on the service
-        service_name: the name of the service to perform th action on
+        service_name: the name of the service to perform the action on
         now: passes the --now flag to the shell invocation.
         quiet: passes the --quiet flag to the shell invocation.
     """
@@ -92,7 +92,7 @@ def service(action: str, service_name: str, now: bool = None, quiet: bool = None
     else:
         logger.debug("Checking if '{}' is active".format(service_name))
 
-    proc = subprocess.Popen(cmd, **popen_kwargs())
+    proc = subprocess.Popen(cmd, **_popen_kwargs())
     for line in iter(proc.stdout.readline, ""):
         logger.debug(line)
 
@@ -106,7 +106,7 @@ def service_running(service_name: str) -> bool:
     Args:
         service_name: the name of the service
     """
-    return service("is-active", service_name, quiet=True)
+    return _service("is-active", service_name, quiet=True)
 
 
 def service_start(service_name: str) -> bool:
@@ -115,7 +115,7 @@ def service_start(service_name: str) -> bool:
     Args:
         service_name: the name of the service to stop
     """
-    return service("start", service_name)
+    return _service("start", service_name)
 
 
 def service_stop(service_name: str) -> bool:
@@ -124,7 +124,7 @@ def service_stop(service_name: str) -> bool:
     Args:
         service_name: the name of the service to stop
     """
-    return service("stop", service_name)
+    return _service("stop", service_name)
 
 
 def service_restart(service_name: str) -> bool:
@@ -133,7 +133,7 @@ def service_restart(service_name: str) -> bool:
     Args:
         service_name: the name of the service to restart
     """
-    return service("restart", service_name)
+    return _service("restart", service_name)
 
 
 def service_reload(service_name: str, restart_on_failure: bool = False) -> bool:
@@ -144,9 +144,9 @@ def service_reload(service_name: str, restart_on_failure: bool = False) -> bool:
         restart_on_failure: boolean indicating whether to fallback to a restart if the
           reload fails.
     """
-    service_result = service("reload", service_name)
+    service_result = _service("reload", service_name)
     if not service_result and restart_on_failure:
-        service_result = service("restart", service_name)
+        service_result = _service("restart", service_name)
     return service_result
 
 
@@ -158,8 +158,8 @@ def service_pause(service_name: str) -> bool:
     Args:
         service_name: the name of the service to pause
     """
-    service("disable", service_name, now=True)
-    service("mask", service_name)
+    _service("disable", service_name, now=True)
+    _service("mask", service_name)
     return not service_running(service_name)
 
 
@@ -171,6 +171,6 @@ def service_resume(service_name: str) -> bool:
     Args:
         service_name: the name of the service to resume
     """
-    service("unmask", service_name)
-    service("enable", service_name, now=True)
+    _service("unmask", service_name)
+    _service("enable", service_name, now=True)
     return service_running(service_name)
