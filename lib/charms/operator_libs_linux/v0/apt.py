@@ -45,7 +45,7 @@ To find details of a specific package:
 
 ```python
 try:
-    vim = apt.DebianPackage.from_system("vim"
+    vim = apt.DebianPackage.from_system("vim")
 
     # To find from the apt cache only
     # apt.DebianPackage.from_apt_cache("vim")
