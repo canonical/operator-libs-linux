@@ -58,3 +58,20 @@ def test_snap_set():
 
     assert lxd.get("ceph.external") == "true"
     assert lxd.get("criu.enable") == "true"
+
+
+def test_unset_key_raises_snap_error():
+    lxd = snap.ensure("lxd")
+
+    # Verify that the correct exception gets raised in the case of an unset key.
+    key = "keythatdoesntexist01"
+    try:
+        lxd.get(key)
+    except snap.SnapError:
+        pass
+    else:
+        logger.error("Setting an unset key should result in a SnapError.")
+
+    # We can make the above work w/ abitrary config.
+    assert lxd.set({key: "true"})
+    assert lxd.get(key)
