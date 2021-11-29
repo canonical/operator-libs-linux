@@ -250,7 +250,7 @@ class Snap(object):
         """
         return self._snap("get", [key])
 
-    def set(self, config: dict[str:str]) -> str:
+    def set(self, config: Dict) -> str:
         """Sets a snap configuration value.
 
         Args:
