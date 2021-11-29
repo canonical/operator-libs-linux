@@ -17,7 +17,7 @@ def with_mock_subp(func):
 
     The function returns the mock Popen object, so that routines such as
     assert_called_with can be called upon it, along with the return from
-    systemd.popen_kwargs, for convenience when composing call objects.
+    systemd._popen_kwargs, for convenience when composing call objects.
 
     """
 
@@ -40,7 +40,7 @@ def with_mock_subp(func):
             mock_popen = mock_subp.Popen
             mock_popen.side_effect = tuple(side_effects)
 
-            return mock_popen, systemd.popen_kwargs()
+            return mock_popen, systemd._popen_kwargs()
 
         func(cls, make_mock_popen)
 
@@ -52,11 +52,11 @@ class TestSystemD(unittest.TestCase):
     def test_service(self, make_mock):
         mockp, kw = make_mock([0, 1])
 
-        success = systemd.service("is-active", "mysql")
+        success = systemd._service("is-active", "mysql")
         mockp.assert_called_with(["systemctl", "is-active", "mysql"], **kw)
         self.assertTrue(success)
 
-        success = systemd.service("is-active", "mysql")
+        success = systemd._service("is-active", "mysql")
         mockp.assert_called_with(["systemctl", "is-active", "mysql"], **kw)
         self.assertFalse(success)
 
