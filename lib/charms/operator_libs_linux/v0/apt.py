@@ -951,8 +951,10 @@ class DebianRepository:
         if repo.gpg_key:
             options["signed-by"] = repo.gpg_key
 
+        # For Python 3.5 it's required to use sorted in the options dict in order to not have
+        # different results in the order of the options between executions.
         options_str = (
-            "[{}] ".format(" ".join(["{}={}".format(k, v) for k, v in options.items()]))
+            "[{}] ".format(" ".join(["{}={}".format(k, v) for k, v in sorted(options.items())]))
             if options
             else ""
         )
