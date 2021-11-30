@@ -20,7 +20,7 @@ def test_install_package():
     except apt.PackageNotFoundError:
         logger.error("A specified package not found in package cache or on system")
     except apt.PackageError as e:
-        logger.error(f"Could not install package. Reason: {e.message}")
+        logger.error("Could not install package. Reason: {}".format(e.message))
 
     assert get_command_path("zsh") == "/usr/bin/zsh"
     assert get_command_path("cfssl") == "/usr/bin/cfssl"
