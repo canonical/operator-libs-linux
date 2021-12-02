@@ -16,6 +16,7 @@ after which they may be imported and used as normal charms.
 
 - [apt] - a library that enables the installation of Debian packages and management of system package repositories.
 - [snap] - a library for installing and working with [snap packages].
+- [systemd] - a library for manipulating services managed by the `systemd` init system.
 - [passwd] - a library for manipulating Linux users and groups.
 
 ## Contributing
@@ -27,4 +28,5 @@ charm following best practice guidelines, and `CONTRIBUTING.md` for developer gu
 [snap packages]: https://snapcraft.io
 [apt]: https://charmhub.io/operator-libs-linux/libraries/apt
 [snap]: https://charmhub.io/operator-libs-linux/libraries/snap
+[systemd]: https://charmhub.io/operator-libs-linux/libraries/systemd
 [passwd]: https://charmhub.io/operator-libs-linux/libraries/passwd

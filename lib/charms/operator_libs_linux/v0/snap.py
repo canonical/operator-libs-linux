@@ -36,7 +36,7 @@ try:
         juju.ensure(snap.SnapState.Latest, channel="beta")
         juju.set("key", "value")
 except snap.SnapError as e:
-    logger.error(f"An exception occurred when installing charmcraft. Reason: {e.message}")
+    logger.error("An exception occurred when installing charmcraft. Reason: %s", e.message)
 ```
 
 In addition, the `snap` module provides "bare" methods which can act on Snap packages as
@@ -52,7 +52,7 @@ try:
     if nextcloud.get("mode") != "production":
         nextcloud.set("mode", "production")
 except snap.SnapError as e:
-    logger.error(f"An exception occurred when installing snaps. Reason: {e.message}")
+    logger.error("An exception occurred when installing snaps. Reason: %s", e.message)
 ```
 """
 
