@@ -48,6 +48,7 @@ __all__ = [  # Don't export `service`. (It's not the intended way of using this 
     "service_running",
     "service_start",
     "service_stop",
+    "daemon_reload",
 ]
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 
 def _popen_kwargs():
@@ -174,3 +175,12 @@ def service_resume(service_name: str) -> bool:
     _service("unmask", service_name)
     _service("enable", service_name, now=True)
     return service_running(service_name)
+
+
+def daemon_reload() -> bool:
+    """Reload systemd manager configuration."""
+    proc = subprocess.Popen(["systemctl", "daemon-reload"], **_popen_kwargs())
+    for line in iter(proc.stdout.readline, ""):
+        logger.debug(line)
+    proc.wait()
+    return proc.returncode == 0

@@ -4,8 +4,10 @@
 
 
 import logging
+from subprocess import check_output
 
 from charms.operator_libs_linux.v0.systemd import (
+    daemon_reload,
     service_pause,
     service_reload,
     service_restart,
@@ -53,3 +55,22 @@ def test_reload():
 
     # The following is observed behavior. Not sure how happy I am about it.
     assert service_reload("cron", restart_on_failure=True)
+
+
+def test_daemon_reload():
+    # Verify that we can reload the systemd manager configuration.
+
+    def needs_reload(svc: str):
+        """Check if a given service has changed, and requires a daemon-reload."""
+        output = check_output(["systemctl", "show", svc, "--property=NeedDaemonReload"])
+        return output.decode().strip() == "NeedDaemonReload=yes"
+
+    # Edit a unit file such that a reload would be required
+    with open("/lib/systemd/system/cron.service", "r+") as f:
+        content = f.read()
+        content.replace("Restart=on-failure", "Restart=never")
+        f.write(content)
+
+    assert needs_reload("cron")
+    assert daemon_reload()
+    assert not needs_reload("cron")

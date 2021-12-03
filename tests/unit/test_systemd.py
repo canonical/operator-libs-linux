@@ -234,3 +234,15 @@ class TestSystemD(unittest.TestCase):
             ]
         )
         self.assertTrue(resumed)
+
+    @with_mock_subp
+    def test_daemon_reload(self, make_mock):
+        mockp, kw = make_mock([0, 1])
+
+        reloaded = systemd.daemon_reload()
+        mockp.assert_called_with(["systemctl", "daemon-reload"], **kw)
+        self.assertTrue(reloaded)
+
+        reloaded = systemd.daemon_reload()
+        mockp.assert_called_with(["systemctl", "daemon-reload"], **kw)
+        self.assertFalse(reloaded)
