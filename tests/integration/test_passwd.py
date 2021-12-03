@@ -17,8 +17,10 @@ def test_add_user():
 
     u = passwd.add_user(username="test-user-0")
 
-    expected_passwd_line = f"{u.pw_name}:x:{u.pw_uid}:{u.pw_gid}::{u.pw_dir}:{u.pw_shell}"
-    expected_group_line = f"{u.pw_name}:x:{u.pw_gid}:"
+    expected_passwd_line = "{}:x:{}:{}::{}:{}".format(
+        u.pw_name, u.pw_uid, u.pw_gid, u.pw_dir, u.pw_shell
+    )
+    expected_group_line = "{}:x:{}:".format(u.pw_name, u.pw_gid)
 
     assert passwd.user_exists("test-user-0") is not None
     assert expected_group_line in lines_in_file("/etc/group")
@@ -33,8 +35,10 @@ def test_remove_user():
 
     passwd.remove_user("test-user-0")
 
-    expected_passwd_line = f"{u.pw_name}:x:{u.pw_uid}:{u.pw_gid}::{u.pw_dir}:{u.pw_shell}"
-    expected_group_line = f"{u.pw_name}:x:{u.pw_gid}:"
+    expected_passwd_line = "{}:x:{}:{}::{}:{}".format(
+        u.pw_name, u.pw_uid, u.pw_gid, u.pw_dir, u.pw_shell
+    )
+    expected_group_line = "{}:x:{}:".format(u.pw_name, u.pw_gid)
 
     assert passwd.user_exists("test-user-0") is None
     assert expected_group_line not in lines_in_file("/etc/group")
@@ -43,7 +47,7 @@ def test_remove_user():
 
 def test_add_user_with_params():
     u = passwd.add_user(username="test-user-1", shell="/bin/bash", primary_group="admin")
-    expected = f"{u.pw_name}:x:{u.pw_uid}:{u.pw_gid}::{u.pw_dir}:{u.pw_shell}"
+    expected = "{}:x:{}:{}::{}:{}".format(u.pw_name, u.pw_uid, u.pw_gid, u.pw_dir, u.pw_shell)
 
     assert expected in lines_in_file("/etc/passwd")
 
@@ -55,7 +59,7 @@ def test_add_group():
 
     g = passwd.add_group(group_name="test-group")
 
-    expected = f"{g.gr_name}:x:{g.gr_gid}:"
+    expected = "{}:x:{}:".format(g.gr_name, g.gr_gid)
 
     assert passwd.group_exists("test-group") is not None
     assert expected in lines_in_file("/etc/group")
@@ -67,7 +71,7 @@ def test_remove_group():
     g = passwd.add_group(group_name="test-group")
     assert passwd.group_exists("test-group") is not None
 
-    expected = f"{g.gr_name}:x:{g.gr_gid}:"
+    expected = "{}:x:{}:".format(g.gr_name, g.gr_gid)
     assert expected in lines_in_file("/etc/group")
 
     passwd.remove_group("test-group")

@@ -76,13 +76,15 @@ class TestRepositoryMapping(TestCase):
 
         repo.disable()
         self.assertIn(
-            f"# {repo.repotype} {repo.uri} {repo.release} {' '.join(repo.groups)}\n",
+            "# {} {} {} {}\n".format(repo.repotype, repo.uri, repo.release, " ".join(repo.groups)),
             open(repo.filename).readlines(),
         )
 
         r.disable(other)
         self.assertIn(
-            f"# {other.repotype} [signed-by={other.gpg_key}] {other.uri} {other.release} {' '.join(other.groups)}\n",
+            "# {} [signed-by={}] {} {} {}\n".format(
+                other.repotype, other.gpg_key, other.uri, other.release, " ".join(other.groups)
+            ),
             open(other.filename).readlines(),
         )
 
@@ -98,7 +100,7 @@ class TestRepositoryMapping(TestCase):
         )
         r.add(d, default_filename=False)
         self.assertIn(
-            f"{d.repotype} {d.uri} {d.release} {' '.join(d.groups)}\n",
+            "{} {} {} {}\n".format(d.repotype, d.uri, d.release, " ".join(d.groups)),
             open(d.filename).readlines(),
         )
 

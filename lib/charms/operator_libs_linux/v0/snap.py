@@ -81,7 +81,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 
 def _cache_init(func):
@@ -120,12 +120,12 @@ class Error(Exception):
 
     def __repr__(self):
         """String representation of the Error class."""
-        return f"<{type(self).__module__}.{type(self).__name__} {self.args}>"
+        return "<{}.{} {}>".format(type(self).__module__, type(self).__name__, self.args)
 
     @property
     def name(self):
         """Return a string representation of the model plus class."""
-        return f"<{type(self).__module__}.{type(self).__name__}>"
+        return "<{}.{}>".format(type(self).__module__, type(self).__name__)
 
     @property
     def message(self):
@@ -205,7 +205,7 @@ class Snap(object):
 
     def __repr__(self):
         """A representation of the snap."""
-        return f"<{self.__module__}.{self.__class__.__name__}: {self.__dict__}>"
+        return "<{}.{}: {}>".format(self.__module__, self.__class__.__name__, self.__dict__)
 
     def __str__(self):
         """A human-readable representation of the snap."""
@@ -267,7 +267,7 @@ class Snap(object):
           channel: the channel to install from
         """
         confinement = "--classic" if self._confinement == "classic" else ""
-        channel = f'--channel="{channel}"' if channel else ""
+        channel = '--channel="{}"'.format(channel) if channel else ""
         self._snap("install", [confinement, channel])
 
     def _refresh(self, channel: Optional[str] = "") -> None:
@@ -276,7 +276,7 @@ class Snap(object):
         Args:
           channel: the channel to install from
         """
-        channel = f"--{channel}" if channel else self._channel
+        channel = "--{}".format(channel) if channel else self._channel
         self._snap("refresh", [channel])
 
     def _remove(self) -> None:
@@ -370,7 +370,7 @@ class _UnixSocketConnection(http.client.HTTPConnection):
     def connect(self):
         """Override connect to use Unix socket (instead of TCP socket)."""
         if not hasattr(socket, "AF_UNIX"):
-            raise NotImplementedError(f"Unix sockets not supported on {sys.platform}")
+            raise NotImplementedError("Unix sockets not supported on {}".format(sys.platform))
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(self.socket_path)
         if self.timeout is not None:
@@ -480,7 +480,7 @@ class SnapClient:
             except (IOError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
                 body = {}
-                message = f"{type(e2).__name__} - {e2}"
+                message = "{} - {}".format(type(e2).__name__, e2)
             raise SnapAPIError(body, code, status, message)
         except urllib.error.URLError as e:
             raise SnapAPIError({}, 500, "Not found", e.reason)
@@ -542,7 +542,7 @@ class SnapCache(Mapping):
             try:
                 self._snap_map[snap_name] = self._load_info(snap_name)
             except SnapAPIError:
-                raise SnapNotFoundError(f"Snap '{snap_name}' not found!")
+                raise SnapNotFoundError("Snap '{}' not found!".format(snap_name))
 
         return self._snap_map[snap_name]
 
@@ -687,15 +687,17 @@ def _wrap_snap_operations(
                 snap.ensure(state=state, classic=classic, channel=channel)
             snaps["success"].append(snap)
         except SnapError as e:
-            logger.warning(f"Failed to {op} snap {s}: {e.message}!")
+            logger.warning("Failed to {} snap {}: {}!".format(op, s, e.message))
             snaps["failed"].append(s)
         except SnapNotFoundError:
-            logger.warning(f"Snap '{s}' not found in cache!")
+            logger.warning("Snap '{}' not found in cache!".format(s))
             snaps["failed"].append(s)
 
     if len(snaps["failed"]):
         raise SnapError(
-            f"Failed to install or refresh snap(s): {', '.join([s for s in snaps['failed']])}"
+            "Failed to install or refresh snap(s): {}".format(
+                ", ".join([s for s in snaps["failed"]])
+            )
         )
 
     return snaps["success"] if len(snaps["success"]) > 1 else snaps["success"][0]

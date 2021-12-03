@@ -124,7 +124,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 5
 
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
@@ -136,12 +136,12 @@ class Error(Exception):
 
     def __repr__(self):
         """String representation of Error."""
-        return f"<{type(self).__module__}.{type(self).__name__} {self.args}>"
+        return "<{}.{} {}>".format(type(self).__module__, type(self).__name__, self.args)
 
     @property
     def name(self):
         """Return a string representation of the model plus class."""
-        return f"<{type(self).__module__}.{type(self).__name__}>"
+        return "<{}.{}>".format(type(self).__module__, type(self).__name__)
 
     @property
     def message(self):
@@ -221,7 +221,7 @@ class DebianPackage:
 
     def __repr__(self):
         """A representation of the package."""
-        return f"<{self.__module__}.{self.__class__.__name__}: {self.__dict__}>"
+        return "<{}.{}: {}>".format(self.__module__, self.__class__.__name__, self.__dict__)
 
     def __str__(self):
         """A human-readable representation of the package."""
@@ -257,20 +257,20 @@ class DebianPackage:
             check_call(_cmd, stderr=PIPE, stdout=PIPE)
         except CalledProcessError as e:
             raise PackageError(
-                f"Could not {command} package(s) [{[*package_names]}]: {e.output}"
+                "Could not {} package(s) [{}]: {}".format(command, [*package_names], e.output)
             ) from None
 
     def _add(self) -> None:
         """Add a package to the system."""
         self._apt(
             "install",
-            f"{self.name}={self.version}",
+            "{}={}".format(self.name, self.version),
             optargs=["--option=Dpkg::Options::=--force-confold"],
         )
 
     def _remove(self) -> None:
         """Removes a package from the system. Implementation-specific."""
-        return self._apt("remove", f"{self.name}={self.version}")
+        return self._apt("remove", "{}={}".format(self.name, self.version))
 
     @property
     def name(self) -> str:
@@ -342,7 +342,7 @@ class DebianPackage:
     @property
     def fullversion(self) -> str:
         """Returns the name+epoch for a package."""
-        return f"{self._version}.{self._arch}"
+        return "{}.{}".format(self._version, self._arch)
 
     @staticmethod
     def _get_epoch_from_version(version: str) -> Tuple[str, str]:
@@ -379,7 +379,9 @@ class DebianPackage:
             # This seems unnecessary, but virtually all `apt` commands have a return code of `100`,
             # and providing meaningful error messages without this is ugly.
             raise PackageNotFoundError(
-                f"Package '{package}{f'.{arch}' if arch else ''}' could not be found on the system or in the apt cache!"
+                "Package '{}{}' could not be found on the system or in the apt cache!".format(
+                    package, ".{}".format(arch) if arch else ""
+                )
             ) from None
 
     @classmethod
@@ -404,7 +406,7 @@ class DebianPackage:
         try:
             output = check_output(["dpkg", "-l", package], stderr=PIPE, universal_newlines=True)
         except CalledProcessError:
-            raise PackageNotFoundError(f"Package is not installed: {package}") from None
+            raise PackageNotFoundError("Package is not installed: {}".format(package)) from None
 
         # Pop off the output from `dpkg -l' because there's no flag to
         # omit it`
@@ -438,7 +440,7 @@ class DebianPackage:
                 logger.warning("dpkg matcher could not parse line: %s", line)
 
         # If we didn't find it, fail through
-        raise PackageNotFoundError(f"Package {package}.{arch} is not installed!")
+        raise PackageNotFoundError("Package {}.{} is not installed!".format(package, arch))
 
     @classmethod
     def from_apt_cache(
@@ -465,7 +467,9 @@ class DebianPackage:
                 ["apt-cache", "show", package], stderr=PIPE, universal_newlines=True
             )
         except CalledProcessError as e:
-            raise PackageError(f"Could not list packages in apt-cache: {e.output}") from None
+            raise PackageError(
+                "Could not list packages in apt-cache: {}".format(e.output)
+            ) from None
 
         pkg_groups = output.strip().split("\n\n")
         keys = ("Package", "Architecture", "Version")
@@ -493,7 +497,7 @@ class DebianPackage:
                 return pkg
 
         # If we didn't find it, fail through
-        raise PackageNotFoundError(f"Package {package}.{arch} is not in the apt cache!")
+        raise PackageNotFoundError("Package {}.{} is not in the apt cache!".format(package, arch))
 
 
 class Version:
@@ -512,11 +516,11 @@ class Version:
 
     def __repr__(self):
         """A representation of the package."""
-        return f"<{self.__module__}.{self.__class__.__name__}: {self.__dict__}>"
+        return "<{}.{}: {}>".format(self.__module__, self.__class__.__name__, self.__dict__)
 
     def __str__(self):
         """A human-readable representation of the package."""
-        return f"{f'{self._epoch}:' if self._epoch else ''}{self._version}"
+        return "{}{}".format("{}:".format(self._epoch) if self._epoch else "", self._version)
 
     @property
     def epoch(self):
@@ -760,7 +764,7 @@ def add_package(
                 packages["failed"].append(p)
 
     if packages["failed"]:
-        raise PackageError(f"Failed to install packages: {', '.join(packages['failed'])}")
+        raise PackageError("Failed to install packages: {}".format(", ".join(packages["failed"])))
 
     return packages["success"] if len(packages["success"]) > 1 else packages["success"][0]
 
@@ -914,7 +918,11 @@ class DebianRepository:
         if self._gpg_key_filename:
             options["signed-by"] = self._gpg_key_filename
 
-        return f"[{' '.join([f'{k}={v}' for k,v in options.items()])}] " if options else ""
+        return (
+            "[{}] ".format(" ".join(["{}={}".format(k, v) for k, v in options.items()]))
+            if options
+            else ""
+        )
 
     @staticmethod
     def prefix_from_uri(uri: str) -> str:
@@ -923,7 +931,7 @@ class DebianRepository:
         path = (
             uridetails.path.lstrip("/").replace("/", "-") if uridetails.path else uridetails.netloc
         )
-        return f"/etc/apt/sources.list.d/{path}"
+        return "/etc/apt/sources.list.d/{}".format(path)
 
     @staticmethod
     def from_repo_line(repo_line: str, write_file: Optional[bool] = True) -> "DebianRepository":
@@ -934,8 +942,8 @@ class DebianRepository:
             write_file: boolean to enable writing the new repo to disk
         """
         repo = RepositoryMapping._parse(repo_line, "UserInput")
-        fname = (
-            f"{DebianRepository.prefix_from_uri(repo.uri)}-{repo.release.replace('/', '-')}.list"
+        fname = "{}-{}.list".format(
+            DebianRepository.prefix_from_uri(repo.uri), repo.release.replace("/", "-")
         )
         repo.filename = fname
 
@@ -943,14 +951,22 @@ class DebianRepository:
         if repo.gpg_key:
             options["signed-by"] = repo.gpg_key
 
-        options_str = f"[{' '.join([f'{k}={v}' for k,v in options.items()])}] " if options else ""
+        # For Python 3.5 it's required to use sorted in the options dict in order to not have
+        # different results in the order of the options between executions.
+        options_str = (
+            "[{}] ".format(" ".join(["{}={}".format(k, v) for k, v in sorted(options.items())]))
+            if options
+            else ""
+        )
 
         if write_file:
             with open(fname, "wb") as f:
                 f.write(
-                    f"{'#' if not repo.enabled else ''}"
-                    f"{repo.repotype} {options_str}{repo.uri} "
-                    f"{repo.release} {' '.join(repo.groups)}\n".encode("utf-8")
+                    (
+                        "{}".format("#" if not repo.enabled else "")
+                        + "{} {}{} ".format(repo.repotype, options_str, repo.uri)
+                        + "{} {}\n".format(repo.release, " ".join(repo.groups))
+                    ).encode("utf-8")
                 )
 
         return repo
@@ -960,10 +976,12 @@ class DebianRepository:
 
         Disable it instead of removing from the repository file.
         """
-        searcher = f"{self.repotype} {self.make_options_string()}{self.uri} {self.release}"
+        searcher = "{} {}{} {}".format(
+            self.repotype, self.make_options_string(), self.uri, self.release
+        )
         for line in fileinput.input(self._filename, inplace=True):
-            if re.match(rf"^{re.escape(searcher)}\s", line):
-                print(f"# {line}", end="")
+            if re.match(r"^{}\s".format(re.escape(searcher)), line):
+                print("# {}".format(line), end="")
             else:
                 print(line, end="")
 
@@ -1000,7 +1018,7 @@ class DebianRepository:
                 key_bytes = key.encode("utf-8")
                 key_name = self._get_keyid_by_gpg_key(key_bytes)
                 key_gpg = self._dearmor_gpg_key(key_bytes)
-                self._gpg_key_filename = f"/etc/apt/trusted.gpg.d/{key_name}.gpg"
+                self._gpg_key_filename = "/etc/apt/trusted.gpg.d/{}.gpg".format(key_name)
                 self._write_apt_gpg_keyfile(key_name=self._gpg_key_filename, key_material=key_gpg)
             else:
                 raise GPGKeyError("ASCII armor markers missing from GPG key")
@@ -1018,7 +1036,7 @@ class DebianRepository:
             key_asc = self._get_key_by_keyid(key)
             # write the key in GPG format so that apt-key list shows it
             key_gpg = self._dearmor_gpg_key(key_asc.encode("utf-8"))
-            self._gpg_key_filename = f"/etc/apt/trusted.gpg.d/{key}.gpg"
+            self._gpg_key_filename = "/etc/apt/trusted.gpg.d/{}.gpg".format(key)
             self._write_apt_gpg_keyfile(key_name=key, key_material=key_gpg)
 
     @staticmethod
@@ -1183,7 +1201,7 @@ class RepositoryMapping(Mapping):
                 except InvalidSourceError:
                     skipped.append(n)
                 else:
-                    repo_identifier = f"{repo.repotype}-{repo.uri}-{repo.release}"
+                    repo_identifier = "{}-{}-{}".format(repo.repotype, repo.uri, repo.release)
                     self._repository_map[repo_identifier] = repo
                     parsed.append(n)
                     logger.debug("parsed repo: '%s'", repo_identifier)
@@ -1259,8 +1277,8 @@ class RepositoryMapping(Mapping):
           repo: a `DebianRepository` object
           default_filename: an (Optional) filename if the default is not desirable
         """
-        new_filename = (
-            f"{DebianRepository.prefix_from_uri(repo.uri)}-{repo.release.replace('/', '-')}.list"
+        new_filename = "{}-{}.list".format(
+            DebianRepository.prefix_from_uri(repo.uri), repo.release.replace("/", "-")
         )
 
         fname = repo.filename or new_filename
@@ -1271,12 +1289,14 @@ class RepositoryMapping(Mapping):
 
         with open(fname, "wb") as f:
             f.write(
-                f"{'#' if not repo.enabled else ''}"
-                f"{repo.repotype} {repo.make_options_string()}{repo.uri} "
-                f"{repo.release} {' '.join(repo.groups)}\n".encode("utf-8")
+                (
+                    "{}".format("#" if not repo.enabled else "")
+                    + "{} {}{} ".format(repo.repotype, repo.make_options_string(), repo.uri)
+                    + "{} {}\n".format(repo.release, " ".join(repo.groups))
+                ).encode("utf-8")
             )
 
-        self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo
+        self._repository_map["{}-{}-{}".format(repo.repotype, repo.uri, repo.release)] = repo
 
     def disable(self, repo: DebianRepository) -> None:
         """Remove a repository. Disable by default.
@@ -1284,12 +1304,14 @@ class RepositoryMapping(Mapping):
         Args:
           repo: a `DebianRepository` to disable
         """
-        searcher = f"{repo.repotype} {repo.make_options_string()}{repo.uri} {repo.release}"
+        searcher = "{} {}{} {}".format(
+            repo.repotype, repo.make_options_string(), repo.uri, repo.release
+        )
 
         for line in fileinput.input(repo.filename, inplace=True):
-            if re.match(rf"^{re.escape(searcher)}\s", line):
-                print(f"# {line}", end="")
+            if re.match(r"^{}\s".format(re.escape(searcher)), line):
+                print("# {}".format(line), end="")
             else:
                 print(line, end="")
 
-        self._repository_map[f"{repo.repotype}-{repo.uri}-{repo.release}"] = repo
+        self._repository_map["{}-{}-{}".format(repo.repotype, repo.uri, repo.release)] = repo
