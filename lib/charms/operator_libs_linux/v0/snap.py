@@ -34,7 +34,7 @@ try:
 
     if not juju.present:
         juju.ensure(snap.SnapState.Latest, channel="beta")
-        juju.set(key="value", key2="value2")
+        juju.set({"some.key": "value", "some.key2": "value2"})
 except snap.SnapError as e:
     logger.error("An exception occurred when installing charmcraft. Reason: %s", e.message)
 ```
@@ -50,7 +50,7 @@ As an example of installing several Snaps and checking details:
 try:
     nextcloud, charmcraft = snap.add(["nextcloud", "charmcraft"])
     if nextcloud.get("mode") != "production":
-        nextcloud.set(mode="production")
+        nextcloud.set({"mode": "production"})
 except snap.SnapError as e:
     logger.error("An exception occurred when installing snaps. Reason: %s", e.message)
 ```
