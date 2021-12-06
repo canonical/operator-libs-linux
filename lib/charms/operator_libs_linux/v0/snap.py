@@ -180,13 +180,20 @@ class Snap(object):
     """
 
     def __init__(
-        self, name, state: SnapState, channel: str, revision: str, confinement: str
+        self,
+        name,
+        state: SnapState,
+        channel: str,
+        revision: str,
+        confinement: str,
+        cohort: Optional[str] = "",
     ) -> None:
         self._name = name
         self._state = state
         self._channel = channel
         self._revision = revision
         self._confinement = confinement
+        self._cohort = cohort
 
     def __eq__(self, other) -> bool:
         """Equality for comparison."""
@@ -260,24 +267,39 @@ class Snap(object):
         """
         return self._snap("unset", [key])
 
-    def _install(self, channel: Optional[str] = "") -> None:
+    def _install(self, channel: Optional[str] = "", cohort: Optional[str] = "") -> None:
         """Add a snap to the system.
 
         Args:
+          confinemenet: strict or classic
           channel: the channel to install from
+          cohort: optionall, the key of a cohort that this snap belongs to
         """
         confinement = "--classic" if self._confinement == "classic" else ""
         channel = '--channel="{}"'.format(channel) if channel else ""
-        self._snap("install", [confinement, channel])
+        cohort = '--cohort="{cohort}"'.format(cohort) if cohort else self._cohort
+        self._snap("install", [confinement, channel, cohort])
 
-    def _refresh(self, channel: Optional[str] = "") -> None:
+    def _refresh(
+        self,
+        channel: Optional[str] = "",
+        cohort: Optional[str] = "",
+        leave_cohort: Optional[bool] = False,
+    ) -> None:
         """Refresh a snap.
 
         Args:
           channel: the channel to install from
+          cohort: optionally, specify a cohort.
+          leave_cohort: leave the current cohort.
         """
         channel = "--{}".format(channel) if channel else self._channel
-        self._snap("refresh", [channel])
+        cohort = '--cohort="{}"'.format(cohort) if cohort else self._cohort
+        leave_cohort = "--leave-cohort" if leave_cohort else ""
+        if leave_cohort:
+            self._cohort = ""
+
+        self._snap("refresh", [channel, cohort, leave_cohort])
 
     def _remove(self) -> None:
         """Removes a snap from the system."""
@@ -293,6 +315,7 @@ class Snap(object):
         state: SnapState,
         classic: Optional[bool] = False,
         channel: Optional[str] = "",
+        cohort: Optional[str] = "",
     ):
         """Ensures that a snap is in a given state.
 
@@ -300,6 +323,7 @@ class Snap(object):
           state: a `SnapState` to reconcile to.
           classic: an (Optional) boolean indicating whether classic confinement should be used
           channel: the channel to install from
+          cohort: optional. Specify the key of a snap cohort.
 
         Raises:
           SnapError if an error is encountered
@@ -309,7 +333,7 @@ class Snap(object):
             if state not in (SnapState.Present, SnapState.Latest):
                 self._remove()
             else:
-                self._install(channel)
+                self._install(channel, cohort)
             self._state = state
 
     @property
@@ -604,6 +628,7 @@ def add(
     state: Union[str, SnapState] = SnapState.Latest,
     channel: Optional[str] = "latest",
     classic: Optional[bool] = False,
+    cohort: Optional[str] = ""
 ) -> Union[Snap, List[Snap]]:
     """Add a snap to the system.
 
@@ -625,7 +650,7 @@ def add(
     if type(state) is str:
         state = SnapState(state)
 
-    return _wrap_snap_operations(snap_names, state, channel, classic)
+    return _wrap_snap_operations(snap_names, state, channel, classic, cohort)
 
 
 @_cache_init
@@ -651,6 +676,7 @@ def ensure(
     state: str,
     channel: Optional[str] = "latest",
     classic: Optional[bool] = False,
+    cohort: Optional[str] = "",
 ) -> Union[Snap, List[Snap]]:
     """Ensures a snap is in a given state to the system.
 
@@ -665,13 +691,17 @@ def ensure(
         SnapError if the snap is not in the cache.
     """
     if state in ("present", "latest"):
-        return add(snap_names, SnapState(state), channel, classic)
+        return add(snap_names, SnapState(state), channel, classic, cohort)
     else:
         return remove(snap_names)
 
 
 def _wrap_snap_operations(
-    snap_names: List[str], state: SnapState, channel: str, classic: bool
+        snap_names: List[str],
+        state: SnapState,
+        channel: str,
+        classic: bool,
+        cohort: Optional[str] = ""
 ) -> Union[Snap, List[Snap]]:
     """Wrap common operations for bare commands."""
     snaps = {"success": [], "failed": []}
@@ -684,7 +714,7 @@ def _wrap_snap_operations(
             if state is SnapState.Absent:
                 snap.ensure(state=SnapState.Absent)
             else:
-                snap.ensure(state=state, classic=classic, channel=channel)
+                snap.ensure(state=state, classic=classic, channel=channel, cohort=cohort)
             snaps["success"].append(snap)
         except SnapError as e:
             logger.warning("Failed to {} snap {}: {}!".format(op, s, e.message))

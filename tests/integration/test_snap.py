@@ -40,3 +40,9 @@ def test_snap_remove():
 
     snap.remove("charmcraft")
     assert get_command_path("charmcraft") == ""
+
+
+def test_snap_refresh():
+    cache = snap.SnapCache()
+    lxd = cache["lxd"]
+    lxd.ensure(snap.SnapState.Latest, classic=False, channel="candidate", cohort="+")
