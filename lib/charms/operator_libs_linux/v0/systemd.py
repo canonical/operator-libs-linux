@@ -24,7 +24,7 @@ service_resume with run the mask/unmask and enable/disable invocations.
 
 Example usage:
 ```python
-from systemd import *
+from charms.operator_libs_linux.v0.systemd import service_running, service_reload
 
 # Start a service
 if not service_running("mysql"):
@@ -32,7 +32,6 @@ if not service_running("mysql"):
 
 # Attempt to reload a service, restarting if necessary
 success = service_reload("nginx", restart_on_failure=True)
-
 ```
 
 """
@@ -40,7 +39,7 @@ success = service_reload("nginx", restart_on_failure=True)
 import logging
 import subprocess
 
-__all__ = [  # Don't export `service`. (It's not the intended way of using this lib.)
+__all__ = [  # Don't export `_systemctl`. (It's not the intended way of using this lib.)
     "service_pause",
     "service_reload",
     "service_restart",
@@ -48,6 +47,7 @@ __all__ = [  # Don't export `service`. (It's not the intended way of using this 
     "service_running",
     "service_start",
     "service_stop",
+    "daemon_reload",
 ]
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 
 def _popen_kwargs():
@@ -73,22 +73,27 @@ def _popen_kwargs():
     )
 
 
-def _service(action: str, service_name: str, now: bool = None, quiet: bool = None) -> bool:
+def _systemctl(
+    sub_cmd: str, service_name: str = None, now: bool = None, quiet: bool = None
+) -> bool:
     """Control a system service.
 
     Args:
-        action: the action to take on the service
+        sub_cmd: the systemctl subcommand to issue
         service_name: the name of the service to perform the action on
         now: passes the --now flag to the shell invocation.
         quiet: passes the --quiet flag to the shell invocation.
     """
-    cmd = ["systemctl", action, service_name]
+    cmd = ["systemctl", sub_cmd]
+
+    if service_name is not None:
+        cmd.append(service_name)
     if now is not None:
         cmd.append("--now")
     if quiet is not None:
         cmd.append("--quiet")
-    if action != "is-active":
-        logger.debug("Attempting to {} '{}' with command {}.".format(action, service_name, cmd))
+    if sub_cmd != "is-active":
+        logger.debug("Attempting to {} '{}' with command {}.".format(cmd, service_name, cmd))
     else:
         logger.debug("Checking if '{}' is active".format(service_name))
 
@@ -106,7 +111,7 @@ def service_running(service_name: str) -> bool:
     Args:
         service_name: the name of the service
     """
-    return _service("is-active", service_name, quiet=True)
+    return _systemctl("is-active", service_name, quiet=True)
 
 
 def service_start(service_name: str) -> bool:
@@ -115,7 +120,7 @@ def service_start(service_name: str) -> bool:
     Args:
         service_name: the name of the service to stop
     """
-    return _service("start", service_name)
+    return _systemctl("start", service_name)
 
 
 def service_stop(service_name: str) -> bool:
@@ -124,7 +129,7 @@ def service_stop(service_name: str) -> bool:
     Args:
         service_name: the name of the service to stop
     """
-    return _service("stop", service_name)
+    return _systemctl("stop", service_name)
 
 
 def service_restart(service_name: str) -> bool:
@@ -133,7 +138,7 @@ def service_restart(service_name: str) -> bool:
     Args:
         service_name: the name of the service to restart
     """
-    return _service("restart", service_name)
+    return _systemctl("restart", service_name)
 
 
 def service_reload(service_name: str, restart_on_failure: bool = False) -> bool:
@@ -144,9 +149,9 @@ def service_reload(service_name: str, restart_on_failure: bool = False) -> bool:
         restart_on_failure: boolean indicating whether to fallback to a restart if the
           reload fails.
     """
-    service_result = _service("reload", service_name)
+    service_result = _systemctl("reload", service_name)
     if not service_result and restart_on_failure:
-        service_result = _service("restart", service_name)
+        service_result = _systemctl("restart", service_name)
     return service_result
 
 
@@ -158,8 +163,8 @@ def service_pause(service_name: str) -> bool:
     Args:
         service_name: the name of the service to pause
     """
-    _service("disable", service_name, now=True)
-    _service("mask", service_name)
+    _systemctl("disable", service_name, now=True)
+    _systemctl("mask", service_name)
     return not service_running(service_name)
 
 
@@ -171,6 +176,11 @@ def service_resume(service_name: str) -> bool:
     Args:
         service_name: the name of the service to resume
     """
-    _service("unmask", service_name)
-    _service("enable", service_name, now=True)
+    _systemctl("unmask", service_name)
+    _systemctl("enable", service_name, now=True)
     return service_running(service_name)
+
+
+def daemon_reload() -> bool:
+    """Reload systemd manager configuration."""
+    return _systemctl("daemon-reload")
