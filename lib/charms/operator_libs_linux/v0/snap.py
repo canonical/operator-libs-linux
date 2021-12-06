@@ -329,12 +329,17 @@ class Snap(object):
           SnapError if an error is encountered
         """
         self._confinement = "classic" if classic or self._confinement == "classic" else ""
-        if self._state is not state:
-            if state not in (SnapState.Present, SnapState.Latest):
+
+        if state not in (SnapState.Present, SnapState.Latest):
+            if self._state not in (SnapState.Absent):
                 self._remove()
-            else:
+        else:
+            if self._state not in (SnapState.Present, SnapState.Latest):
                 self._install(channel, cohort)
-            self._state = state
+            else:
+                self._refresh(channel, cohort)
+
+        self._state = state
 
     @property
     def present(self) -> bool:
