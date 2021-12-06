@@ -343,12 +343,20 @@ class Snap(object):
         self._confinement = "classic" if classic or self._confinement == "classic" else ""
 
         if state not in (SnapState.Present, SnapState.Latest):
-            if self._state not in (SnapState.Absent,):
+            # We are attempting to remove this snap.
+            if self._state in (SnapState.Present, SnapState.Latest):
+                # The snap is installed, so we run _remove.
                 self._remove()
+            else:
+                # The snap is not installed -- no need to do anything.
+                pass
         else:
+            # We are installing or refreshing a snap.
             if self._state not in (SnapState.Present, SnapState.Latest):
+                # The snap is not installed, so we install it.
                 self._install(channel, cohort)
             else:
+                # The snap is installed, but we are changing it (e.g., switching channels).
                 self._refresh(channel, cohort)
 
         self._state = state
