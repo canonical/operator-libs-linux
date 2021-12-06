@@ -45,4 +45,4 @@ def test_snap_remove():
 def test_snap_refresh():
     cache = snap.SnapCache()
     lxd = cache["lxd"]
-    lxd.ensure(snap.SnapState.Latest, classic=False, channel="candidate", cohort="+")
+    lxd.ensure(snap.SnapState.Latest, classic=False, channel="latest/candidate", cohort="+")
