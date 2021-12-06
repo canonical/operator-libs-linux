@@ -52,11 +52,11 @@ class TestSystemD(unittest.TestCase):
     def test_service(self, make_mock):
         mockp, kw = make_mock([0, 1])
 
-        success = systemd._service("is-active", "mysql")
+        success = systemd._systemctl("is-active", "mysql")
         mockp.assert_called_with(["systemctl", "is-active", "mysql"], **kw)
         self.assertTrue(success)
 
-        success = systemd._service("is-active", "mysql")
+        success = systemd._systemctl("is-active", "mysql")
         mockp.assert_called_with(["systemctl", "is-active", "mysql"], **kw)
         self.assertFalse(success)
 
