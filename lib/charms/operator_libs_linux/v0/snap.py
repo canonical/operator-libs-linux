@@ -331,7 +331,7 @@ class Snap(object):
         self._confinement = "classic" if classic or self._confinement == "classic" else ""
 
         if state not in (SnapState.Present, SnapState.Latest):
-            if self._state not in (SnapState.Absent):
+            if self._state not in (SnapState.Absent,):
                 self._remove()
         else:
             if self._state not in (SnapState.Present, SnapState.Latest):
