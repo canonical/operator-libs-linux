@@ -39,7 +39,7 @@ success = service_reload("nginx", restart_on_failure=True)
 import logging
 import subprocess
 
-__all__ = [  # Don't export `_systemd`. (It's not the intended way of using this lib.)
+__all__ = [  # Don't export `_systemctl`. (It's not the intended way of using this lib.)
     "service_pause",
     "service_reload",
     "service_restart",
@@ -73,24 +73,26 @@ def _popen_kwargs():
     )
 
 
-def _systemctl(cmd: str, service_name: str = None, now: bool = None, quiet: bool = None) -> bool:
+def _systemctl(
+    sub_cmd: str, service_name: str = None, now: bool = None, quiet: bool = None
+) -> bool:
     """Control a system service.
 
     Args:
-        cmd: the systemctl subcommand to issue
+        sub_cmd: the systemctl subcommand to issue
         service_name: the name of the service to perform the action on
         now: passes the --now flag to the shell invocation.
         quiet: passes the --quiet flag to the shell invocation.
     """
-    cmd = ["systemctl", cmd]
-    if service_name:
-        cmd.append(service_name)
+    cmd = ["systemctl", sub_cmd]
 
+    if service_name is not None:
+        cmd.append(service_name)
     if now is not None:
         cmd.append("--now")
     if quiet is not None:
         cmd.append("--quiet")
-    if cmd != "is-active":
+    if sub_cmd != "is-active":
         logger.debug("Attempting to {} '{}' with command {}.".format(cmd, service_name, cmd))
     else:
         logger.debug("Checking if '{}' is active".format(service_name))
