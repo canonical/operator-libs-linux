@@ -77,7 +77,7 @@ def _systemctl(cmd: str, service_name: str = None, now: bool = None, quiet: bool
     """Control a system service.
 
     Args:
-        action: the action to take on the service
+        cmd: the systemctl subcommand to issue
         service_name: the name of the service to perform the action on
         now: passes the --now flag to the shell invocation.
         quiet: passes the --quiet flag to the shell invocation.
