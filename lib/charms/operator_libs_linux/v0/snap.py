@@ -277,7 +277,7 @@ class Snap(object):
         """
         confinement = "--classic" if self._confinement == "classic" else ""
         channel = '--channel="{}"'.format(channel) if channel else ""
-        cohort = '--cohort="{cohort}"'.format(cohort) if cohort else self._cohort
+        cohort = '--cohort="{}"'.format(cohort) if cohort else self._cohort
         self._snap("install", [confinement, channel, cohort])
 
     def _refresh(
@@ -633,7 +633,7 @@ def add(
     state: Union[str, SnapState] = SnapState.Latest,
     channel: Optional[str] = "latest",
     classic: Optional[bool] = False,
-    cohort: Optional[str] = ""
+    cohort: Optional[str] = "",
 ) -> Union[Snap, List[Snap]]:
     """Add a snap to the system.
 
@@ -702,11 +702,11 @@ def ensure(
 
 
 def _wrap_snap_operations(
-        snap_names: List[str],
-        state: SnapState,
-        channel: str,
-        classic: bool,
-        cohort: Optional[str] = ""
+    snap_names: List[str],
+    state: SnapState,
+    channel: str,
+    classic: bool,
+    cohort: Optional[str] = "",
 ) -> Union[Snap, List[Snap]]:
     """Wrap common operations for bare commands."""
     snaps = {"success": [], "failed": []}

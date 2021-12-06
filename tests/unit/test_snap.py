@@ -263,7 +263,14 @@ class TestSnapCache(unittest.TestCase):
 
         foo.ensure(snap.SnapState.Latest, classic=True, channel="latest/edge")
         mock_subprocess.assert_called_with(
-            ["snap", "install", "foo", "--classic", '--channel="latest/edge"', "",],
+            [
+                "snap",
+                "install",
+                "foo",
+                "--classic",
+                '--channel="latest/edge"',
+                "",
+            ],
             universal_newlines=True,
         )
         self.assertEqual(foo.latest, True)
@@ -314,7 +321,7 @@ class TestSnapBareMethods(unittest.TestCase):
         foo = snap.add("curl", classic=True, channel="latest")
         mock_subprocess.assert_called_with(
             ["snap", "install", "curl", "--classic", '--channel="latest"', ""],
-            universal_newlines=True
+            universal_newlines=True,
         )
         self.assertEqual(foo.present, True)
 
@@ -322,16 +329,35 @@ class TestSnapBareMethods(unittest.TestCase):
         mock_subprocess.assert_called_with(["snap", "remove", "curl"], universal_newlines=True)
         self.assertEqual(bar.present, False)
 
-        baz = snap.add("lxd", channel="latest", cohort="+")
-        mock_subprocess.assert_called_with(
-            ["snap", "install", "curl", "", '--channel="latest"', '--cohort="+"'],
-            universal_newlines=True
+    @patch("charms.operator_libs_linux.v0.snap.subprocess")
+    def test_cohort(self, mock_subprocess):
+
+        mock_subprocess.check_output = MagicMock()
+
+        snap.add("curl", channel="latest", cohort="+")
+        mock_subprocess.check_output.assert_called_with(
+            [
+                "snap",
+                "install",
+                "curl",
+                "",
+                '--channel="latest"',
+                '--cohort="+"',
+            ],
+            universal_newlines=True,
         )
 
-        qux = snap.refresh("lxd", channel="latest", cohort="+")
-        mock_subprocess.assert_called_with(
-            ["snap", "refresh", "lxd", "", '--channel="latest"', '--cohort="+"'],
-            universal_newlines=True
+        snap.ensure("curl", "latest", classic=True, channel="latest/beta", cohort="+")
+        mock_subprocess.check_output.assert_called_with(
+            [
+                "snap",
+                "refresh",
+                "curl",
+                "--latest/beta",
+                '--cohort="+"',
+                "",
+            ],
+            universal_newlines=True,
         )
 
     @patch("charms.operator_libs_linux.v0.snap.subprocess.check_output")
