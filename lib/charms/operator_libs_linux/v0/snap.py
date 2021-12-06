@@ -277,11 +277,14 @@ class Snap(object):
         """
         confinement = "--classic" if self._confinement == "classic" else ""
         channel = '--channel="{}"'.format(channel) if channel else ""
+        args = [confinement, channel]
+
         if not cohort:
             cohort = self._cohort
+        if cohort:
+            args.append('--cohort="{}"'.format(cohort))
 
-        cohort = '--cohort="{}"'.format(cohort) if cohort else ""
-        self._snap("install", [confinement, channel, cohort])
+        self._snap("install", args)
 
     def _refresh(
         self,
@@ -297,14 +300,18 @@ class Snap(object):
           leave_cohort: leave the current cohort.
         """
         channel = '--channel="{}"'.format(channel) if channel else ""
+        args = [channel]
+
         if not cohort:
             cohort = self._cohort
-        cohort = '--cohort="{}"'.format(cohort) if cohort else ""
-        leave_cohort = "--leave-cohort" if leave_cohort else ""
+
         if leave_cohort:
             self._cohort = ""
+            args.append("--leave-cohort")
+        elif cohort:
+            args.append('--cohort="{}"'.format(cohort))
 
-        self._snap("refresh", [channel, cohort, leave_cohort])
+        self._snap("refresh", args)
 
     def _remove(self) -> None:
         """Removes a snap from the system."""
