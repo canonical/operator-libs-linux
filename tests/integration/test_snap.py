@@ -49,7 +49,9 @@ def test_snap_refresh():
 
 
 def test_snap_set():
-    lxd = snap.ensure(["lxd"], snap.SnapState.Latest, channel="stable")
+    cache = snap.SnapCache()
+    lxd = cache["lxd"]
+    lxd.ensure(snap.SnapState.Latest, channel="stable")  # The settings below are in 4.20+
 
     assert lxd.get("ceph.external") == "false"
     assert lxd.get("criu.enable") == "false"
@@ -61,7 +63,9 @@ def test_snap_set():
 
 
 def test_unset_key_raises_snap_error():
-    lxd = snap.ensure(["lxd"], snap.SnapState.Latest, channel="stable")
+    cache = snap.SnapCache()
+    lxd = cache["lxd"]
+    lxd.ensure(snap.SnapState.Latest, channel="stable")
 
     # Verify that the correct exception gets raised in the case of an unset key.
     key = "keythatdoesntexist01"
