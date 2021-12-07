@@ -79,8 +79,8 @@ def test_unset_key_raises_snap_error():
         logger.error("Getting an unset key should result in a SnapError.")
 
     # We can make the above work w/ abitrary config.
-    assert lxd.set({key: "true"})
-    assert lxd.get(key)
+    lxd.set({key: "true"})
+    assert lxd.get(key) == "true"
 
 
 def test_snap_ensure():
