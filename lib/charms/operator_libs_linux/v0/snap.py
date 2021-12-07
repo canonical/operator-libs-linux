@@ -81,7 +81,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 4
 
 
 def _cache_init(func):
@@ -271,7 +271,6 @@ class Snap(object):
         """Add a snap to the system.
 
         Args:
-          confinemenet: strict or classic
           channel: the channel to install from
           cohort: optional, the key of a cohort that this snap belongs to
         """
