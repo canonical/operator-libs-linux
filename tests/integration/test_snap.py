@@ -51,7 +51,11 @@ def test_snap_refresh():
 def test_snap_set():
     cache = snap.SnapCache()
     lxd = cache["lxd"]
-    lxd.ensure(snap.SnapState.Latest, channel="stable")  # The settings below are in 4.20+
+    lxd.ensure(snap.SnapState.Latest, channel="latest")
+
+    import os
+
+    lxd.set({"ceph.external": "false", "criu.enable": "false"})
 
     assert lxd.get("ceph.external") == "false"
     assert lxd.get("criu.enable") == "false"
@@ -65,7 +69,7 @@ def test_snap_set():
 def test_unset_key_raises_snap_error():
     cache = snap.SnapCache()
     lxd = cache["lxd"]
-    lxd.ensure(snap.SnapState.Latest, channel="stable")
+    lxd.ensure(snap.SnapState.Latest, channel="latest")
 
     # Verify that the correct exception gets raised in the case of an unset key.
     key = "keythatdoesntexist01"
@@ -79,3 +83,13 @@ def test_unset_key_raises_snap_error():
     # We can make the above work w/ abitrary config.
     assert lxd.set({key: "true"})
     assert lxd.get(key)
+
+
+def test_snap_ensure():
+    cache = snap.SnapCache()
+    charmcraft = cache["charmcraft"]
+
+    # Verify that we can run ensure multiple times in a row without delays.
+    charmcraft.ensure(snap.SnapState.Latest, channel="latest/stable")
+    charmcraft.ensure(snap.SnapState.Latest, channel="latest/stable")
+    charmcraft.ensure(snap.SnapState.Latest, channel="latest/stable")
