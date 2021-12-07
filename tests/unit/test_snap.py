@@ -399,8 +399,16 @@ class TestSnapBareMethods(unittest.TestCase):
         )
 
         foo.set({"bar": "baz", "qux": "quux"})
-        latest_args = mock_subprocess.call_args_list[-1].args[0]
-        self.assertEqual(["snap", "set", "foo"], latest_args[:3])
-        # Order of the settings can vary, and is specifically different in Python 3.5.
-        self.assertTrue('bar="baz"' in latest_args)
-        self.assertTrue('qux="quux"' in latest_args)
+        try:
+            mock_subprocess.assert_called_with(
+                ["snap", "set", "foo", 'bar="baz"', 'qux="quux"'],
+                universal_newlines=True,
+            )
+        except AssertionError:
+            # The ordering of this call can be unpredictable across Python verisons.
+            # Unfortunately, the methods available to introspect the call list have also
+            # changed, so we do this, which is a little clunky.
+            mock_subprocess.assert_called_with(
+                ["snap", "set", "foo", 'qux="quux"', 'bar="baz"'],
+                universal_newlines=True,
+            )
