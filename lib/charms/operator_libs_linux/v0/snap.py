@@ -81,7 +81,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 4
 
 
 def _cache_init(func):
@@ -180,13 +180,20 @@ class Snap(object):
     """
 
     def __init__(
-        self, name, state: SnapState, channel: str, revision: str, confinement: str
+        self,
+        name,
+        state: SnapState,
+        channel: str,
+        revision: str,
+        confinement: str,
+        cohort: Optional[str] = "",
     ) -> None:
         self._name = name
         self._state = state
         self._channel = channel
         self._revision = revision
         self._confinement = confinement
+        self._cohort = cohort
 
     def __eq__(self, other) -> bool:
         """Equality for comparison."""
@@ -260,24 +267,50 @@ class Snap(object):
         """
         return self._snap("unset", [key])
 
-    def _install(self, channel: Optional[str] = "") -> None:
+    def _install(self, channel: Optional[str] = "", cohort: Optional[str] = "") -> None:
         """Add a snap to the system.
 
         Args:
           channel: the channel to install from
+          cohort: optional, the key of a cohort that this snap belongs to
         """
         confinement = "--classic" if self._confinement == "classic" else ""
         channel = '--channel="{}"'.format(channel) if channel else ""
-        self._snap("install", [confinement, channel])
+        args = [confinement, channel]
 
-    def _refresh(self, channel: Optional[str] = "") -> None:
+        if not cohort:
+            cohort = self._cohort
+        if cohort:
+            args.append('--cohort="{}"'.format(cohort))
+
+        self._snap("install", args)
+
+    def _refresh(
+        self,
+        channel: Optional[str] = "",
+        cohort: Optional[str] = "",
+        leave_cohort: Optional[bool] = False,
+    ) -> None:
         """Refresh a snap.
 
         Args:
           channel: the channel to install from
+          cohort: optionally, specify a cohort.
+          leave_cohort: leave the current cohort.
         """
-        channel = "--{}".format(channel) if channel else self._channel
-        self._snap("refresh", [channel])
+        channel = '--channel="{}"'.format(channel) if channel else ""
+        args = [channel]
+
+        if not cohort:
+            cohort = self._cohort
+
+        if leave_cohort:
+            self._cohort = ""
+            args.append("--leave-cohort")
+        elif cohort:
+            args.append('--cohort="{}"'.format(cohort))
+
+        self._snap("refresh", args)
 
     def _remove(self) -> None:
         """Removes a snap from the system."""
@@ -293,6 +326,7 @@ class Snap(object):
         state: SnapState,
         classic: Optional[bool] = False,
         channel: Optional[str] = "",
+        cohort: Optional[str] = "",
     ):
         """Ensures that a snap is in a given state.
 
@@ -300,17 +334,31 @@ class Snap(object):
           state: a `SnapState` to reconcile to.
           classic: an (Optional) boolean indicating whether classic confinement should be used
           channel: the channel to install from
+          cohort: optional. Specify the key of a snap cohort.
 
         Raises:
           SnapError if an error is encountered
         """
         self._confinement = "classic" if classic or self._confinement == "classic" else ""
-        if self._state is not state:
-            if state not in (SnapState.Present, SnapState.Latest):
+
+        if state not in (SnapState.Present, SnapState.Latest):
+            # We are attempting to remove this snap.
+            if self._state in (SnapState.Present, SnapState.Latest):
+                # The snap is installed, so we run _remove.
                 self._remove()
             else:
-                self._install(channel)
-            self._state = state
+                # The snap is not installed -- no need to do anything.
+                pass
+        else:
+            # We are installing or refreshing a snap.
+            if self._state not in (SnapState.Present, SnapState.Latest):
+                # The snap is not installed, so we install it.
+                self._install(channel, cohort)
+            else:
+                # The snap is installed, but we are changing it (e.g., switching channels).
+                self._refresh(channel, cohort)
+
+        self._state = state
 
     @property
     def present(self) -> bool:
@@ -604,6 +652,7 @@ def add(
     state: Union[str, SnapState] = SnapState.Latest,
     channel: Optional[str] = "latest",
     classic: Optional[bool] = False,
+    cohort: Optional[str] = "",
 ) -> Union[Snap, List[Snap]]:
     """Add a snap to the system.
 
@@ -625,7 +674,7 @@ def add(
     if type(state) is str:
         state = SnapState(state)
 
-    return _wrap_snap_operations(snap_names, state, channel, classic)
+    return _wrap_snap_operations(snap_names, state, channel, classic, cohort)
 
 
 @_cache_init
@@ -651,6 +700,7 @@ def ensure(
     state: str,
     channel: Optional[str] = "latest",
     classic: Optional[bool] = False,
+    cohort: Optional[str] = "",
 ) -> Union[Snap, List[Snap]]:
     """Ensures a snap is in a given state to the system.
 
@@ -665,13 +715,17 @@ def ensure(
         SnapError if the snap is not in the cache.
     """
     if state in ("present", "latest"):
-        return add(snap_names, SnapState(state), channel, classic)
+        return add(snap_names, SnapState(state), channel, classic, cohort)
     else:
         return remove(snap_names)
 
 
 def _wrap_snap_operations(
-    snap_names: List[str], state: SnapState, channel: str, classic: bool
+    snap_names: List[str],
+    state: SnapState,
+    channel: str,
+    classic: bool,
+    cohort: Optional[str] = "",
 ) -> Union[Snap, List[Snap]]:
     """Wrap common operations for bare commands."""
     snaps = {"success": [], "failed": []}
@@ -684,7 +738,7 @@ def _wrap_snap_operations(
             if state is SnapState.Absent:
                 snap.ensure(state=SnapState.Absent)
             else:
-                snap.ensure(state=state, classic=classic, channel=channel)
+                snap.ensure(state=state, classic=classic, channel=channel, cohort=cohort)
             snaps["success"].append(snap)
         except SnapError as e:
             logger.warning("Failed to {} snap {}: {}!".format(op, s, e.message))
