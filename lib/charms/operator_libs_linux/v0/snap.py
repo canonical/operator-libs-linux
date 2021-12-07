@@ -256,7 +256,7 @@ class Snap(object):
         Args:
            config: a dictionary containing keys and values specifying the config to set.
         """
-        args = [f'{key}="{val}"' for key, val in config.items()]
+        args = ['{}="{}"'.format(key, val) for key, val in config.items()]
 
         return self._snap("set", [*args])
 
