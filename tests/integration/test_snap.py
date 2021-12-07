@@ -53,8 +53,6 @@ def test_snap_set():
     lxd = cache["lxd"]
     lxd.ensure(snap.SnapState.Latest, channel="latest")
 
-    import os
-
     lxd.set({"ceph.external": "false", "criu.enable": "false"})
 
     assert lxd.get("ceph.external") == "false"
