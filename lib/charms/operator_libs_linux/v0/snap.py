@@ -248,7 +248,7 @@ class Snap(object):
         Args:
             key: the key to retrieve
         """
-        return self._snap("get", [key])
+        return self._snap("get", [key]).strip()
 
     def set(self, config: Dict) -> str:
         """Sets a snap configuration value.
