@@ -5,7 +5,7 @@
 
 import logging
 
-from charms.operator_libs_linux.v0 import snap
+from charms.operator_libs_linux.v1 import snap
 from helpers import get_command_path
 
 logger = logging.getLogger(__name__)
