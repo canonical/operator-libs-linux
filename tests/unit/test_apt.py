@@ -23,6 +23,14 @@ dpkg_output_vim = """Desired=Unknown/Install/Remove/Purge/Hold
 ii  vim                           2:8.1.2269-1ubuntu5                                                       amd64          Vi IMproved - Common files
 """
 
+dpkg_output_all_arch = """Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name                                 Version                                                                   Architecture Description
++++-====================================-=========================================================================-============-===============================================================================
+ii  postgresql                           12+214ubuntu0.1                                                           all         object-relational SQL database (supported version)
+"""
+
 dpkg_output_multi_arch = """Desired=Unknown/Install/Remove/Purge/Hold
 | Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
 |/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
@@ -35,6 +43,31 @@ ii  vim                           2:8.1.2269-1ubuntu5                           
 apt_cache_mocktester = """
 Package: mocktester
 Architecture: amd64
+Version: 1:1.2.3-4
+Priority: optional
+Section: test
+Origin: Ubuntu
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Original-Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>
+Bugs: https://bugs.launchpad.net/ubuntu/+filebug
+Installed-Size: 1234
+Depends: vim-common
+Recommends: zsh
+Suggests: foobar
+Filename: pool/main/m/mocktester/mocktester_1:1.2.3-4_amd64.deb
+Size: 65536
+MD5sum: a87e414ad5aede7c820ce4c4e6bc7fa9
+SHA1: b21d6ce47cb471c73fb4ec07a24c6f4e56fd19fc
+SHA256: 89e7d5f61a0e3d32ef9aebd4b16e61840cd97e10196dfa186b06b6cde2f900a2
+Homepage: https://wiki.gnome.org/Apps/MockTester
+Description: Testing Package
+Task: ubuntu-desktop
+Description-md5: e7f99df3aa92cf870d335784e155ec33
+"""
+
+apt_cache_mocktester_all_arch = """
+Package: mocktester
+Architecture: all
 Version: 1:1.2.3-4
 Priority: optional
 Section: test
@@ -171,6 +204,16 @@ class TestApt(unittest.TestCase):
         self.assertEqual(str(zsh.version), "5.8-3ubuntu1")
 
     @patch("charms.operator_libs_linux.v0.apt.check_output")
+    def test_can_load_from_dpkg_with_all_arch(self, mock_subprocess):
+        mock_subprocess.side_effect = ["amd64", dpkg_output_all_arch]
+
+        postgresql = apt.DebianPackage.from_installed_package("postgresql")
+        self.assertEqual(postgresql.epoch, "")
+        self.assertEqual(postgresql.arch, "all")
+        self.assertEqual(postgresql.fullversion, "12+214ubuntu0.1.all")
+        self.assertEqual(str(postgresql.version), "12+214ubuntu0.1")
+
+    @patch("charms.operator_libs_linux.v0.apt.check_output")
     def test_can_load_from_dpkg_multi_arch(self, mock_subprocess):
         mock_subprocess.side_effect = ["amd64", dpkg_output_multi_arch]
 
@@ -188,6 +231,16 @@ class TestApt(unittest.TestCase):
         self.assertEqual(tester.epoch, "1")
         self.assertEqual(tester.arch, "amd64")
         self.assertEqual(tester.fullversion, "1:1.2.3-4.amd64")
+        self.assertEqual(str(tester.version), "1:1.2.3-4")
+
+    @patch("charms.operator_libs_linux.v0.apt.check_output")
+    def test_can_load_from_apt_cache_all_arch(self, mock_subprocess):
+        mock_subprocess.side_effect = ["amd64", apt_cache_mocktester_all_arch]
+
+        tester = apt.DebianPackage.from_apt_cache("mocktester")
+        self.assertEqual(tester.epoch, "1")
+        self.assertEqual(tester.arch, "all")
+        self.assertEqual(tester.fullversion, "1:1.2.3-4.all")
         self.assertEqual(str(tester.version), "1:1.2.3-4")
 
     @patch("charms.operator_libs_linux.v0.apt.check_output")

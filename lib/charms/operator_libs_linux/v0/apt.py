@@ -124,7 +124,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 5
+LIBPATCH = 6
 
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
@@ -434,7 +434,9 @@ class DebianPackage:
                     matches["arch"],
                     PackageState.Present,
                 )
-                if pkg.arch == arch and (version == "" or str(pkg.version) == version):
+                if (pkg.arch == "all" or pkg.arch == arch) and (
+                    version == "" or str(pkg.version) == version
+                ):
                     return pkg
             except AttributeError:
                 logger.warning("dpkg matcher could not parse line: %s", line)
@@ -493,7 +495,9 @@ class DebianPackage:
                 PackageState.Available,
             )
 
-            if pkg.arch == arch and (version == "" or str(pkg.version) == version):
+            if (pkg.arch == "all" or pkg.arch == arch) and (
+                version == "" or str(pkg.version) == version
+            ):
                 return pkg
 
         # If we didn't find it, fail through
