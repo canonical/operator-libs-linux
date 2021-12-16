@@ -166,18 +166,6 @@ class TestSystemD(unittest.TestCase):
             ]
         )
 
-        # Failures in disable and mask aren't handled.
-        mockp, kw = make_mock([1, 1, 3])
-        paused = systemd.service_pause("mysql")
-        mockp.assert_has_calls(
-            [
-                call(["systemctl", "disable", "mysql", "--now"], **kw),
-                call(["systemctl", "mask", "mysql"], **kw),
-                call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
-            ]
-        )
-        self.assertTrue(paused)
-
     @with_mock_subp
     def test_service_resume(self, make_mock):
 
@@ -215,19 +203,6 @@ class TestSystemD(unittest.TestCase):
                 call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
             ]
         )
-
-        # Failures in unmask and enable aren't handled.
-        mockp, kw = make_mock([1, 1, 0])
-
-        resumed = systemd.service_resume("mysql")
-        mockp.assert_has_calls(
-            [
-                call(["systemctl", "unmask", "mysql"], **kw),
-                call(["systemctl", "enable", "mysql", "--now"], **kw),
-                call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
-            ]
-        )
-        self.assertTrue(resumed)
 
     @with_mock_subp
     def test_daemon_reload(self, make_mock):

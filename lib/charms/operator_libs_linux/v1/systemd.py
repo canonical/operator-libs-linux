@@ -188,16 +188,12 @@ def service_pause(service_name: str) -> bool:
     Args:
         service_name: the name of the service to pause
     """
-    try:
-        _systemctl("disable", service_name, now=True)
-    except SystemdError:
-        pass
-    try:
-        _systemctl("mask", service_name)
-    except SystemdError:
-        pass
+    _systemctl("disable", service_name, now=True)
+    _systemctl("mask", service_name)
+
     if not service_running(service_name):
         return True
+
     raise SystemdError(
         "Attempted to pause '{}', but it is still running.".format(service_name)
     )
@@ -211,14 +207,8 @@ def service_resume(service_name: str) -> bool:
     Args:
         service_name: the name of the service to resume
     """
-    try:
-        _systemctl("unmask", service_name)
-    except SystemdError:
-        pass
-    try:
-        _systemctl("enable", service_name, now=True)
-    except SystemdError:
-        pass
+    _systemctl("unmask", service_name)
+    _systemctl("enable", service_name, now=True)
 
     if service_running(service_name):
         return True
