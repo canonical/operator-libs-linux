@@ -5,7 +5,7 @@ import unittest
 from typing import List
 from unittest.mock import MagicMock, call, patch
 
-from charms.operator_libs_linux.v0 import systemd
+from charms.operator_libs_linux.v1 import systemd
 
 
 def with_mock_subp(func):
@@ -21,7 +21,7 @@ def with_mock_subp(func):
 
     """
 
-    @patch("charms.operator_libs_linux.v0.systemd.subprocess")
+    @patch("charms.operator_libs_linux.v1.systemd.subprocess")
     def make_mocks_and_run(cls, mock_subp):
         def make_mock_popen(returncodes: List[int], lines: List[str] = None, stdout: str = None):
             lines = lines if lines is not None else ("", "")

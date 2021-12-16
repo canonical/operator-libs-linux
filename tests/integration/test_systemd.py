@@ -6,7 +6,7 @@
 import logging
 from subprocess import check_output
 
-from charms.operator_libs_linux.v0.systemd import (
+from charms.operator_libs_linux.v1.systemd import (
     SystemdError,
     daemon_reload,
     service_pause,
