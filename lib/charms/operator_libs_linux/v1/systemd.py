@@ -194,9 +194,7 @@ def service_pause(service_name: str) -> bool:
     if not service_running(service_name):
         return True
 
-    raise SystemdError(
-        "Attempted to pause '{}', but it is still running.".format(service_name)
-    )
+    raise SystemdError("Attempted to pause '{}', but it is still running.".format(service_name))
 
 
 def service_resume(service_name: str) -> bool:
