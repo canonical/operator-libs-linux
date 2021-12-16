@@ -7,6 +7,7 @@ import logging
 from subprocess import check_output
 
 from charms.operator_libs_linux.v0.systemd import (
+    SystemdError,
     daemon_reload,
     service_pause,
     service_reload,
@@ -50,7 +51,12 @@ def test_stop_and_start():
 
 def test_reload():
     # Verify that we can reload services that support reload.
-    assert not service_reload("cron")
+    try:
+        service_reload("cron")
+    except SystemdError:
+        pass
+    else:
+        raise AssertionError("cron does not support reload, but we didn't raise and error.")
     assert service_reload("apparmor")
 
     # The following is observed behavior. Not sure how happy I am about it.
