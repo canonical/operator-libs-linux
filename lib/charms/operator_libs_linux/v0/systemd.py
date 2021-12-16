@@ -121,7 +121,7 @@ def _systemctl(
         return True
 
     raise SystemdError(
-        "Could not {}{}. SystemD says: {}".format(
+        "Could not {}{}: systemd output: {}".format(
             sub_cmd, " {}".format(service_name) if service_name else "", last_line
         )
     )
@@ -199,7 +199,7 @@ def service_pause(service_name: str) -> bool:
     if not service_running(service_name):
         return True
     raise SystemdError(
-        "Attempted to pause {}, but it still appears to be running.".format(service_name)
+        "Attempted to pause '{}', but it is still running.".format(service_name)
     )
 
 
@@ -223,7 +223,7 @@ def service_resume(service_name: str) -> bool:
     if service_running(service_name):
         return True
 
-    raise SystemdError("Attempted to resume {}, but it is not running.".format(service_name))
+    raise SystemdError("Attempted to resume '{}', but it is not running.".format(service_name))
 
 
 def daemon_reload() -> bool:
