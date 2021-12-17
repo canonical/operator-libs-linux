@@ -56,11 +56,15 @@ logger = logging.getLogger(__name__)
 LIBID = "045b0d179f6b4514a8bb9b48aee9ebaf"
 
 # Increment this major API version when introducing breaking changes
-LIBAPI = 0
+LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 0
+
+
+class SystemdError(Exception):
+    pass
 
 
 def _popen_kwargs():
@@ -98,11 +102,29 @@ def _systemctl(
         logger.debug("Checking if '{}' is active".format(service_name))
 
     proc = subprocess.Popen(cmd, **_popen_kwargs())
+    last_line = ""
     for line in iter(proc.stdout.readline, ""):
+        last_line = line
         logger.debug(line)
 
     proc.wait()
-    return proc.returncode == 0
+
+    if sub_cmd == "is-active":
+        # If we are just checking whether a service is running, return True/False, rather
+        # than raising an error.
+        if proc.returncode < 1:
+            return True
+        if proc.returncode == 3:  # Code returned when service is not active.
+            return False
+
+    if proc.returncode < 1:
+        return True
+
+    raise SystemdError(
+        "Could not {}{}: systemd output: {}".format(
+            sub_cmd, " {}".format(service_name) if service_name else "", last_line
+        )
+    )
 
 
 def service_running(service_name: str) -> bool:
@@ -149,10 +171,13 @@ def service_reload(service_name: str, restart_on_failure: bool = False) -> bool:
         restart_on_failure: boolean indicating whether to fallback to a restart if the
           reload fails.
     """
-    service_result = _systemctl("reload", service_name)
-    if not service_result and restart_on_failure:
-        service_result = _systemctl("restart", service_name)
-    return service_result
+    try:
+        return _systemctl("reload", service_name)
+    except SystemdError:
+        if restart_on_failure:
+            return _systemctl("restart", service_name)
+        else:
+            raise
 
 
 def service_pause(service_name: str) -> bool:
@@ -165,7 +190,11 @@ def service_pause(service_name: str) -> bool:
     """
     _systemctl("disable", service_name, now=True)
     _systemctl("mask", service_name)
-    return not service_running(service_name)
+
+    if not service_running(service_name):
+        return True
+
+    raise SystemdError("Attempted to pause '{}', but it is still running.".format(service_name))
 
 
 def service_resume(service_name: str) -> bool:
@@ -178,7 +207,11 @@ def service_resume(service_name: str) -> bool:
     """
     _systemctl("unmask", service_name)
     _systemctl("enable", service_name, now=True)
-    return service_running(service_name)
+
+    if service_running(service_name):
+        return True
+
+    raise SystemdError("Attempted to resume '{}', but it is not running.".format(service_name))
 
 
 def daemon_reload() -> bool:
