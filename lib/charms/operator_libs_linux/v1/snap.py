@@ -576,18 +576,10 @@ class SnapCache(Mapping):
 
     def __getitem__(self, snap_name: str) -> Snap:
         """Return either the installed version or latest version for a given snap."""
-        snap = None
-        try:
-            snap = self._snap_map[snap_name]
-        except KeyError:
-            # The snap catalog may not be populated yet. Try to fetch info
-            # blindly
-            logger.warning(
-                "Snap '{}' not found in the snap cache. "
-                "The catalog may not be populated by snapd yet".format(snap_name)
-            )
-
+        snap = self._snap_map.get(snap_name, None)
         if snap is None:
+            # The snapd cache file may not have existed when _snap_map was
+            # populated.  This is normal.
             try:
                 self._snap_map[snap_name] = self._load_info(snap_name)
             except SnapAPIError:
@@ -606,9 +598,9 @@ class SnapCache(Mapping):
         Leave them empty and lazily load later if asked for.
         """
         if not os.path.isfile("/var/cache/snapd/names"):
-            logger.warning(
-                "The snap cache has not been populated or is not in the default location"
-            )
+            # The snap catalog may not be populated yet; this is normal.
+            # snapd updates the cache infrequently and the cache file may not
+            # currently exist.
             return
 
         with open("/var/cache/snapd/names", "r") as f:
