@@ -197,14 +197,10 @@ class Snap(object):
 
     def __eq__(self, other) -> bool:
         """Equality for comparison."""
-        return (
-            isinstance(other, self.__class__)
-            and (
-                self._name,
-                self._revision,
-            )
-            == (other._name, other._revision)
-        )
+        return isinstance(other, self.__class__) and (
+            self._name,
+            self._revision,
+        ) == (other._name, other._revision)
 
     def __hash__(self):
         """A basic hash so this class can be used in Mappings and dicts."""
