@@ -224,7 +224,7 @@ class Snap(object):
             str(self._state),
         )
 
-    def _snap(self, command: str, optargs: Optional[List[str]] = None) -> str:
+    def _snap(self, command: str, optargs: Optional[Iterable[str]] = None) -> str:
         """Perform a snap operation.
 
         Args:
@@ -235,7 +235,7 @@ class Snap(object):
         Raises:
           SnapError if there is a problem encountered
         """
-        optargs = optargs if optargs is not None else []
+        optargs = optargs or []
         _cmd = ["snap", command, self._name, *optargs]
         try:
             return subprocess.check_output(_cmd, universal_newlines=True)
@@ -284,7 +284,7 @@ class Snap(object):
         if cohort:
             args.append('--cohort="{}"'.format(cohort))
 
-        self._snap("install", args)
+        self._snap("install", filter(None, args))
 
     def _refresh(
         self,
