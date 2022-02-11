@@ -206,14 +206,10 @@ class DebianPackage:
         Returns:
           A boolean reflecting equality
         """
-        return (
-            isinstance(other, self.__class__)
-            and (
-                self._name,
-                self._version.number,
-            )
-            == (other._name, other._version.number)
-        )
+        return isinstance(other, self.__class__) and (
+            self._name,
+            self._version.number,
+        ) == (other._name, other._version.number)
 
     def __hash__(self):
         """A basic hash so this class can be used in Mappings and dicts."""

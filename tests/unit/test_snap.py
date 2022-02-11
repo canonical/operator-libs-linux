@@ -340,7 +340,6 @@ class TestSnapBareMethods(unittest.TestCase):
                 "snap",
                 "install",
                 "curl",
-                "",
                 '--channel="latest"',
                 '--cohort="+"',
             ],

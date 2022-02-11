@@ -91,3 +91,8 @@ def test_snap_ensure():
     charmcraft.ensure(snap.SnapState.Latest, channel="latest/stable")
     charmcraft.ensure(snap.SnapState.Latest, channel="latest/stable")
     charmcraft.ensure(snap.SnapState.Latest, channel="latest/stable")
+
+
+def test_new_snap_ensure():
+    vlc = snap.SnapCache()["vlc"]
+    vlc.ensure(snap.SnapState.Latest, channel="edge")

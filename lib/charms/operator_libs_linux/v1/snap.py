@@ -81,7 +81,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 
 def _cache_init(func):
@@ -197,14 +197,10 @@ class Snap(object):
 
     def __eq__(self, other) -> bool:
         """Equality for comparison."""
-        return (
-            isinstance(other, self.__class__)
-            and (
-                self._name,
-                self._revision,
-            )
-            == (other._name, other._revision)
-        )
+        return isinstance(other, self.__class__) and (
+            self._name,
+            self._revision,
+        ) == (other._name, other._revision)
 
     def __hash__(self):
         """A basic hash so this class can be used in Mappings and dicts."""
@@ -224,7 +220,7 @@ class Snap(object):
             str(self._state),
         )
 
-    def _snap(self, command: str, optargs: Optional[List[str]] = None) -> str:
+    def _snap(self, command: str, optargs: Optional[Iterable[str]] = None) -> str:
         """Perform a snap operation.
 
         Args:
@@ -235,7 +231,7 @@ class Snap(object):
         Raises:
           SnapError if there is a problem encountered
         """
-        optargs = optargs if optargs is not None else []
+        optargs = optargs or []
         _cmd = ["snap", command, self._name, *optargs]
         try:
             return subprocess.check_output(_cmd, universal_newlines=True)
@@ -275,12 +271,13 @@ class Snap(object):
           channel: the channel to install from
           cohort: optional, the key of a cohort that this snap belongs to
         """
-        confinement = "--classic" if self._confinement == "classic" else ""
-        channel = '--channel="{}"'.format(channel) if channel else ""
-        args = [confinement, channel]
+        cohort = cohort or self._cohort
 
-        if not cohort:
-            cohort = self._cohort
+        args = []
+        if self.confinement == "classic":
+            args.append("--classic")
+        if channel:
+            args.append('--channel="{}"'.format(channel))
         if cohort:
             args.append('--cohort="{}"'.format(cohort))
 
