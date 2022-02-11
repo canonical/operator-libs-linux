@@ -271,16 +271,17 @@ class Snap(object):
           channel: the channel to install from
           cohort: optional, the key of a cohort that this snap belongs to
         """
-        confinement = "--classic" if self._confinement == "classic" else ""
-        channel = '--channel="{}"'.format(channel) if channel else ""
-        args = [confinement, channel]
+        cohort = cohort or self._cohort
 
-        if not cohort:
-            cohort = self._cohort
+        args = []
+        if self.confinement == "classic":
+            args.append("--classic")
+        if channel:
+            args.append('--channel="{}"'.format(channel))
         if cohort:
             args.append('--cohort="{}"'.format(cohort))
 
-        self._snap("install", filter(None, args))
+        self._snap("install", args)
 
     def _refresh(
         self,
