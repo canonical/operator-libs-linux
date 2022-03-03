@@ -40,6 +40,14 @@ ii  vim                           2:8.1.2269-1ubuntu5                           
 ii  vim                           2:8.1.2269-1ubuntu5                                                       i386          Vi IMproved - Common files
 """
 
+dpkg_output_not_installed = """Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name                              Version               Architecture          Description
++++-=================================-=====================-=====================-========================================================================
+rc  ubuntu-advantage-tools            27.2.2~16.04.1        amd64                 management tools for Ubuntu Advantage
+"""
+
 apt_cache_mocktester = """
 Package: mocktester
 Architecture: amd64
@@ -222,6 +230,20 @@ class TestApt(unittest.TestCase):
         self.assertEqual(vim.arch, "i386")
         self.assertEqual(vim.fullversion, "2:8.1.2269-1ubuntu5.i386")
         self.assertEqual(str(vim.version), "2:8.1.2269-1ubuntu5")
+
+    @patch("charms.operator_libs_linux.v0.apt.check_output")
+    def test_can_load_from_dpkg_not_installed(self, mock_subprocess):
+        mock_subprocess.side_effect = ["amd64", dpkg_output_not_installed]
+
+        with self.assertRaises(apt.PackageNotFoundError) as ctx:
+            apt.DebianPackage.from_installed_package("ubuntu-advantage-tools")
+
+        self.assertEqual(
+            "<charms.operator_libs_linux.v0.apt.PackageNotFoundError>", ctx.exception.name
+        )
+        self.assertIn(
+            "Package ubuntu-advantage-tools.amd64 is not installed!", ctx.exception.message
+        )
 
     @patch("charms.operator_libs_linux.v0.apt.check_output")
     def test_can_load_from_apt_cache(self, mock_subprocess):
@@ -455,3 +477,12 @@ class TestAptBareMethods(unittest.TestCase):
         mock_subprocess.assert_any_call(["apt-get", "update"], stderr=-1, stdout=-1)
         self.assertEqual("<charms.operator_libs_linux.v0.apt.PackageError>", ctx.exception.name)
         self.assertIn("Failed to install packages: nothere", ctx.exception.message)
+
+    @patch("charms.operator_libs_linux.v0.apt.check_output")
+    @patch("charms.operator_libs_linux.v0.apt.check_call")
+    def test_remove_package_not_installed(self, mock_subprocess, mock_subprocess_output):
+        mock_subprocess_output.side_effect = ["amd64", dpkg_output_not_installed]
+
+        packages = apt.remove_package("ubuntu-advantage-tools")
+        mock_subprocess.assert_not_called()
+        self.assertEqual(packages, [])

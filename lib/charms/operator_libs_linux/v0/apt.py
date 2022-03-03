@@ -124,7 +124,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 7
 
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
@@ -422,6 +422,16 @@ class DebianPackage:
         for line in lines:
             try:
                 matches = dpkg_matcher.search(line).groupdict()
+                package_status = matches["package_status"]
+
+                if not package_status.endswith("i"):
+                    logger.debug(
+                        "package '%s' in dpkg output but not installed, status: '%s'",
+                        package,
+                        package_status,
+                    )
+                    break
+
                 epoch, split_version = DebianPackage._get_epoch_from_version(matches["version"])
                 pkg = DebianPackage(
                     matches["package_name"],
@@ -817,7 +827,9 @@ def remove_package(
         except PackageNotFoundError:
             logger.info("package '%s' was requested for removal, but it was not installed.", p)
 
-    return packages if len(packages) > 1 else packages[0]
+    # the list of packages will be empty when no package is removed
+    logger.debug("packages: '%s'", packages)
+    return packages[0] if len(packages) == 1 else packages
 
 
 def update() -> None:
