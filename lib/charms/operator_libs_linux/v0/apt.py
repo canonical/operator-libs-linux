@@ -355,7 +355,7 @@ class DebianPackage:
 
         Args:
             package: a string representing the package
-            version: an optional string if a specific version isr equested
+            version: an optional string if a specific version is requested
             arch: an optional architecture, defaulting to `dpkg --print-architecture`. If an
                 architecture is not specified, this will be used for selection.
 
@@ -388,7 +388,7 @@ class DebianPackage:
 
         Args:
             package: a string representing the package
-            version: an optional string if a specific version isr equested
+            version: an optional string if a specific version is requested
             arch: an optional architecture, defaulting to `dpkg --print-architecture`.
                 If an architecture is not specified, this will be used for selection.
         """
@@ -458,7 +458,7 @@ class DebianPackage:
 
         Args:
             package: a string representing the package
-            version: an optional string if a specific version isr equested
+            version: an optional string if a specific version is requested
             arch: an optional architecture, defaulting to `dpkg --print-architecture`.
                 If an architecture is not specified, this will be used for selection.
         """
