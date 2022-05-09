@@ -736,7 +736,9 @@ def add_package(
         update_cache: whether or not to run `apt-get update` prior to operating
 
     Raises:
+        TypeError if no package name is given, or explicit version is set for multiple packages
         PackageNotFoundError if the package is not in the cache.
+        PackageError if packages fail to install
     """
     cache_refreshed = False
     if update_cache:
