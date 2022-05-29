@@ -107,7 +107,7 @@ def test_snap_start():
 
     assert kp.services
     kp.start()
-    assert kp.services["daemon"]["active"] == True
+    assert kp.services["daemon"]["active"] is not False
 
     with pytest.raises(snap.SnapError):
         kp.start(["foobar"])
@@ -119,8 +119,8 @@ def test_snap_stop():
     kp.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
 
     kp.stop(["daemon"], disable=True)
-    assert kp.services["daemon"]["active"] == False
-    assert kp.services["daemon"]["enabled"] == False
+    assert kp.services["daemon"]["active"] is False
+    assert kp.services["daemon"]["enabled"] is False
 
 
 def test_snap_logs():

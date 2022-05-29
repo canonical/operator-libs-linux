@@ -313,18 +313,19 @@ class Snap(object):
 
         self._snap_daemons("stop", services, options)
 
-    def logs(self, service: Optional[List[str]] = None, num_lines: Optional[int] = 10) -> str:
+    def logs(self, services: Optional[List[str]] = None, num_lines: Optional[int] = 10) -> str:
         """Shows a snap services' logs.
 
         Args:
-            services (list): (optional) list of individual snap services to show logs from (otherwise all)
+            services (list): (optional) list of individual snap services to show logs from
+                (otherwise all)
             num_lines (int): (optional) integer number of log lines to return. Default `10`
         """
         options = []
         if num_lines:
             options.append(f"-n={num_lines}")
 
-        return self._snap_daemons("logs", service, options).stdout
+        return self._snap_daemons("logs", services, options).stdout
 
     def restart(
         self, services: Optional[List[str]] = None, reload: Optional[bool] = False
@@ -332,8 +333,10 @@ class Snap(object):
         """Restarts a snap's services.
 
         Args:
-            services (list): (optional) list of individual snap services to show logs from (otherwise all)
-            reload (bool): (optional) flag to use the service reload command, if available. Default `False`
+            services (list): (optional) list of individual snap services to show logs from.
+                (otherwise all)
+            reload (bool): (optional) flag to use the service reload command, if available.
+                Default `False`
         """
         options = []
         if reload:
@@ -891,4 +894,4 @@ def install_local(
 
         return c[snap_name]
     except CalledProcessError as e:
-        raise SnapError("Could not install snap {}: {}".format(_cmd, filename, e.output))
+        raise SnapError("Could not install snap {}: {}".format(filename, e.output))
