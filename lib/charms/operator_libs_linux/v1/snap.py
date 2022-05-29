@@ -52,7 +52,7 @@ try:
     if nextcloud.get("mode") != "production":
         nextcloud.set({"mode": "production"})
 except snap.SnapError as e:
-    logger.error("An exception occurred when installing snaps. Reason: %s", e.message)
+    logger.error("An exception occurred when installing snaps. Reason: {}".format(e.message))
 ```
 """
 
@@ -62,6 +62,7 @@ import logging
 import os
 import socket
 import subprocess
+from subprocess import CompletedProcess
 import sys
 import urllib.error
 import urllib.parse
@@ -161,7 +162,7 @@ class SnapState(Enum):
 
 
 class SnapError(Error):
-    """Raised when there's an error installing or removing a snap."""
+    """Raised when there's an error running snap control commands."""
 
 
 class SnapNotFoundError(Error):
@@ -236,7 +237,28 @@ class Snap(object):
         try:
             return subprocess.check_output(_cmd, universal_newlines=True)
         except CalledProcessError as e:
-            raise SnapError("Could not %s snap [%s]: %s", _cmd, self._name, e.output)
+            raise SnapError("Could not {} for snap [{}]: {}".format(_cmd, self._name, e.output))
+
+    def _snap_daemons(
+        self,
+        command: str,
+        services: Optional[List[str]] = None,
+        options: Optional[Iterable[str]] = None,
+    ) -> CompletedProcess:
+
+        options = options or []
+        if services:
+            # an attempt to keep the command constrained to the snap instance's services
+            services = [f"{self._name}.{service}" for service in services]
+        else:
+            services = [self._name]
+
+        _cmd = ["snap", command, *options, *services]
+
+        try:
+            return subprocess.run(_cmd, universal_newlines=True, check=True, capture_output=True)
+        except CalledProcessError as e:
+            raise SnapError("Could not {} for snap [{}]: {}".format(_cmd, self._name, e.stderr))
 
     def get(self, key) -> str:
         """Gets a snap configuration value.
@@ -263,6 +285,62 @@ class Snap(object):
             key: the key to unset
         """
         return self._snap("unset", [key])
+
+    def start(self, services: Optional[List[str]] = None, enable: Optional[bool] = False) -> None:
+        """Starts a snap's services.
+
+        Args:
+            services (list): (optional) list of individual snap services to start (otherwise all)
+            enable (bool): (optional) flag to enable snap services on start. Default `false`
+        """
+        options = []
+        if enable:
+            options.append("--enable")
+
+        self._snap_daemons("start", services, options)
+
+    def stop(
+        self, services: Optional[List[str]] = None, disable: Optional[bool] = False
+    ) -> None:
+        """Stops a snap's services.
+
+        Args:
+            services (list): (optional) list of individual snap services to stop (otherwise all)
+            disable (bool): (optional) flag to disable snap services on stop. Default `False`
+        """
+        options = []
+        if disable:
+            options.append("--disable")
+
+        self._snap_daemons("stop", services, options)
+
+    def logs(self, service: Optional[List[str]] = None, num_lines: Optional[int] = 10) -> str:
+        """Shows a snap services' logs.
+
+        Args:
+            services (list): (optional) list of individual snap services to show logs from (otherwise all)
+            num_lines (int): (optional) integer number of log lines to return. Default `10`
+        """
+        options = []
+        if num_lines:
+            options.append(f"-n={num_lines}")
+
+        return self._snap_daemons("logs", service, options).stdout
+
+    def restart(
+        self, services: Optional[List[str]] = None, reload: Optional[bool] = False
+    ) -> None:
+        """Restarts a snap's services.
+
+        Args:
+            services (list): (optional) list of individual snap services to show logs from (otherwise all)
+            reload (bool): (optional) flag to use the service reload command, if available. Default `False`
+        """
+        options = []
+        if reload:
+            options.append("--reload")
+
+        self._snap_daemons("restart", services, options)
 
     def _install(self, channel: Optional[str] = "", cohort: Optional[str] = "") -> None:
         """Add a snap to the system.
@@ -310,7 +388,7 @@ class Snap(object):
 
         self._snap("refresh", args)
 
-    def _remove(self) -> None:
+    def _remove(self) -> str:
         """Removes a snap from the system."""
         return self._snap("remove")
 
@@ -401,6 +479,23 @@ class Snap(object):
     def confinement(self) -> str:
         """Returns the confinement for a snap."""
         return self._confinement
+
+    @property
+    def services(self) -> dict:
+        """Returns (if any) the services of the snap."""
+        service_map = {}
+        try:
+            services = self._snap("services")
+            headers = [line.split() for line in services.splitlines()[:1]][0][1:]  # removing output headers 
+            services = [line.split() for line in services.splitlines()[1:]]
+            for item in services:
+                service_name = item.pop(0).split(".")[1]  # removing snap name from service name
+                item_map = {k: v for k, v in zip(headers, item)}
+                service_map[service_name] = item_map
+            return service_map
+        except SnapError as e:
+            logger.error(e)
+            return service_map
 
 
 class _UnixSocketConnection(http.client.HTTPConnection):
@@ -775,4 +870,4 @@ def install_local(
 
         return c[snap_name]
     except CalledProcessError as e:
-        raise SnapError("Could not install snap [%s]: %s", _cmd, filename, e.output)
+        raise SnapError("Could not install snap {}: {}".format(_cmd, filename, e.output))
