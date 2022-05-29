@@ -278,6 +278,49 @@ class TestSnapCache(unittest.TestCase):
         foo.state = snap.SnapState.Absent
         mock_subprocess.assert_called_with(["snap", "remove", "foo"], universal_newlines=True)
 
+    @patch("charms.operator_libs_linux.v1.snap.subprocess.run")
+    def test_can_run_snap_daemon_commands(self, mock_subprocess):
+        mock_subprocess.return_value = MagicMock()
+        foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
+
+        foo.start(["bar", "baz"], enable=True)
+        mock_subprocess.assert_called_with(
+            ["snap", "start", "--enable", "foo.bar", "foo.baz"],
+            universal_newlines=True,
+            check=True,
+            capture_output=True,
+        )
+
+        foo.stop(["bar"])
+        mock_subprocess.assert_called_with(
+            ["snap", "stop", "foo.bar"],
+            universal_newlines=True,
+            check=True,
+            capture_output=True,
+        )
+
+        foo.stop()
+        mock_subprocess.assert_called_with(
+            ["snap", "stop", "foo"],
+            universal_newlines=True,
+            check=True,
+            capture_output=True,
+        )
+
+    @patch("charms.operator_libs_linux.v1.snap.subprocess.check_output")
+    def test_services_property(self, mock_subprocess):
+        mock_subprocess.return_value = (
+            "Service          Startup  Current   Notes\n"
+            "lxd.activate     enabled  inactive  -\n"
+            "lxd.daemon       enabled  active    socket-activated\n"
+            "lxd.user-daemon  enabled  inactive  socket-activated\n"
+        )
+        print(mock_subprocess.return_value)
+
+        foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
+        self.assertEqual(len(foo.services), 3)
+        self.assertEqual(set(foo.services), {"activate", "daemon", "user-daemon"})
+        self.assertNotIn("lxd", list(sum(list(foo.services.items()), ())))
 
 class TestSocketClient(unittest.TestCase):
     def test_socket_not_found(self):

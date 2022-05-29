@@ -7,6 +7,8 @@ import logging
 
 from charms.operator_libs_linux.v1 import snap
 from helpers import get_command_path
+import pytest
+
 
 logger = logging.getLogger(__name__)
 
@@ -96,3 +98,40 @@ def test_snap_ensure():
 def test_new_snap_ensure():
     vlc = snap.SnapCache()["vlc"]
     vlc.ensure(snap.SnapState.Latest, channel="edge")
+
+
+def test_snap_start():
+    cache = snap.SnapCache()
+    lxd = cache["lxd"]
+    lxd.ensure(snap.SnapState.Latest, channel="latest")
+
+    assert lxd.services
+    print(lxd.services)
+    lxd.start()
+    assert lxd.services["daemon"]["Current"] == "active"
+
+    with pytest.raises(snap.SnapError):
+        lxd.start(["foobar"])
+
+def test_snap_stop():
+    cache = snap.SnapCache()
+    lxd = cache["lxd"]
+    lxd.ensure(snap.SnapState.Latest, channel="latest")
+
+    lxd.stop(["daemon"], disable=True)
+    assert lxd.services["daemon"]["Current"] == "inactive"
+    assert lxd.services["daemon"]["Startup"] == "disabled"
+
+def test_snap_logs():
+    cache = snap.SnapCache()
+    lxd = cache["lxd"]
+    lxd.ensure(snap.SnapState.Latest, channel="latest")
+
+    assert len(lxd.logs(num_lines=10).splitlines()) == 10
+
+def test_snap_restart():
+    cache = snap.SnapCache()
+    lxd = cache["lxd"]
+    lxd.ensure(snap.SnapState.Latest, channel="latest")
+
+    lxd.restart()
