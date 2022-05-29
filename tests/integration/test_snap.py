@@ -4,11 +4,11 @@
 
 
 import logging
+from subprocess import CalledProcessError
 
+import pytest
 from charms.operator_libs_linux.v1 import snap
 from helpers import get_command_path
-import pytest
-
 
 logger = logging.getLogger(__name__)
 
@@ -102,36 +102,47 @@ def test_new_snap_ensure():
 
 def test_snap_start():
     cache = snap.SnapCache()
-    lxd = cache["lxd"]
-    lxd.ensure(snap.SnapState.Latest, channel="latest")
+    kp = cache["kube-proxy"]
+    kp.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
 
-    assert lxd.services
-    print(lxd.services)
-    lxd.start()
-    assert lxd.services["daemon"]["Current"] == "active"
+    assert kp.services
+    kp.start()
+    assert kp.services["daemon"]["active"] == True
 
     with pytest.raises(snap.SnapError):
-        lxd.start(["foobar"])
+        kp.start(["foobar"])
+
 
 def test_snap_stop():
     cache = snap.SnapCache()
-    lxd = cache["lxd"]
-    lxd.ensure(snap.SnapState.Latest, channel="latest")
+    kp = cache["kube-proxy"]
+    kp.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
 
-    lxd.stop(["daemon"], disable=True)
-    assert lxd.services["daemon"]["Current"] == "inactive"
-    assert lxd.services["daemon"]["Startup"] == "disabled"
+    kp.stop(["daemon"], disable=True)
+    assert kp.services["daemon"]["active"] == False
+    assert kp.services["daemon"]["enabled"] == False
+
 
 def test_snap_logs():
     cache = snap.SnapCache()
-    lxd = cache["lxd"]
-    lxd.ensure(snap.SnapState.Latest, channel="latest")
+    kp = cache["kube-proxy"]
+    kp.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
 
-    assert len(lxd.logs(num_lines=10).splitlines()) == 10
+    # Terrible means of populating logs
+    kp.start()
+    kp.stop()
+    kp.start()
+    kp.stop()
+
+    assert len(kp.logs(num_lines=10).splitlines()) == 10
+
 
 def test_snap_restart():
     cache = snap.SnapCache()
-    lxd = cache["lxd"]
-    lxd.ensure(snap.SnapState.Latest, channel="latest")
+    kp = cache["kube-proxy"]
+    kp.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
 
-    lxd.restart()
+    try:
+        kp.restart()
+    except CalledProcessError as e:
+        pytest.fail(e.stderr)

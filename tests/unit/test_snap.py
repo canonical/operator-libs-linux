@@ -129,6 +129,12 @@ installed_result = r"""
         {
           "snap": "charmcraft",
           "name": "charmcraft"
+        },
+        {
+          "snap": "charmcraft",
+          "name": "foo_service",
+          "daemon": "simple",
+          "enabled": true
         }
       ],
       "contact": "",
@@ -307,20 +313,33 @@ class TestSnapCache(unittest.TestCase):
             capture_output=True,
         )
 
-    @patch("charms.operator_libs_linux.v1.snap.subprocess.check_output")
-    def test_services_property(self, mock_subprocess):
-        mock_subprocess.return_value = (
-            "Service          Startup  Current   Notes\n"
-            "lxd.activate     enabled  inactive  -\n"
-            "lxd.daemon       enabled  active    socket-activated\n"
-            "lxd.user-daemon  enabled  inactive  socket-activated\n"
-        )
-        print(mock_subprocess.return_value)
+    def test_apps_property(self):
+        s = SnapCacheTester()
+        s._snap_client.get_installed_snaps.return_value = json.loads(installed_result)["result"]
+        s._load_installed_snaps()
 
-        foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
-        self.assertEqual(len(foo.services), 3)
-        self.assertEqual(set(foo.services), {"activate", "daemon", "user-daemon"})
-        self.assertNotIn("lxd", list(sum(list(foo.services.items()), ())))
+        self.assertEqual(len(s["charmcraft"].apps), 2)
+        self.assertIn({"snap": "charmcraft", "name": "charmcraft"}, s["charmcraft"].apps)
+
+    def test_services_property(self):
+        s = SnapCacheTester()
+        s._snap_client.get_installed_snaps.return_value = json.loads(installed_result)["result"]
+        s._load_installed_snaps()
+
+        self.assertEqual(len(s["charmcraft"].services), 1)
+        self.assertDictEqual(
+            s["charmcraft"].services,
+            {
+                "foo_service": {
+                    "daemon": "simple",
+                    "enabled": True,
+                    "active": False,
+                    "daemon-scope": None,
+                    "activators": [],
+                }
+            },
+        )
+
 
 class TestSocketClient(unittest.TestCase):
     def test_socket_not_found(self):

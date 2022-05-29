@@ -62,15 +62,14 @@ import logging
 import os
 import socket
 import subprocess
-from subprocess import CompletedProcess
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Mapping
 from enum import Enum
-from subprocess import CalledProcessError
-from typing import Dict, Iterable, List, Optional, Union
+from subprocess import CalledProcessError, CompletedProcess
+from typing import Any, Dict, Iterable, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +186,7 @@ class Snap(object):
         channel: str,
         revision: str,
         confinement: str,
+        apps: Optional[List[Dict]] = [],
         cohort: Optional[str] = "",
     ) -> None:
         self._name = name
@@ -195,6 +195,7 @@ class Snap(object):
         self._revision = revision
         self._confinement = confinement
         self._cohort = cohort
+        self._apps = apps or []
 
     def __eq__(self, other) -> bool:
         """Equality for comparison."""
@@ -299,9 +300,7 @@ class Snap(object):
 
         self._snap_daemons("start", services, options)
 
-    def stop(
-        self, services: Optional[List[str]] = None, disable: Optional[bool] = False
-    ) -> None:
+    def stop(self, services: Optional[List[str]] = None, disable: Optional[bool] = False) -> None:
         """Stops a snap's services.
 
         Args:
@@ -434,7 +433,17 @@ class Snap(object):
                 # The snap is installed, but we are changing it (e.g., switching channels).
                 self._refresh(channel, cohort)
 
+        self._update_snap_apps()
         self._state = state
+
+    def _update_snap_apps(self) -> None:
+        """Updates a snap's apps after snap changes state."""
+        snap_client = SnapClient()
+        try:
+            self._apps = snap_client.get_installed_snap_apps(self._name)
+        except SnapAPIError:
+            logger.warning(f"Unable to retrieve snap apps for {self._name}")
+            self._apps = []
 
     @property
     def present(self) -> bool:
@@ -481,21 +490,27 @@ class Snap(object):
         return self._confinement
 
     @property
-    def services(self) -> dict:
-        """Returns (if any) the services of the snap."""
-        service_map = {}
-        try:
-            services = self._snap("services")
-            headers = [line.split() for line in services.splitlines()[:1]][0][1:]  # removing output headers 
-            services = [line.split() for line in services.splitlines()[1:]]
-            for item in services:
-                service_name = item.pop(0).split(".")[1]  # removing snap name from service name
-                item_map = {k: v for k, v in zip(headers, item)}
-                service_map[service_name] = item_map
-            return service_map
-        except SnapError as e:
-            logger.error(e)
-            return service_map
+    def apps(self) -> List:
+        """Returns (if any) the installed apps of the snap."""
+        self._update_snap_apps()
+        return self._apps
+
+    @property
+    def services(self) -> Dict:
+        """Returns (if any) the installed services of the snap."""
+        self._update_snap_apps()
+        services = {}
+        for app in self._apps:
+            if "daemon" in app:
+                services[app["name"]] = {
+                    "daemon": app["daemon"],
+                    "daemon-scope": app.get("daemon-scope", None),
+                    "enabled": app.get("enabled", False),
+                    "active": app.get("active", False),
+                    "activators": app.get("activators", []),
+                }
+
+        return services
 
 
 class _UnixSocketConnection(http.client.HTTPConnection):
@@ -576,7 +591,7 @@ class SnapClient:
         path: str,
         query: Dict = None,
         body: Dict = None,
-    ) -> Dict:
+    ) -> Any:
         """Make a JSON request to the Snapd server with the given HTTP method and path.
 
         If query dict is provided, it is encoded and appended as a query string
@@ -634,6 +649,10 @@ class SnapClient:
     def get_snap_information(self, name: str) -> Dict:
         """Query the snap server for information about single snap."""
         return self._request("GET", "find", {"name": name})[0]
+
+    def get_installed_snap_apps(self, name: str) -> List:
+        """Query the snap server for apps about a single installed snap."""
+        return self._request("GET", "apps", {"names": name, "select": "service"})
 
 
 class SnapCache(Mapping):
@@ -706,11 +725,12 @@ class SnapCache(Mapping):
 
         for i in installed:
             snap = Snap(
-                i["name"],
-                SnapState.Latest,
-                i["channel"],
-                i["revision"],
-                i["confinement"],
+                name=i["name"],
+                state=SnapState.Latest,
+                channel=i["channel"],
+                revision=i["revision"],
+                confinement=i["confinement"],
+                apps=i.get("apps", None),
             )
             self._snap_map[snap.name] = snap
 
@@ -723,11 +743,12 @@ class SnapCache(Mapping):
         info = self._snap_client.get_snap_information(name)
 
         return Snap(
-            info["name"],
-            SnapState.Available,
-            info["channel"],
-            info["revision"],
-            info["confinement"],
+            name=info["name"],
+            state=SnapState.Available,
+            channel=info["channel"],
+            revision=info["revision"],
+            confinement=info["confinement"],
+            apps=None,
         )
 
 
