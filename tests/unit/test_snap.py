@@ -313,19 +313,23 @@ class TestSnapCache(unittest.TestCase):
             capture_output=True,
         )
 
-    def test_apps_property(self):
+    @patch("charms.operator_libs_linux.v1.snap.SnapClient.get_installed_snap_apps")
+    def test_apps_property(self, patched):
         s = SnapCacheTester()
         s._snap_client.get_installed_snaps.return_value = json.loads(installed_result)["result"]
         s._load_installed_snaps()
 
+        patched.return_value = json.loads(installed_result)["result"][0]["apps"]
         self.assertEqual(len(s["charmcraft"].apps), 2)
         self.assertIn({"snap": "charmcraft", "name": "charmcraft"}, s["charmcraft"].apps)
 
-    def test_services_property(self):
+    @patch("charms.operator_libs_linux.v1.snap.SnapClient.get_installed_snap_apps")
+    def test_services_property(self, patched):
         s = SnapCacheTester()
         s._snap_client.get_installed_snaps.return_value = json.loads(installed_result)["result"]
         s._load_installed_snaps()
 
+        patched.return_value = json.loads(installed_result)["result"][0]["apps"]
         self.assertEqual(len(s["charmcraft"].services), 1)
         self.assertDictEqual(
             s["charmcraft"].services,
