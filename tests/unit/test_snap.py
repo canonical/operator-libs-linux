@@ -338,7 +338,7 @@ class TestSnapCache(unittest.TestCase):
                     "daemon": "simple",
                     "enabled": True,
                     "active": False,
-                    "daemon-scope": None,
+                    "daemon_scope": None,
                     "activators": [],
                 }
             },

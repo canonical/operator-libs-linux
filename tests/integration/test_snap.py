@@ -134,7 +134,7 @@ def test_snap_logs():
     kp.start()
     kp.stop()
 
-    assert len(kp.logs(num_lines=10).splitlines()) == 10
+    assert len(kp.logs(num_lines=15).splitlines()) == 15
 
 
 def test_snap_restart():

@@ -52,7 +52,7 @@ try:
     if nextcloud.get("mode") != "production":
         nextcloud.set({"mode": "production"})
 except snap.SnapError as e:
-    logger.error("An exception occurred when installing snaps. Reason: {}".format(e.message))
+    logger.error("An exception occurred when installing snaps. Reason: %s" % e.message)
 ```
 """
 
@@ -91,6 +91,39 @@ def _cache_init(func):
         return func(*args, **kwargs)
 
     return inner
+
+
+# recursive hints seems to error out pytest
+JSONType = Union[Dict[str, Any], List[Any], str, int, float]
+
+
+class SnapService:
+    """Data wrapper for snap services."""
+
+    def __init__(
+        self,
+        daemon: Optional[str] = None,
+        daemon_scope: Optional[str] = None,
+        enabled: bool = False,
+        active: bool = False,
+        activators: List[str] = [],
+        **kwargs,
+    ):
+        self.daemon = daemon
+        self.daemon_scope = kwargs.get("daemon-scope", None) or daemon_scope
+        self.enabled = enabled
+        self.active = active
+        self.activators = activators
+
+    def as_dict(self) -> Dict:
+        """Returns instance representation as dict."""
+        return {
+            "daemon": self.daemon,
+            "daemon_scope": self.daemon_scope,
+            "enabled": self.enabled,
+            "active": self.active,
+            "activators": self.activators,
+        }
 
 
 class MetaCache(type):
@@ -186,7 +219,7 @@ class Snap(object):
         channel: str,
         revision: str,
         confinement: str,
-        apps: Optional[List[Dict]] = [],
+        apps: Optional[List[Dict[str, str]]] = None,
         cohort: Optional[str] = "",
     ) -> None:
         self._name = name
@@ -196,6 +229,7 @@ class Snap(object):
         self._confinement = confinement
         self._cohort = cohort
         self._apps = apps or []
+        self._snap_client = SnapClient()
 
     def __eq__(self, other) -> bool:
         """Equality for comparison."""
@@ -238,23 +272,25 @@ class Snap(object):
         try:
             return subprocess.check_output(_cmd, universal_newlines=True)
         except CalledProcessError as e:
-            raise SnapError("Could not {} for snap [{}]: {}".format(_cmd, self._name, e.output))
+            raise SnapError(
+                "Snap: {!r}; command {!r} failed with output = {!r}".format(
+                    self._name, _cmd, e.output
+                )
+            )
 
     def _snap_daemons(
         self,
-        command: str,
+        command: List[str],
         services: Optional[List[str]] = None,
-        options: Optional[Iterable[str]] = None,
     ) -> CompletedProcess:
 
-        options = options or []
         if services:
             # an attempt to keep the command constrained to the snap instance's services
             services = [f"{self._name}.{service}" for service in services]
         else:
             services = [self._name]
 
-        _cmd = ["snap", command, *options, *services]
+        _cmd = ["snap", *command, *services]
 
         try:
             return subprocess.run(_cmd, universal_newlines=True, check=True, capture_output=True)
@@ -294,11 +330,8 @@ class Snap(object):
             services (list): (optional) list of individual snap services to start (otherwise all)
             enable (bool): (optional) flag to enable snap services on start. Default `false`
         """
-        options = []
-        if enable:
-            options.append("--enable")
-
-        self._snap_daemons("start", services, options)
+        args = ["start", "--enable"] if enable else ["start"]
+        self._snap_daemons(args, services)
 
     def stop(self, services: Optional[List[str]] = None, disable: Optional[bool] = False) -> None:
         """Stops a snap's services.
@@ -307,11 +340,8 @@ class Snap(object):
             services (list): (optional) list of individual snap services to stop (otherwise all)
             disable (bool): (optional) flag to disable snap services on stop. Default `False`
         """
-        options = []
-        if disable:
-            options.append("--disable")
-
-        self._snap_daemons("stop", services, options)
+        args = ["stop", "--disable"] if disable else ["stop"]
+        self._snap_daemons(args, services)
 
     def logs(self, services: Optional[List[str]] = None, num_lines: Optional[int] = 10) -> str:
         """Shows a snap services' logs.
@@ -321,11 +351,8 @@ class Snap(object):
                 (otherwise all)
             num_lines (int): (optional) integer number of log lines to return. Default `10`
         """
-        options = []
-        if num_lines:
-            options.append(f"-n={num_lines}")
-
-        return self._snap_daemons("logs", services, options).stdout
+        args = ["logs", "-n={}".format(num_lines)] if num_lines else ["logs"]
+        return self._snap_daemons(args, services).stdout
 
     def restart(
         self, services: Optional[List[str]] = None, reload: Optional[bool] = False
@@ -338,11 +365,8 @@ class Snap(object):
             reload (bool): (optional) flag to use the service reload command, if available.
                 Default `False`
         """
-        options = []
-        if reload:
-            options.append("--reload")
-
-        self._snap_daemons("restart", services, options)
+        args = ["restart", "--reload"] if reload else ["restart"]
+        self._snap_daemons(args, services)
 
     def _install(self, channel: Optional[str] = "", cohort: Optional[str] = "") -> None:
         """Add a snap to the system.
@@ -441,11 +465,10 @@ class Snap(object):
 
     def _update_snap_apps(self) -> None:
         """Updates a snap's apps after snap changes state."""
-        snap_client = SnapClient()
         try:
-            self._apps = snap_client.get_installed_snap_apps(self._name)
+            self._apps = self._snap_client.get_installed_snap_apps(self._name)
         except SnapAPIError:
-            logger.warning(f"Unable to retrieve snap apps for {self._name}")
+            logger.warning("Unable to retrieve snap apps for {}".format(self._name))
             self._apps = []
 
     @property
@@ -505,13 +528,7 @@ class Snap(object):
         services = {}
         for app in self._apps:
             if "daemon" in app:
-                services[app["name"]] = {
-                    "daemon": app["daemon"],
-                    "daemon-scope": app.get("daemon-scope", None),
-                    "enabled": app.get("enabled", False),
-                    "active": app.get("active", False),
-                    "activators": app.get("activators", []),
-                }
+                services[app["name"]] = SnapService(**app).as_dict()
 
         return services
 
@@ -594,7 +611,7 @@ class SnapClient:
         path: str,
         query: Dict = None,
         body: Dict = None,
-    ) -> Any:
+    ) -> JSONType:
         """Make a JSON request to the Snapd server with the given HTTP method and path.
 
         If query dict is provided, it is encoded and appended as a query string
@@ -654,7 +671,7 @@ class SnapClient:
         return self._request("GET", "find", {"name": name})[0]
 
     def get_installed_snap_apps(self, name: str) -> List:
-        """Query the snap server for apps about a single installed snap."""
+        """Query the snap server for apps belonging to a named, currently installed snap."""
         return self._request("GET", "apps", {"names": name, "select": "service"})
 
 
