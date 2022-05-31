@@ -286,7 +286,7 @@ class Snap(object):
 
         if services:
             # an attempt to keep the command constrained to the snap instance's services
-            services = [f"{self._name}.{service}" for service in services]
+            services = ["{}.{}".format(self._name, service) for service in services]
         else:
             services = [self._name]
 
