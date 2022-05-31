@@ -107,7 +107,7 @@ class SnapService:
         enabled: bool = False,
         active: bool = False,
         activators: List[str] = [],
-        **kwargs,
+        **kwargs
     ):
         self.daemon = daemon
         self.daemon_scope = kwargs.get("daemon-scope", None) or daemon_scope
