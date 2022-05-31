@@ -468,7 +468,7 @@ class Snap(object):
         try:
             self._apps = self._snap_client.get_installed_snap_apps(self._name)
         except SnapAPIError:
-            logger.warning("Unable to retrieve snap apps for {}".format(self._name))
+            logger.debug("Unable to retrieve snap apps for {}".format(self._name))
             self._apps = []
 
     @property
