@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import fake_snapd as fake_snapd
 from charms.operator_libs_linux.v1 import snap
+from freezegun import freeze_time
 
 patch("charms.operator_libs_linux.v1.snap._cache_init", lambda x: x).start()
 
@@ -477,3 +478,42 @@ class TestSnapBareMethods(unittest.TestCase):
                 ["snap", "set", "foo", 'qux="quux"', 'bar="baz"'],
                 universal_newlines=True,
             )
+
+    @patch("charms.operator_libs_linux.v1.snap.subprocess.check_call")
+    def test_system_set(self, mock_subprocess):
+        snap._system_set("refresh.hold", "foobar")
+        mock_subprocess.assert_called_with(
+            ["snap", "set", "system", "refresh.hold=foobar"],
+            universal_newlines=True,
+        )
+
+    @patch("charms.operator_libs_linux.v1.snap.subprocess.check_call")
+    def test_system_set_fail(self, mock_subprocess):
+        mock_subprocess.side_effect = CalledProcessError(1, "foobar")
+        try:
+            snap._system_set("refresh.hold", "foobar")
+        except snap.SnapError as e:
+            self.assertEqual(str(e), "Failed setting system config 'refresh.hold' to 'foobar'")
+
+    def test_hold_refresh_invalid(self):
+        try:
+            snap.hold_refresh(days=120)
+        except ValueError as e:
+            self.assertEqual(str(e), "days must be between 1 and 90")
+
+    @patch("charms.operator_libs_linux.v1.snap.subprocess.check_call")
+    def test_hold_refresh_reset(self, mock_subprocess):
+        snap.hold_refresh(days=0)
+        mock_subprocess.assert_called_with(
+            ["snap", "set", "system", "refresh.hold="],
+            universal_newlines=True,
+        )
+
+    @freeze_time("1970-01-01")
+    @patch("charms.operator_libs_linux.v1.snap.subprocess.check_call")
+    def test_hold_refresh_valid_days(self, mock_subprocess):
+        snap.hold_refresh(days=90)
+        mock_subprocess.assert_called_with(
+            ["snap", "set", "system", "refresh.hold=1970-04-01T00:00:00+00:00"],
+            universal_newlines=True,
+        )

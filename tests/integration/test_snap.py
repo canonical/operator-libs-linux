@@ -4,7 +4,8 @@
 
 
 import logging
-from subprocess import CalledProcessError
+from datetime import datetime, timedelta
+from subprocess import CalledProcessError, check_output
 
 import pytest
 from charms.operator_libs_linux.v1 import snap
@@ -146,3 +147,17 @@ def test_snap_restart():
         kp.restart()
     except CalledProcessError as e:
         pytest.fail(e.stderr)
+
+
+def test_hold_refresh():
+    hold_date = (datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d")
+    snap.hold_refresh()
+    result = check_output(["snap", "refresh", "--time"])
+    assert f"hold: {hold_date}" in result.decode()
+
+
+def test_reset_hold_refresh():
+    snap.hold_refresh()
+    snap.hold_refresh(0)
+    result = check_output(["snap", "refresh", "--time"])
+    assert "hold: " not in result.decode()
