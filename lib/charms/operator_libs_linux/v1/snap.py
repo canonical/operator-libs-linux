@@ -936,8 +936,8 @@ def hold_refresh(days: int = 90) -> bool:
         days: number of days to hold system refreshes for. Maximum 90. Set to zero to remove hold.
     """
     # Currently the snap daemon can only hold for a maximum of 90 days
-    if days > 90:
-        raise ValueError("days must be between 1 and 90")
+    if not isinstance(days, int) or days > 90:
+        raise ValueError("days must be an int between 1 and 90")
     elif days == 0:
         _system_set("refresh.hold", "")
         logger.info("Removed system-wide snap refresh hold")
