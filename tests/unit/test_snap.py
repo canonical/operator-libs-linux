@@ -523,3 +523,27 @@ class TestSnapBareMethods(unittest.TestCase):
             ["snap", "set", "system", "refresh.hold=1970-04-01T00:00:00+00:00"],
             universal_newlines=True,
         )
+
+    @patch("charms.operator_libs_linux.v1.snap.subprocess.check_output")
+    def test_install_local(self, mock_subprocess):
+        mock_subprocess.return_value = "curl XXX installed"
+        snap.install_local("./curl.snap")
+        mock_subprocess.assert_called_with(
+            ["snap", "install", "./curl.snap"],
+            universal_newlines=True,
+        )
+
+    @patch("charms.operator_libs_linux.v1.snap.subprocess.check_output")
+    def test_install_local_args(self, mock_subprocess):
+        mock_subprocess.return_value = "curl XXX installed"
+        for kwargs, cmd_args in [
+            ({"classic": True}, ["--classic"]),
+            ({"dangerous": True}, ["--dangerous"]),
+            ({"classic": True, "dangerous": True}, ["--classic", "--dangerous"]),
+        ]:
+            snap.install_local("./curl.snap", **kwargs)
+            mock_subprocess.assert_called_with(
+                ["snap", "install", "./curl.snap"] + cmd_args,
+                universal_newlines=True,
+            )
+            mock_subprocess.reset_mock()
