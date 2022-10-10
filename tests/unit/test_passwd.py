@@ -170,7 +170,7 @@ class TestPasswd(TestCase):
 
         self.assertEqual(result, new_user_pwnam)
         check_output.assert_called_with(
-            ["useradd", "--shell", "/bin/bash", "--system", username], stderr=-2
+            ["useradd", "--shell", "/bin/bash", "--create-home", "--system", username], stderr=-2
         )
         getpwnam.assert_called_with(username)
 
@@ -193,6 +193,7 @@ class TestPasswd(TestCase):
                 "/bin/bash",
                 "--home",
                 "/var/lib/johndoe",
+                "--create-home",
                 "--system",
                 username,
             ],
@@ -218,6 +219,7 @@ class TestPasswd(TestCase):
                 "/bin/bash",
                 "--uid",
                 str(user_id),
+                "--create-home",
                 "--system",
                 "-g",
                 user_name,
