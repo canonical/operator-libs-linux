@@ -60,6 +60,7 @@ import http.client
 import json
 import logging
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -907,8 +908,10 @@ def install_local(
     if dangerous:
         _cmd.append("--dangerous")
     try:
-        result = subprocess.check_output(_cmd, universal_newlines=True).splitlines()[0]
+        ansi_filter = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+        result = subprocess.check_output(_cmd, universal_newlines=True).splitlines()[-1]
         snap_name, _ = result.split(" ", 1)
+        snap_name = ansi_filter.sub("", snap_name)
 
         c = SnapCache()
 
