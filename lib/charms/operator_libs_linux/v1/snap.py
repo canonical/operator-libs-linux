@@ -365,7 +365,7 @@ class Snap(object):
         return self._snap_daemons(args, services).stdout
 
     def connect(
-        self, plug: Optional[str] = None, service: Optional[str] = None, slot: Optional[str] = None
+        self, plug: str, service: Optional[str] = None, slot: Optional[str] = None
     ) -> None:
         """Connects a plug to a slot.
 
@@ -377,10 +377,10 @@ class Snap(object):
         Raises:
             SnapError if there is a problem encountered
         """
-        command = ["connect", f"{self._name}:{plug}"]
+        command = ["connect", "{}:{}".format(self._name, plug)]
 
         if service and slot:
-            command = command + [f"{service}:{slot}"]
+            command = command + ["{}:{}".format(service, slot)]
         elif slot:
             command = command + [slot]
 
