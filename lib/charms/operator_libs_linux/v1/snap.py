@@ -364,7 +364,9 @@ class Snap(object):
         args = ["logs", "-n={}".format(num_lines)] if num_lines else ["logs"]
         return self._snap_daemons(args, services).stdout
 
-    def connect(self, plug: Optional[str] = None, service: Optional[str] = None, slot: Optional[str] = None) -> None:
+    def connect(
+        self, plug: Optional[str] = None, service: Optional[str] = None, slot: Optional[str] = None
+    ) -> None:
         """Connects a plug to a slot.
 
         Args:
