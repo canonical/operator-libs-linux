@@ -314,6 +314,35 @@ class TestSnapCache(unittest.TestCase):
             capture_output=True,
         )
 
+    @patch("charms.operator_libs_linux.v1.snap.subprocess.run")
+    def test_snap_connect(self, mock_subprocess):
+        mock_subprocess.return_value = MagicMock()
+        foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
+
+        foo.connect(plug="bar", slot="baz")
+        mock_subprocess.assert_called_with(
+            ["snap", "connect", "foo:bar", "baz"],
+            universal_newlines=True,
+            check=True,
+            capture_output=True,
+        )
+
+        foo.connect(plug="bar")
+        mock_subprocess.assert_called_with(
+            ["snap", "connect", "foo:bar"],
+            universal_newlines=True,
+            check=True,
+            capture_output=True,
+        )
+
+        foo.connect(plug="bar", service="baz", slot="boo")
+        mock_subprocess.assert_called_with(
+            ["snap", "connect", "foo:bar", "baz:boo"],
+            universal_newlines=True,
+            check=True,
+            capture_output=True,
+        )
+
     @patch("charms.operator_libs_linux.v1.snap.SnapClient.get_installed_snap_apps")
     def test_apps_property(self, patched):
         s = SnapCacheTester()
