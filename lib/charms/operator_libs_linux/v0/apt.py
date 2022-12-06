@@ -250,7 +250,8 @@ class DebianPackage:
             package_names = [package_names]
         _cmd = ["apt-get", "-y", *optargs, command, *package_names]
         try:
-            check_call(_cmd, stderr=PIPE, stdout=PIPE)
+            env = {'DEBIAN_FRONTEND': 'noninteractive'}
+            check_call(_cmd, env=env, stderr=PIPE, stdout=PIPE)
         except CalledProcessError as e:
             raise PackageError(
                 "Could not {} package(s) [{}]: {}".format(command, [*package_names], e.output)
