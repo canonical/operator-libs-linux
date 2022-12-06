@@ -300,6 +300,7 @@ class TestApt(unittest.TestCase):
                 "install",
                 "mocktester=1:1.2.3-4",
             ],
+            env={"DEBIAN_FRONTEND": "noninteractive"},
             stderr=-1,
             stdout=-1,
         )
@@ -308,6 +309,7 @@ class TestApt(unittest.TestCase):
         pkg.state = apt.PackageState.Absent
         mock_subprocess_call.assert_called_with(
             ["apt-get", "-y", "remove", "mocktester=1:1.2.3-4"],
+            env={"DEBIAN_FRONTEND": "noninteractive"},
             stdout=-1,
             stderr=-1,
         )
@@ -376,6 +378,7 @@ class TestAptBareMethods(unittest.TestCase):
                 "install",
                 "aisleriot=1:3.22.9-1",
             ],
+            env={"DEBIAN_FRONTEND": "noninteractive"},
             stderr=-1,
             stdout=-1,
         )
@@ -385,7 +388,10 @@ class TestAptBareMethods(unittest.TestCase):
         bar = apt.remove_package("zsh")
         bar.ensure(apt.PackageState.Absent)
         mock_subprocess.assert_called_with(
-            ["apt-get", "-y", "remove", "zsh=5.8-3ubuntu1"], stderr=-1, stdout=-1
+            ["apt-get", "-y", "remove", "zsh=5.8-3ubuntu1"],
+            env={"DEBIAN_FRONTEND": "noninteractive"},
+            stderr=-1,
+            stdout=-1,
         )
         self.assertEqual(bar.present, False)
 
@@ -415,6 +421,7 @@ class TestAptBareMethods(unittest.TestCase):
                 "install",
                 "aisleriot=1:3.22.9-1",
             ],
+            env={"DEBIAN_FRONTEND": "noninteractive"},
             stderr=-1,
             stdout=-1,
         )
@@ -426,6 +433,7 @@ class TestAptBareMethods(unittest.TestCase):
                 "install",
                 "mocktester=1:1.2.3-4",
             ],
+            env={"DEBIAN_FRONTEND": "noninteractive"},
             stderr=-1,
             stdout=-1,
         )
@@ -435,10 +443,16 @@ class TestAptBareMethods(unittest.TestCase):
         mock_subprocess_output.side_effect = ["amd64", dpkg_output_vim, "amd64", dpkg_output_zsh]
         bar = apt.remove_package(["vim", "zsh"])
         mock_subprocess.assert_any_call(
-            ["apt-get", "-y", "remove", "vim=2:8.1.2269-1ubuntu5"], stderr=-1, stdout=-1
+            ["apt-get", "-y", "remove", "vim=2:8.1.2269-1ubuntu5"],
+            env={"DEBIAN_FRONTEND": "noninteractive"},
+            stderr=-1,
+            stdout=-1,
         )
         mock_subprocess.assert_any_call(
-            ["apt-get", "-y", "remove", "zsh=5.8-3ubuntu1"], stderr=-1, stdout=-1
+            ["apt-get", "-y", "remove", "zsh=5.8-3ubuntu1"],
+            env={"DEBIAN_FRONTEND": "noninteractive"},
+            stderr=-1,
+            stdout=-1,
         )
         self.assertEqual(bar[0].present, False)
         self.assertEqual(bar[1].present, False)
