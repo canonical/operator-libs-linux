@@ -60,6 +60,7 @@ import http.client
 import json
 import logging
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -83,6 +84,10 @@ LIBAPI = 1
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 LIBPATCH = 6
+
+
+# Regex to locate 7-bit C1 ANSI sequences
+ansi_filter = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
 
 def _cache_init(func):
@@ -942,12 +947,19 @@ def install_local(
     if dangerous:
         _cmd.append("--dangerous")
     try:
-        result = subprocess.check_output(_cmd, universal_newlines=True).splitlines()[0]
+        result = subprocess.check_output(_cmd, universal_newlines=True).splitlines()[-1]
         snap_name, _ = result.split(" ", 1)
+        snap_name = ansi_filter.sub("", snap_name)
 
         c = SnapCache()
 
-        return c[snap_name]
+        try:
+            return c[snap_name]
+        except SnapAPIError as e:
+            logger.error(
+                "Could not find snap {} when querying Snapd socket: {}".format(snap_name, e.body)
+            )
+            raise SnapError("Failed to find snap {} in Snap cache".format(snap_name))
     except CalledProcessError as e:
         raise SnapError("Could not install snap {}: {}".format(filename, e.output))
 
