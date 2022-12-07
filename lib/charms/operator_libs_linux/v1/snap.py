@@ -298,7 +298,6 @@ class Snap(object):
         Raises:
           SnapError if there is a problem encountered
         """
-
         if services:
             # an attempt to keep the command constrained to the snap instance's services
             services = ["{}.{}".format(self._name, service) for service in services]
