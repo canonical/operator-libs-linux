@@ -83,7 +83,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 7
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -289,7 +289,15 @@ class Snap(object):
         command: List[str],
         services: Optional[List[str]] = None,
     ) -> CompletedProcess:
+        """Perform snap app commands.
 
+        Args:
+          command: the snap command to execute
+          services: the snap service to execute command on
+
+        Raises:
+          SnapError if there is a problem encountered
+        """
         if services:
             # an attempt to keep the command constrained to the snap instance's services
             services = ["{}.{}".format(self._name, service) for service in services]
@@ -359,6 +367,32 @@ class Snap(object):
         """
         args = ["logs", "-n={}".format(num_lines)] if num_lines else ["logs"]
         return self._snap_daemons(args, services).stdout
+
+    def connect(
+        self, plug: str, service: Optional[str] = None, slot: Optional[str] = None
+    ) -> None:
+        """Connects a plug to a slot.
+
+        Args:
+            plug (str): the plug to connect
+            service (str): (optional) the snap service name to plug into
+            slot (str): (optional) the snap service slot to plug in to
+
+        Raises:
+            SnapError if there is a problem encountered
+        """
+        command = ["connect", "{}:{}".format(self._name, plug)]
+
+        if service and slot:
+            command = command + ["{}:{}".format(service, slot)]
+        elif slot:
+            command = command + [slot]
+
+        _cmd = ["snap", *command]
+        try:
+            subprocess.run(_cmd, universal_newlines=True, check=True, capture_output=True)
+        except CalledProcessError as e:
+            raise SnapError("Could not {} for snap [{}]: {}".format(_cmd, self._name, e.stderr))
 
     def restart(
         self, services: Optional[List[str]] = None, reload: Optional[bool] = False

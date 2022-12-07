@@ -149,6 +149,17 @@ def test_snap_restart():
         pytest.fail(e.stderr)
 
 
+def test_snap_connect():
+    cache = snap.SnapCache()
+    vlc = cache["vlc"]
+    vlc.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
+
+    try:
+        vlc.connect("jack1")
+    except CalledProcessError as e:
+        pytest.fail(e.stderr)
+
+
 def test_hold_refresh():
     hold_date = (datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d")
     snap.hold_refresh()
