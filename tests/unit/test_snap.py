@@ -266,7 +266,9 @@ class TestSnapCache(unittest.TestCase):
         self.assertEqual(foo.present, True)
 
         foo.ensure(snap.SnapState.Absent)
-        mock_subprocess.assert_called_with(["snap", "remove", "foo"], universal_newlines=True)
+        mock_subprocess.assert_called_with(
+            ["snap", "remove", "foo"], universal_newlines=True, timeout=15
+        )
 
         foo.ensure(snap.SnapState.Latest, classic=True, channel="latest/edge")
 
@@ -279,11 +281,14 @@ class TestSnapCache(unittest.TestCase):
                 '--channel="latest/edge"',
             ],
             universal_newlines=True,
+            timeout=15,
         )
         self.assertEqual(foo.latest, True)
 
         foo.state = snap.SnapState.Absent
-        mock_subprocess.assert_called_with(["snap", "remove", "foo"], universal_newlines=True)
+        mock_subprocess.assert_called_with(
+            ["snap", "remove", "foo"], universal_newlines=True, timeout=15
+        )
 
     @patch("charms.operator_libs_linux.v1.snap.subprocess.run")
     def test_can_run_snap_daemon_commands(self, mock_subprocess):
@@ -418,11 +423,14 @@ class TestSnapBareMethods(unittest.TestCase):
         mock_subprocess.assert_called_with(
             ["snap", "install", "curl", "--classic", '--channel="latest"'],
             universal_newlines=True,
+            timeout=15,
         )
         self.assertEqual(foo.present, True)
 
         bar = snap.remove("curl")
-        mock_subprocess.assert_called_with(["snap", "remove", "curl"], universal_newlines=True)
+        mock_subprocess.assert_called_with(
+            ["snap", "remove", "curl"], universal_newlines=True, timeout=15
+        )
         self.assertEqual(bar.present, False)
 
     @patch("charms.operator_libs_linux.v1.snap.subprocess")
@@ -440,6 +448,7 @@ class TestSnapBareMethods(unittest.TestCase):
                 '--cohort="+"',
             ],
             universal_newlines=True,
+            timeout=15,
         )
 
         snap.ensure("curl", "latest", classic=True, channel="latest/beta", cohort="+")
@@ -452,6 +461,7 @@ class TestSnapBareMethods(unittest.TestCase):
                 '--cohort="+"',
             ],
             universal_newlines=True,
+            timeout=15,
         )
 
     @patch("charms.operator_libs_linux.v1.snap.subprocess.check_output")
@@ -461,11 +471,14 @@ class TestSnapBareMethods(unittest.TestCase):
         mock_subprocess.assert_called_with(
             ["snap", "install", "curl", "--classic", '--channel="latest/test"'],
             universal_newlines=True,
+            timeout=15,
         )
         self.assertEqual(foo.present, True)
 
         bar = snap.ensure("curl", "absent")
-        mock_subprocess.assert_called_with(["snap", "remove", "curl"], universal_newlines=True)
+        mock_subprocess.assert_called_with(
+            ["snap", "remove", "curl"], universal_newlines=True, timeout=15
+        )
         self.assertEqual(bar.present, False)
 
     @patch("charms.operator_libs_linux.v1.snap.subprocess.check_output")
@@ -489,8 +502,7 @@ class TestSnapBareMethods(unittest.TestCase):
 
         foo.set({"bar": "baz"})
         mock_subprocess.assert_called_with(
-            ["snap", "set", "foo", 'bar="baz"'],
-            universal_newlines=True,
+            ["snap", "set", "foo", 'bar="baz"'], universal_newlines=True, timeout=15
         )
 
         foo.set({"bar": "baz", "qux": "quux"})
@@ -498,6 +510,7 @@ class TestSnapBareMethods(unittest.TestCase):
             mock_subprocess.assert_called_with(
                 ["snap", "set", "foo", 'bar="baz"', 'qux="quux"'],
                 universal_newlines=True,
+                timeout=15,
             )
         except AssertionError:
             # The ordering of this call can be unpredictable across Python verisons.
@@ -506,6 +519,7 @@ class TestSnapBareMethods(unittest.TestCase):
             mock_subprocess.assert_called_with(
                 ["snap", "set", "foo", 'qux="quux"', 'bar="baz"'],
                 universal_newlines=True,
+                timeout=15,
             )
 
     @patch("charms.operator_libs_linux.v1.snap.subprocess.check_call")
@@ -540,8 +554,7 @@ class TestSnapBareMethods(unittest.TestCase):
     def test_hold_refresh_reset(self, mock_subprocess):
         snap.hold_refresh(days=0)
         mock_subprocess.assert_called_with(
-            ["snap", "set", "system", "refresh.hold="],
-            universal_newlines=True,
+            ["snap", "set", "system", "refresh.hold="], universal_newlines=True
         )
 
     @freeze_time("1970-01-01")
@@ -565,8 +578,7 @@ class TestSnapBareMethods(unittest.TestCase):
         mock_subprocess.return_value = "curl XXX installed"
         snap.install_local("./curl.snap")
         mock_subprocess.assert_called_with(
-            ["snap", "install", "./curl.snap"],
-            universal_newlines=True,
+            ["snap", "install", "./curl.snap"], universal_newlines=True
         )
 
     @patch("charms.operator_libs_linux.v1.snap.subprocess.check_output")
@@ -579,7 +591,6 @@ class TestSnapBareMethods(unittest.TestCase):
         ]:
             snap.install_local("./curl.snap", **kwargs)
             mock_subprocess.assert_called_with(
-                ["snap", "install", "./curl.snap"] + cmd_args,
-                universal_newlines=True,
+                ["snap", "install", "./curl.snap"] + cmd_args, universal_newlines=True
             )
             mock_subprocess.reset_mock()

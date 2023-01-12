@@ -1,3 +1,4 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
+tenacity==8.0.1
 git+https://github.com/canonical/operator/#egg=ops

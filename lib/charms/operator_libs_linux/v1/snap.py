@@ -72,13 +72,8 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from subprocess import CalledProcessError, CompletedProcess, TimeoutExpired
 from typing import Any, Dict, Iterable, List, Optional, Union
-from tenacity import (
-    before_log,
-    retry,
-    stop_after_attempt,
-    wait_fixed,
-)
 
+from tenacity import before_log, retry, stop_after_attempt, wait_fixed
 
 logger = logging.getLogger(__name__)
 
