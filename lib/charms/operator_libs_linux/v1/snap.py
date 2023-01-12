@@ -70,8 +70,15 @@ import urllib.request
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from subprocess import CalledProcessError, CompletedProcess
+from subprocess import CalledProcessError, CompletedProcess, TimeoutExpired
 from typing import Any, Dict, Iterable, List, Optional, Union
+from tenacity import (
+    before_log,
+    retry,
+    stop_after_attempt,
+    wait_fixed,
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +90,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 7
+LIBPATCH = 8
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -262,13 +269,23 @@ class Snap(object):
             str(self._state),
         )
 
-    def _snap(self, command: str, optargs: Optional[Iterable[str]] = None) -> str:
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_fixed(5),
+        reraise=True,
+        before=before_log(logger, logging.DEBUG),
+    )
+    def _snap(
+        self, command: str, optargs: Optional[Iterable[str]] = None, timeout: Optional[int] = 15
+    ) -> str:
         """Perform a snap operation.
 
         Args:
           command: the snap command to execute
           optargs: an (optional) list of additional arguments to pass,
             commonly confinement or channel
+          timeout: optional. the expected amount of time for the snap operation to complete. Five
+          retries will be made if the operation does not complete within the expected timeout.
 
         Raises:
           SnapError if there is a problem encountered
@@ -276,7 +293,11 @@ class Snap(object):
         optargs = optargs or []
         _cmd = ["snap", command, self._name, *optargs]
         try:
-            return subprocess.check_output(_cmd, universal_newlines=True)
+            return subprocess.check_output(_cmd, universal_newlines=True, timeout=timeout)
+        except TimeoutExpired:
+            raise SnapError(
+                "Snap: {!r}; command {!r} timed out after {!r}".format(self._name, _cmd, timeout)
+            )
         except CalledProcessError as e:
             raise SnapError(
                 "Snap: {!r}; command {!r} failed with output = {!r}".format(
@@ -408,12 +429,17 @@ class Snap(object):
         args = ["restart", "--reload"] if reload else ["restart"]
         self._snap_daemons(args, services)
 
-    def _install(self, channel: Optional[str] = "", cohort: Optional[str] = "") -> None:
+    def _install(
+        self, channel: Optional[str] = "", cohort: Optional[str] = "", timeout: Optional[int] = 15
+    ) -> None:
         """Add a snap to the system.
 
         Args:
           channel: the channel to install from
           cohort: optional, the key of a cohort that this snap belongs to
+          timeout: optional. the expected amount of time for the snap install operation to
+            complete. Five retries will be made if the operation does not complete within the
+            expected timeout.
         """
         cohort = cohort or self._cohort
 
@@ -425,7 +451,7 @@ class Snap(object):
         if cohort:
             args.append('--cohort="{}"'.format(cohort))
 
-        self._snap("install", args)
+        self._snap("install", args, timeout)
 
     def _refresh(
         self,
@@ -469,6 +495,7 @@ class Snap(object):
         classic: Optional[bool] = False,
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
+        timeout: Optional[int] = 15,
     ):
         """Ensures that a snap is in a given state.
 
@@ -477,6 +504,9 @@ class Snap(object):
           classic: an (Optional) boolean indicating whether classic confinement should be used
           channel: the channel to install from
           cohort: optional. Specify the key of a snap cohort.
+          timeout: optional. the expected amount of time for the snap install operation to
+            complete. Five retries will be made if the operation does not complete within the
+            expected timeout.
 
         Raises:
           SnapError if an error is encountered
@@ -495,7 +525,7 @@ class Snap(object):
             # We are installing or refreshing a snap.
             if self._state not in (SnapState.Present, SnapState.Latest):
                 # The snap is not installed, so we install it.
-                self._install(channel, cohort)
+                self._install(channel, cohort, timeout)
             else:
                 # The snap is installed, but we are changing it (e.g., switching channels).
                 self._refresh(channel, cohort)
