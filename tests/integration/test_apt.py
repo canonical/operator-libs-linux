@@ -4,7 +4,9 @@
 
 
 import logging
-from urllib.request import urlopen
+import subprocess
+import tempfile
+from urllib.request import urlopen, urlretrieve
 
 from charms.operator_libs_linux.v0 import apt
 from helpers import get_command_path
@@ -42,7 +44,12 @@ def test_install_package_external_repository():
     repositories = apt.RepositoryMapping()
 
     # Get the Hashicorp GPG key
-    key = urlopen("https://apt.releases.hashicorp.com/gpg").read().decode()
+    with tempfile.NamedTemporaryFile() as key_file:
+        urlretrieve("https://apt.releases.hashicorp.com/gpg", filename=key_file.name)
+        process = subprocess.run(
+            ['gpg', '--keyring', key_file.name, '--no-default-keyring', '--export', '-a'],
+            stdout=subprocess.PIPE, encoding='utf-8')
+        key = process.stdout
 
     # Add the hashicorp repository if it doesn't already exist
     if "deb-apt.releases.hashicorp.com-focal" not in repositories:
@@ -62,7 +69,7 @@ def test_list_file_generation_external_repository():
     repositories = apt.RepositoryMapping()
 
     # Get the mongo GPG key
-    key = urlopen(" https://www.mongodb.org/static/pgp/server-5.0.asc").read().decode()
+    key = urlopen("https://www.mongodb.org/static/pgp/server-5.0.asc").read().decode()
 
     # Add the mongo repository if it doesn't already exist
     repo_name = "deb-https://repo.mongodb.org/apt/ubuntu-focal/mongodb-org/5.0"
