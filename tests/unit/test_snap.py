@@ -1,6 +1,7 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import datetime
 import json
 import unittest
 from subprocess import CalledProcessError
@@ -8,7 +9,6 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import fake_snapd as fake_snapd
 from charms.operator_libs_linux.v1 import snap
-from freezegun import freeze_time
 
 patch("charms.operator_libs_linux.v1.snap._cache_init", lambda x: x).start()
 
@@ -544,10 +544,17 @@ class TestSnapBareMethods(unittest.TestCase):
             universal_newlines=True,
         )
 
-    @freeze_time("1970-01-01")
+    @patch("charms.operator_libs_linux.v1.snap.datetime")
     @patch("charms.operator_libs_linux.v1.snap.subprocess.check_call")
-    def test_hold_refresh_valid_days(self, mock_subprocess):
+    def test_hold_refresh_valid_days(self, mock_subprocess, mock_datetime):
+        # A little too closely-tied to the internals of hold_refresh(), but at least
+        # the test runs whatever your local time zone is.
+        mock_datetime.now.return_value.astimezone.return_value = datetime.datetime(
+            1970, 1, 1, 0, 0, 0, tzinfo=datetime.timezone.utc
+        )
+
         snap.hold_refresh(days=90)
+
         mock_subprocess.assert_called_with(
             ["snap", "set", "system", "refresh.hold=1970-04-01T00:00:00+00:00"],
             universal_newlines=True,
