@@ -47,8 +47,10 @@ def test_install_package_external_repository():
     with tempfile.NamedTemporaryFile() as key_file:
         urlretrieve("https://apt.releases.hashicorp.com/gpg", filename=key_file.name)
         process = subprocess.run(
-            ['gpg', '--keyring', key_file.name, '--no-default-keyring', '--export', '-a'],
-            stdout=subprocess.PIPE, encoding='utf-8')
+            ["gpg", "--keyring", key_file.name, "--no-default-keyring", "--export", "-a"],
+            stdout=subprocess.PIPE,
+            encoding="utf-8",
+        )
         key = process.stdout
 
     # Add the hashicorp repository if it doesn't already exist
