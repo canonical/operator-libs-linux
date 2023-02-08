@@ -277,7 +277,10 @@ class TestApt(unittest.TestCase):
 
     @patch("charms.operator_libs_linux.v0.apt.check_output")
     @patch("charms.operator_libs_linux.v0.apt.check_call")
-    def test_can_run_apt_commands(self, mock_subprocess_call, mock_subprocess_output):
+    @patch("os.environ.copy")
+    def test_can_run_apt_commands(
+        self, mock_environ, mock_subprocess_call, mock_subprocess_output
+    ):
         mock_subprocess_call.return_value = 0
         mock_subprocess_output.side_effect = [
             "amd64",
@@ -285,6 +288,7 @@ class TestApt(unittest.TestCase):
             "amd64",
             apt_cache_mocktester,
         ]
+        mock_environ.return_value = {"PING": "PONG"}
 
         pkg = apt.DebianPackage.from_system("mocktester")
         self.assertEqual(pkg.present, False)
@@ -300,7 +304,7 @@ class TestApt(unittest.TestCase):
                 "install",
                 "mocktester=1:1.2.3-4",
             ],
-            env={"DEBIAN_FRONTEND": "noninteractive"},
+            env={"DEBIAN_FRONTEND": "noninteractive", "PING": "PONG"},
             stderr=-1,
             stdout=-1,
         )
@@ -309,7 +313,7 @@ class TestApt(unittest.TestCase):
         pkg.state = apt.PackageState.Absent
         mock_subprocess_call.assert_called_with(
             ["apt-get", "-y", "remove", "mocktester=1:1.2.3-4"],
-            env={"DEBIAN_FRONTEND": "noninteractive"},
+            env={"DEBIAN_FRONTEND": "noninteractive", "PING": "PONG"},
             stdout=-1,
             stderr=-1,
         )
@@ -360,7 +364,10 @@ class TestApt(unittest.TestCase):
 class TestAptBareMethods(unittest.TestCase):
     @patch("charms.operator_libs_linux.v0.apt.check_output")
     @patch("charms.operator_libs_linux.v0.apt.check_call")
-    def test_can_run_bare_changes_on_single_package(self, mock_subprocess, mock_subprocess_output):
+    @patch("os.environ.copy")
+    def test_can_run_bare_changes_on_single_package(
+        self, mock_environ, mock_subprocess, mock_subprocess_output
+    ):
         mock_subprocess.return_value = 0
         mock_subprocess_output.side_effect = [
             "amd64",
@@ -368,6 +375,7 @@ class TestAptBareMethods(unittest.TestCase):
             "amd64",
             apt_cache_aisleriot,
         ]
+        mock_environ.return_value = {}
 
         foo = apt.add_package("aisleriot")
         mock_subprocess.assert_called_with(
@@ -397,8 +405,9 @@ class TestAptBareMethods(unittest.TestCase):
 
     @patch("charms.operator_libs_linux.v0.apt.check_output")
     @patch("charms.operator_libs_linux.v0.apt.check_call")
+    @patch("os.environ.copy")
     def test_can_run_bare_changes_on_multiple_packages(
-        self, mock_subprocess, mock_subprocess_output
+        self, mock_environ, mock_subprocess, mock_subprocess_output
     ):
         mock_subprocess.return_value = 0
         mock_subprocess_output.side_effect = [
@@ -411,6 +420,7 @@ class TestAptBareMethods(unittest.TestCase):
             "amd64",
             apt_cache_mocktester,
         ]
+        mock_environ.return_value = {}
 
         foo = apt.add_package(["aisleriot", "mocktester"])
         mock_subprocess.assert_any_call(
