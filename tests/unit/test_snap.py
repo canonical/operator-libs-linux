@@ -427,7 +427,6 @@ class TestSnapBareMethods(unittest.TestCase):
 
     @patch("charms.operator_libs_linux.v1.snap.subprocess")
     def test_cohort(self, mock_subprocess):
-
         mock_subprocess.check_output = MagicMock()
 
         snap.add("curl", channel="latest", cohort="+")
@@ -484,7 +483,6 @@ class TestSnapBareMethods(unittest.TestCase):
 
     @patch("charms.operator_libs_linux.v1.snap.subprocess.check_output")
     def test_snap_set(self, mock_subprocess):
-
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
 
         foo.set({"bar": "baz"})
