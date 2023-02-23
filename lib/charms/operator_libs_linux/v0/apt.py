@@ -896,7 +896,7 @@ def import_key(key: str) -> str:
         # write the key in GPG format so that apt-key list shows it
         key_gpg = DebianRepository._dearmor_gpg_key(key_asc.encode("utf-8"))
         gpg_key_filename = "/etc/apt/trusted.gpg.d/{}.gpg".format(key)
-        DebianRepository._write_apt_gpg_keyfile(key_name=key, key_material=key_gpg)
+        DebianRepository._write_apt_gpg_keyfile(key_name=gpg_key_filename, key_material=key_gpg)
         return gpg_key_filename
 
 
