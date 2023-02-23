@@ -124,7 +124,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 9
+LIBPATCH = 10
 
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
@@ -854,8 +854,11 @@ def import_key(key: str) -> str:
     trusted by the system).
 
     Args:
-        key: A GPG key in ASCII armor format,
-                    including BEGIN and END markers or a keyid.
+        key: A GPG key in ASCII armor format, including BEGIN
+            and END markers or a keyid.
+
+    Returns:
+        The GPG key filename written.
 
     Raises:
         GPGKeyError if the key could not be imported
