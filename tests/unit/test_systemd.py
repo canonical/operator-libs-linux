@@ -168,7 +168,6 @@ class TestSystemD(unittest.TestCase):
 
     @with_mock_subp
     def test_service_resume(self, make_mock):
-
         # Service is already running
         mockp, kw = make_mock([0, 0, 0])
         resumed = systemd.service_resume("mysql")
