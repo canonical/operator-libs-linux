@@ -446,7 +446,7 @@ class dnf(metaclass=_MetaDNF):  # noqa N802
         """
         if len(packages) == 0:
             raise DNFExecutionError("No packages specified.")
-        _dnf("purge", args=[*packages])
+        _dnf("remove", args=[*packages])
 
     @staticmethod
     @_refresh
