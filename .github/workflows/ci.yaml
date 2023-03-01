@@ -35,7 +35,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - uses: canonical/setup-lxd@90d76101915da56a42a562ba766b1a77019242fd
+      - uses: canonical/setup-lxd@v0.1.0
+        with:
+          channel: 5.9/stable
       - name: Install dependencies
         run: python -m pip install tox
       - name: Run integration tests
