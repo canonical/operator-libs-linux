@@ -12,7 +12,7 @@ from cleantest.data import File
 from cleantest.provider import LXDArchon, lxd
 
 
-@lxd.target("test-ubuntu")
+@lxd.target("test-ubuntu-jammy")
 def fail_on_ubuntu() -> None:
     import sys
 
@@ -24,7 +24,7 @@ def fail_on_ubuntu() -> None:
         sys.exit(0)
 
 
-@lxd.target("test-rocky")
+@lxd.target("test-alma-9")
 def install_package() -> None:
     import sys
 
@@ -44,7 +44,7 @@ def install_package() -> None:
         sys.exit(1)
 
 
-@lxd.target("test-rocky")
+@lxd.target("test-alma-9")
 def query_dnf_and_package() -> None:
     import sys
 
@@ -68,7 +68,7 @@ def query_dnf_and_package() -> None:
         sys.exit(1)
 
 
-@lxd.target("test-rocky")
+@lxd.target("test-alma-9")
 def remove_package() -> None:
     import sys
 
@@ -84,7 +84,7 @@ def remove_package() -> None:
         sys.exit(1)
 
 
-@lxd.target("test-rocky")
+@lxd.target("test-alma-9")
 def check_absent() -> None:
     import sys
 
@@ -106,14 +106,14 @@ def check_absent() -> None:
         sys.exit(1)
 
 
-@lxd.target("test-rocky")
+@lxd.target("test-alma-9")
 def add_repo() -> None:
     import sys
 
     try:
         from charms.operator_libs_linux.v0.dnf import dnf
 
-        dnf.add_repo("https://dl.rockylinux.org/pub/rocky/9.1/HighAvailability/x86_64/os/")
+        dnf.add_repo("https://repo.almalinux.org/almalinux/9/HighAvailability/x86_64/os")
         dnf.install("pacemaker")
         assert dnf["pacemaker"].installed is True
         sys.exit(0)
@@ -125,8 +125,8 @@ class TestDNF(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         archon = LXDArchon()
-        archon.add("test-ubuntu", image="ubuntu-jammy-amd64")
-        archon.add("test-rocky", image="rockylinux-9-amd64")
+        archon.add("test-ubuntu-jammy", image="ubuntu-jammy-amd64")
+        archon.add("test-alma-9", image="almalinux-9-amd64")
         charm_library = (
             pathlib.Path(__file__).parent.parent.parent
             / "lib"
@@ -136,9 +136,9 @@ class TestDNF(unittest.TestCase):
             / "dnf.py"
         )
         charm_lib_path = "/root/lib/charms/operator_libs_linux/v0"
-        archon.execute(["test-ubuntu", "test-rocky"], f"mkdir -p {charm_lib_path}")
-        archon.push("test-ubuntu", data_obj=File(charm_library, f"{charm_lib_path}/dnf.py"))
-        archon.push("test-rocky", data_obj=File(charm_library, f"{charm_lib_path}/dnf.py"))
+        archon.execute(["test-ubuntu-jammy", "test-alma-9"], f"mkdir -p {charm_lib_path}")
+        archon.push("test-ubuntu-jammy", data_obj=File(charm_library, f"{charm_lib_path}/dnf.py"))
+        archon.push("test-alma-9", data_obj=File(charm_library, f"{charm_lib_path}/dnf.py"))
         Env().add({"PYTHONPATH": "/root/lib"})
 
     def test_fail_on_ubuntu(self) -> None:
