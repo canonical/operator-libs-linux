@@ -353,6 +353,9 @@ class _MetaDNF(type):
                 )
             )
 
+        # Install necessary commands needed by charm library.
+        _dnf("install", args=["dnf-plugins-core"])
+
         return super(_MetaDNF, cls).__new__(cls, name, bases, attrs)
 
     @property
