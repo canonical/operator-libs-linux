@@ -43,4 +43,4 @@ jobs:
       - name: Run integration tests
         run: tox -e integration
       - name: Run integration tests - cleantest
-        run: tox -e integration-but-with-cleantest
+        run: tox -e integration-cleantest
