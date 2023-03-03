@@ -16,12 +16,11 @@ from cleantest.provider import LXDArchon, lxd
 def fail_on_ubuntu() -> None:
     import sys
 
-    try:
-        from charms.operator_libs_linux.v0.dnf import dnf  # noqa F401
+    import charms.operator_libs_linux.v0.dnf as dnf
 
-        sys.exit(1)
-    except ImportError:
+    if not dnf.installed():
         sys.exit(0)
+    sys.exit(1)
 
 
 @lxd.target("test-alma-9")
@@ -29,18 +28,18 @@ def install_package() -> None:
     import sys
 
     try:
-        from charms.operator_libs_linux.v0.dnf import dnf
+        import charms.operator_libs_linux.v0.dnf as dnf
 
         dnf.update()
         dnf.install("epel-release")
         dnf.install("slurm-slurmd", "slurm-slurmctld", "slurm-slurmdbd", "slurm-slurmrestd")
-        assert dnf["epel-release"].installed is True
-        assert dnf["slurm-slurmd"].installed is True
-        assert dnf["slurm-slurmctld"].installed is True
-        assert dnf["slurm-slurmdbd"].installed is True
-        assert dnf["slurm-slurmrestd"].installed is True
+        assert dnf.fetch("epel-release").installed
+        assert dnf.fetch("slurm-slurmd").installed
+        assert dnf.fetch("slurm-slurmctld").installed
+        assert dnf.fetch("slurm-slurmdbd").installed
+        assert dnf.fetch("slurm-slurmrestd").installed
         sys.exit(0)
-    except (ImportError, AssertionError):
+    except AssertionError:
         sys.exit(1)
 
 
@@ -49,22 +48,23 @@ def query_dnf_and_package() -> None:
     import sys
 
     try:
-        from charms.operator_libs_linux.v0.dnf import dnf
+        import charms.operator_libs_linux.v0.dnf as dnf
 
-        assert dnf.version == "4.12.0"
-        package = dnf["slurm-slurmd"]
-        assert package.installed is True
-        assert package.available is False
-        assert package.absent is False
+        assert dnf.version() == "4.12.0"
+        package = dnf.fetch("slurm-slurmd")
+        assert package.installed
+        assert not package.available
+        assert not package.absent
+        assert not package.unknown
         assert package.name == "slurm-slurmd"
         assert package.arch == "x86_64"
         assert package.epoch is None
         assert package.version == "22.05.6"
         assert package.release == "3.el9"
-        assert package.fullversion == "22.05.6-3.el9"
+        assert package.full_version == "22.05.6-3.el9"
         assert package.repo == "epel"
         sys.exit(0)
-    except (ImportError, AssertionError):
+    except AssertionError:
         sys.exit(1)
 
 
@@ -73,14 +73,14 @@ def remove_package() -> None:
     import sys
 
     try:
-        from charms.operator_libs_linux.v0.dnf import dnf
+        import charms.operator_libs_linux.v0.dnf as dnf
 
         dnf.remove("slurm-slurmdbd")
         dnf.purge("slurm-slurmrestd")
-        assert dnf["slurm-slurmdbd"].available is True
-        assert dnf["slurm-slurmrestd"].available is True
+        assert dnf.fetch("slurm-slurmdbd").available
+        assert dnf.fetch("slurm-slurmrestd").available
         sys.exit(0)
-    except (ImportError, AssertionError):
+    except AssertionError:
         sys.exit(1)
 
 
@@ -89,20 +89,22 @@ def check_absent() -> None:
     import sys
 
     try:
-        from charms.operator_libs_linux.v0.dnf import dnf
+        import charms.operator_libs_linux.v0.dnf as dnf
 
-        bogus = dnf["nuccitheboss"]
-        assert bogus.installed is False
-        assert bogus.available is False
-        assert bogus.absent is True
+        bogus = dnf.fetch("nuccitheboss")
+        assert not bogus.installed
+        assert not bogus.available
+        assert bogus.absent
+        assert not bogus.unknown
         assert bogus.name == "nuccitheboss"
         assert bogus.arch is None
         assert bogus.epoch is None
         assert bogus.version is None
         assert bogus.release is None
-        assert bogus.fullversion is None
+        assert bogus.full_version is None
         assert bogus.repo is None
-    except (ImportError, AssertionError):
+        sys.exit(0)
+    except AssertionError:
         sys.exit(1)
 
 
@@ -111,13 +113,13 @@ def add_repo() -> None:
     import sys
 
     try:
-        from charms.operator_libs_linux.v0.dnf import dnf
+        import charms.operator_libs_linux.v0.dnf as dnf
 
         dnf.add_repo("https://repo.almalinux.org/almalinux/9/HighAvailability/x86_64/os")
         dnf.install("pacemaker")
-        assert dnf["pacemaker"].installed is True
+        assert dnf.fetch("pacemaker").installed
         sys.exit(0)
-    except (ImportError, AssertionError):
+    except AssertionError:
         sys.exit(1)
 
 
@@ -154,7 +156,7 @@ class TestDNF(unittest.TestCase):
             self.assertEqual(result.exit_code, 0)
 
     def test_remove_package(self) -> None:
-        for name, result in query_dnf_and_package():
+        for name, result in remove_package():
             self.assertEqual(result.exit_code, 0)
 
     def test_check_absent(self) -> None:
