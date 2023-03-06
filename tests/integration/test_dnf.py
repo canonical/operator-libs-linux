@@ -55,7 +55,6 @@ def query_dnf_and_package() -> None:
         assert package.installed
         assert not package.available
         assert not package.absent
-        assert not package.unknown
         assert package.name == "slurm-slurmd"
         assert package.arch == "x86_64"
         assert package.epoch is None
@@ -95,7 +94,6 @@ def check_absent() -> None:
         assert not bogus.installed
         assert not bogus.available
         assert bogus.absent
-        assert not bogus.unknown
         assert bogus.name == "nuccitheboss"
         assert bogus.arch is None
         assert bogus.epoch is None

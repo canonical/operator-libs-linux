@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,11 +19,10 @@ import re
 import shutil
 import subprocess
 from enum import Enum
-from io import StringIO
 from typing import Dict, Optional, Union
 
 
-class ExecutionError(Exception):
+class Error(Exception):
     """Raise when dnf encounters an execution error."""
 
 
@@ -32,7 +30,6 @@ class _PackageState(Enum):
     INSTALLED = "installed"
     AVAILABLE = "available"
     ABSENT = "absent"
-    UNKNOWN = "unknown"
 
 
 class PackageInfo:
@@ -55,11 +52,6 @@ class PackageInfo:
     def absent(self) -> bool:
         """Determine if package is marked 'absent'."""
         return self._data["state"] == _PackageState.ABSENT
-
-    @property
-    def unknown(self) -> bool:
-        """Determine if package is marked 'unknown'."""
-        return self._data["state"] == _PackageState.UNKNOWN
 
     @property
     def name(self) -> str:
@@ -106,7 +98,7 @@ class PackageInfo:
 
 def version() -> str:
     """Get version of `dnf` executable."""
-    return StringIO(_dnf("--version")).readline().strip("\n")
+    return _dnf("--version").splitlines()[0]
 
 
 def installed() -> bool:
@@ -125,9 +117,10 @@ def upgrade(*packages: str) -> None:
     Args:
         *packages (str): Packages to upgrade on system.
     """
-    if len(packages) == 0:
-        raise ExecutionError("No packages specified.")
-    _dnf("upgrade", *packages)
+    if not packages:
+        _dnf("upgrade")
+    else:
+        _dnf("upgrade", *packages)
 
 
 def install(*packages: Union[str, os.PathLike]) -> None:
@@ -136,7 +129,7 @@ def install(*packages: Union[str, os.PathLike]) -> None:
     Args:
         *packages (Union[str, os.PathLine]): Packages to install on the system.
     """
-    if len(packages) == 0:
+    if not packages:
         raise TypeError("No packages specified.")
     _dnf("install", *packages)
 
@@ -147,7 +140,7 @@ def remove(*packages: str) -> None:
     Args:
         *packages (str): Packages to remove from system.
     """
-    if len(packages) == 0:
+    if not packages:
         raise TypeError("No packages specified.")
     _dnf("remove", *packages)
 
@@ -158,7 +151,7 @@ def purge(*packages: str) -> None:
     Args:
         *packages (str): Packages to purge from system.
     """
-    if len(packages) == 0:
+    if not packages:
         raise TypeError("No packages specified.")
     _dnf("remove", *packages)
 
@@ -173,16 +166,28 @@ def fetch(package: str) -> PackageInfo:
         PackageInfo: Information about package.
     """
     try:
-        status, info = _dnf("list", "-q", package).split("\n")[:2]  # Only take top two lines.
-        pkg_name, pkg_version, pkg_repo = info.split()
-        name, arch = pkg_name.rsplit(".", 1)
-        epoch, version, release = re.match(r"(?:(.*):)?(.*)-(.*)", pkg_version).groups()
+        stdout = _dnf("list", "-q", package)
+        # Only take top two lines of output.
+        status, info = stdout.splitlines()[:2]
+
+        # Check if package is in states INSTALLED or AVAILABLE. If not, mark absent.
         if "Installed" in status:
             state = _PackageState.INSTALLED
         elif "Available" in status:
             state = _PackageState.AVAILABLE
         else:
-            state = _PackageState.UNKNOWN
+            raise Error(f"{package} is not installed or available but {status} instead.")
+
+        pkg_name, pkg_version, pkg_repo = info.split()
+        name, arch = pkg_name.rsplit(".", 1)
+
+        # Version should be good, but if not mark absent since package
+        # is probably in a bad state then.
+        version_match = re.match(r"(?:(.*):)?(.*)-(.*)", pkg_version)
+        if not version_match:
+            raise Error(f"Bad version {pkg_version}. Marking {package} absent.")
+        else:
+            epoch, version, release = version_match.groups()
 
         return PackageInfo(
             {
@@ -195,8 +200,7 @@ def fetch(package: str) -> PackageInfo:
                 "state": state,
             }
         )
-
-    except ExecutionError:
+    except Error:
         return PackageInfo({"name": package, "state": _PackageState.ABSENT})
 
 
@@ -218,22 +222,20 @@ def _dnf(*args: str) -> str:
         *args (str): Arguments to pass to `dnf` executable.
 
     Raises:
-        ExecutionError: Raised if DNF command execution fails.
+        Error: Raised if DNF command execution fails.
 
     Returns:
         str: Captured stdout of executed DNF command.
     """
-    if not installed():
-        raise ExecutionError(f"dnf not found on PATH {os.getenv('PATH')}")
-
-    cmd = ["dnf", "-y", *args]
     try:
         return subprocess.run(
-            cmd,
+            ["dnf", "-y", *args],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
             check=True,
         ).stdout.strip("\n")
+    except FileNotFoundError:
+        raise Error(f"dnf not found on PATH {os.getenv('PATH')}")
     except subprocess.CalledProcessError as e:
-        raise ExecutionError(f"{e} Reason:\n{e.stderr}")
+        raise Error(f"{e} Reason:\n{e.stderr}")
