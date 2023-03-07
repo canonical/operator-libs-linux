@@ -20,7 +20,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Optional, Union
+from typing import Optional, Union
 
 
 class Error(Exception):
@@ -83,21 +83,15 @@ def installed() -> bool:
     return shutil.which("dnf") is not None
 
 
-def update() -> None:
-    """Update all packages on the system."""
-    _dnf("update")
-
-
-def upgrade(*packages: str) -> None:
+def upgrade(*packages: Optional[str]) -> None:
     """Upgrade one or more packages.
 
     Args:
-        *packages (str): Packages to upgrade on system.
+        *packages (Optional[str]):
+            Packages to upgrade on system. If packages is omitted,
+            upgrade all packages on the system.
     """
-    if not packages:
-        _dnf("upgrade")
-    else:
-        _dnf("upgrade", *packages)
+    _dnf("upgrade", *packages)
 
 
 def install(*packages: Union[str, os.PathLike]) -> None:
@@ -122,17 +116,6 @@ def remove(*packages: str) -> None:
     _dnf("remove", *packages)
 
 
-def purge(*packages: str) -> None:
-    """Purge one or more packages from the system.
-
-    Args:
-        *packages (str): Packages to purge from system.
-    """
-    if not packages:
-        raise TypeError("No packages specified.")
-    _dnf("remove", *packages)
-
-
 def fetch(package: str) -> PackageInfo:
     """Fetch information about a package.
 
@@ -141,6 +124,14 @@ def fetch(package: str) -> PackageInfo:
 
     Returns:
         PackageInfo: Information about package.
+
+    Notes:
+        `package` needs to exactly match the name of the package that you are fetching.
+        For example, if working with the `python2` package on select EL distributions,
+        `dnf.install("python2")` will succeed, but `dnf.fetch("python2")` will return
+        the package in ABSENT state. This is because the name of the python2 package is
+        python2.7, not python2. To get info about the python2 package, you need to use
+        its exact name: `dnf.fetch("python2.7")`.
     """
     try:
         stdout = _dnf("list", "-q", package)
@@ -207,7 +198,7 @@ def _dnf(*args: str) -> str:
             ["dnf", "-y", *args],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            universal_newlines=True,
+            text=True,
             check=True,
         ).stdout.strip("\n")
     except FileNotFoundError:
