@@ -18,6 +18,7 @@ import os
 import re
 import shutil
 import subprocess
+from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, Optional, Union
 
@@ -32,46 +33,32 @@ class _PackageState(Enum):
     ABSENT = "absent"
 
 
+@dataclass(frozen=True)
 class PackageInfo:
     """Dataclass representing DNF package information."""
 
-    def __init__(self, data: Dict[str, Union[str, _PackageState]]) -> None:
-        self._data = data
+    name: str
+    arch: str = None
+    epoch: str = None
+    version: str = None
+    release: str = None
+    repo: str = None
+    _state: _PackageState = _PackageState.ABSENT
 
     @property
     def installed(self) -> bool:
         """Determine if package is marked 'installed'."""
-        return self._data["state"] == _PackageState.INSTALLED
+        return self._state == _PackageState.INSTALLED
 
     @property
     def available(self) -> bool:
         """Determine if package is marked 'available'."""
-        return self._data["state"] == _PackageState.AVAILABLE
+        return self._state == _PackageState.AVAILABLE
 
     @property
     def absent(self) -> bool:
         """Determine if package is marked 'absent'."""
-        return self._data["state"] == _PackageState.ABSENT
-
-    @property
-    def name(self) -> str:
-        """Get name of package."""
-        return self._data["name"]
-
-    @property
-    def arch(self) -> Optional[str]:
-        """Get architecture of package."""
-        return self._data.get("arch", None)
-
-    @property
-    def epoch(self) -> Optional[str]:
-        """Get epoch of package."""
-        return self._data.get("epoch", None)
-
-    @property
-    def version(self) -> Optional[str]:
-        """Get version of package."""
-        return self._data.get("version", None)
+        return self._state == _PackageState.ABSENT
 
     @property
     def full_version(self) -> Optional[str]:
@@ -84,16 +71,6 @@ class PackageInfo:
             full_version.insert(0, f"{self.epoch}:")
 
         return "".join(full_version)
-
-    @property
-    def release(self) -> Optional[str]:
-        """Get release of package."""
-        return self._data.get("release", None)
-
-    @property
-    def repo(self) -> Optional[str]:
-        """Get repository package is from."""
-        return self._data.get("repo", None)
 
 
 def version() -> str:
@@ -190,18 +167,16 @@ def fetch(package: str) -> PackageInfo:
             epoch, version, release = version_match.groups()
 
         return PackageInfo(
-            {
-                "name": name,
-                "arch": arch,
-                "epoch": epoch,
-                "version": version,
-                "release": release,
-                "repo": pkg_repo[1:] if pkg_repo.startswith("@") else pkg_repo,
-                "state": state,
-            }
+            name=name,
+            arch=arch,
+            epoch=epoch,
+            version=version,
+            release=release,
+            repo=pkg_repo[1:] if pkg_repo.startswith("@") else pkg_repo,
+            _state=state,
         )
     except Error:
-        return PackageInfo({"name": package, "state": _PackageState.ABSENT})
+        return PackageInfo(name=package)
 
 
 def add_repo(repo: str) -> None:
