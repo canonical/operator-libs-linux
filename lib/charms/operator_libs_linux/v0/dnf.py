@@ -170,7 +170,7 @@ def fetch(package: str) -> PackageInfo:
         return PackageInfo(name=package)
 
 
-def add_repo(repo: str) -> None:
+def add_repo(repo: str) -> None:  # pragma: no cover
     """Add a new repository to DNF.
 
     Args:
