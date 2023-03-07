@@ -98,7 +98,7 @@ def install(*packages: Union[str, os.PathLike]) -> None:
     """Install one or more packages.
 
     Args:
-        *packages (Union[str, os.PathLine]): Packages to install on the system.
+        *packages (Union[str, os.PathLike]): Packages to install on the system.
     """
     if not packages:
         raise TypeError("No packages specified.")
