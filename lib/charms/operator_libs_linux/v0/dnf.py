@@ -22,6 +22,16 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Union
 
+# The unique Charmhub library identifier, never change it
+LIBID = "1e93f444444d4a4a8df06c1c16b33aaf"
+
+# Increment this major API version when introducing breaking changes
+LIBAPI = 0
+
+# Increment this PATCH version before using `charmcraft publish-lib` or reset
+# to 0 if you are raising the major API version
+LIBPATCH = 1
+
 
 class Error(Exception):
     """Raise when dnf encounters an execution error."""
