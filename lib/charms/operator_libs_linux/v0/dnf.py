@@ -87,7 +87,7 @@ def upgrade(*packages: Optional[str]) -> None:
     """Upgrade one or more packages.
 
     Args:
-        *packages (Optional[str]):
+        *packages:
             Packages to upgrade on system. If packages is omitted,
             upgrade all packages on the system.
     """
@@ -98,7 +98,7 @@ def install(*packages: Union[str, os.PathLike]) -> None:
     """Install one or more packages.
 
     Args:
-        *packages (Union[str, os.PathLike]): Packages to install on the system.
+        *packages: Packages to install on the system.
     """
     if not packages:
         raise TypeError("No packages specified.")
@@ -109,7 +109,7 @@ def remove(*packages: str) -> None:
     """Remove one or more packages from the system.
 
     Args:
-        *packages (str): Packages to remove from system.
+        *packages: Packages to remove from system.
     """
     if not packages:
         raise TypeError("No packages specified.")
@@ -120,7 +120,7 @@ def fetch(package: str) -> PackageInfo:
     """Fetch information about a package.
 
     Args:
-        package (str): Package to get information about.
+        package: Package to get information about.
 
     Returns:
         PackageInfo: Information about package.
@@ -174,7 +174,7 @@ def add_repo(repo: str) -> None:  # pragma: no cover
     """Add a new repository to DNF.
 
     Args:
-        repo (str): URL of new repository to add.
+        repo: URL of new repository to add.
     """
     if not fetch("dnf-plugins-core").installed:
         install("dnf-plugins-core")
@@ -185,7 +185,7 @@ def _dnf(*args: str) -> str:
     """Execute a DNF command.
 
     Args:
-        *args (str): Arguments to pass to `dnf` executable.
+        *args: Arguments to pass to `dnf` executable.
 
     Raises:
         Error: Raised if DNF command execution fails.
