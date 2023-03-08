@@ -38,12 +38,12 @@ class PackageInfo:
     """Dataclass representing DNF package information."""
 
     name: str
+    _state: _PackageState
     arch: str = None
     epoch: str = None
     version: str = None
     release: str = None
     repo: str = None
-    _state: _PackageState = _PackageState.ABSENT
 
     @property
     def installed(self) -> bool:
@@ -144,7 +144,7 @@ def fetch(package: str) -> PackageInfo:
         elif "Available" in status:
             state = _PackageState.AVAILABLE
         else:
-            raise Error(f"{package} is not installed or available but {status} instead.")
+            return PackageInfo(name=package, _state=_PackageState.ABSENT)
 
         pkg_name, pkg_version, pkg_repo = info.split()
         name, arch = pkg_name.rsplit(".", 1)
@@ -153,7 +153,7 @@ def fetch(package: str) -> PackageInfo:
         # is probably in a bad state then.
         version_match = re.match(r"(?:(.*):)?(.*)-(.*)", pkg_version)
         if not version_match:
-            raise Error(f"Bad version {pkg_version}. Marking {package} absent.")
+            return PackageInfo(name=package, _state=_PackageState.ABSENT)
         else:
             epoch, version, release = version_match.groups()
 
@@ -167,7 +167,7 @@ def fetch(package: str) -> PackageInfo:
             _state=state,
         )
     except Error:
-        return PackageInfo(name=package)
+        return PackageInfo(name=package, _state=_PackageState.ABSENT)
 
 
 def add_repo(repo: str) -> None:  # pragma: no cover
