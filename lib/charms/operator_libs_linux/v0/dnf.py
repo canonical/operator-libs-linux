@@ -12,7 +12,89 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Abstractions for system's DNF package information and repositories."""
+"""Abstractions for the system's DNF package information and repositories.
+
+This charm library contains abstractions and wrappers around Enterprise Linux
+(CentOS Stream, AlmaLinux, Rocky Linux, Cloud Linux, etc.) repositories and packages
+to provide an idiomatic and Pythonic mechanism for managing packages and repositories
+within machine charms deployed to an Enterprise Linux base.
+
+To install packages using the library:
+
+```python
+import charms.operator_libs_linux.v0.dnf as dnf
+
+try:
+    dnf.install("epel-release")
+    dnf.install("slurm-slurmd", "slurm-slurmctld", "slurm-slurmdbd", "slurm-slurmrestd")
+except dnf.Error:
+    logger.error("Failed to install requested packages.")
+```
+
+To upgrade specific packages and/or entire system using the library:
+
+```python
+import charms.operator_libs_linux.v0.dnf as dnf
+
+try:
+    # To upgrade a specific package.
+    dnf.upgrade("slurm-slurmd")
+    # To upgrade the whole system.
+    dnf.upgrade()
+except dnf.Error:
+    logger.error("Failed to perform requested package upgrades.")
+```
+
+__Important:__ If no packages are passed to `dnf.upgrade(...)`, all packages with newer
+versions available in the system's known repositories will be upgraded.
+
+To remove packages using the library:
+
+```python
+import charms.operator_libs_linux.v0.dnf as dnf
+
+try:
+    dnf.remove("slurm-slurmd", "slurm-slurmctld", "slurm-slurmdbd", "slurm-slurmrestd")
+    dnf.remove("epel-release")
+except dnf.Error:
+    logger.error("Failed to remove requested packages.")
+```
+
+Packages can have three possible states: installed, available, and absent. "installed"
+means that the package is currently installed on the system. "available" means that the
+package is available within the system's known package repositories, but is not currently
+installed. "absent" means that the package was not found either or the system on within
+the system's known package repositories.
+
+To find details of a specific package using the library:
+
+```python
+import charms.operator_libs_linux.v0.dnf as dnf
+
+try:
+    package = dnf.fetch("slurm-slurmd")
+    assert package.installed
+    assert package.version == "22.05.6"
+except AssertionError:
+    logger.error("Package slurm-slurmd is not installed or is not expected version.")
+```
+
+__Important:__ `dnf.fetch(...)` will only match exact package names, not aliases. Ensure
+that you are using the exact package name, otherwise the fetched package will be marked
+as "absent". e.g. use the exact package name "python2.7" and not the alias "python2".
+
+To add a new package repository using the library:
+
+```python
+import charms.operator_libs_linux.v0.dnf as dnf
+
+try:
+    dnf.add_repo("http://mirror.stream.centos.org/9-stream/HighAvailability/x86_64/os")
+    dnf.install("pacemaker")
+except dnf.Error:
+    logger.error("Failed to install pacemaker package from HighAvailability repository.")
+```
+"""
 
 import os
 import re
