@@ -1,0 +1,21 @@
+name: Release Libraries
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release-libs:
+    name: Release any bumped library
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Release any bumped charm library
+        uses: canonical/charming-actions/release-libraries@2.2.3
+        with:
+          credentials: "${{ secrets.CHARMHUB_TOKEN }}"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
