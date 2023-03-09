@@ -498,7 +498,7 @@ class TestSnapBareMethods(unittest.TestCase):
                 universal_newlines=True,
             )
         except AssertionError:
-            # The ordering of this call can be unpredictable across Python verisons.
+            # The ordering of this call can be unpredictable across Python versions.
             # Unfortunately, the methods available to introspect the call list have also
             # changed, so we do this, which is a little clunky.
             mock_subprocess.assert_called_with(

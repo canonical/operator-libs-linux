@@ -9,10 +9,10 @@ from charms.operator_libs_linux.v1 import systemd
 
 
 def with_mock_subp(func):
-    """Decorator that sets up a Popen mock.
+    """Set up a Popen mock.
 
     Any function that uses this decorator should take a function as an argument. When
-    called wtih a series of return codes, that function will mock out subprocess.Popen,
+    called with a series of return codes, that function will mock out subprocess.Popen,
     and set it to return those error codes, in order.
 
     The function returns the mock Popen object, so that routines such as
@@ -106,7 +106,7 @@ class TestSystemD(unittest.TestCase):
 
     @with_mock_subp
     def test_service_reload(self, make_mock):
-        # We reload succesfully.
+        # We reload successfully.
         mockp, kw = make_mock([0])
         reloaded = systemd.service_reload("mysql")
         mockp.assert_called_with(["systemctl", "reload", "mysql"], **kw)
