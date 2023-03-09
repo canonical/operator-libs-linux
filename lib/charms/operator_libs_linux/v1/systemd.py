@@ -64,17 +64,19 @@ LIBPATCH = 1
 
 
 class SystemdError(Exception):
+    """Custom exception for SystemD related errors."""
+
     pass
 
 
 def _popen_kwargs():
-    return dict(
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        bufsize=1,
-        universal_newlines=True,
-        encoding="utf-8",
-    )
+    return {
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.STDOUT,
+        "bufsize": 1,
+        "universal_newlines": True,
+        "encoding": "utf-8",
+    }
 
 
 def _systemctl(
