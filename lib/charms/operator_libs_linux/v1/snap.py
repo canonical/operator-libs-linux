@@ -976,15 +976,21 @@ def _system_set(config_item: str, value: str) -> None:
         raise SnapError("Failed setting system config '{}' to '{}'".format(config_item, value))
 
 
-def hold_refresh(days: int = 90) -> bool:
+def hold_refresh(days: int = 90, forever: bool = False) -> bool:
     """Set the system-wide snap refresh hold.
 
     Args:
         days: number of days to hold system refreshes for. Maximum 90. Set to zero to remove hold.
+        forever: if set  to True, will set a hold forever.
     """
+    if not isinstance(forever, bool):
+        raise ValueError("forever must be a boolean")
     # Currently the snap daemon can only hold for a maximum of 90 days
-    if not isinstance(days, int) or days > 90:
+    elif not isinstance(days, int) or days > 90:
         raise ValueError("days must be an int between 1 and 90")
+    elif forever:
+        _system_set("refresh.hold", "forever")
+        logger.info("Set system-wide snap refresh hold to: forever")
     elif days == 0:
         _system_set("refresh.hold", "")
         logger.info("Removed system-wide snap refresh hold")

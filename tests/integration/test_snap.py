@@ -167,6 +167,12 @@ def test_hold_refresh():
     assert f"hold: {hold_date}" in result.decode()
 
 
+def test_forever_hold_refresh():
+    snap.hold_refresh(forever=True)
+    result = check_output(["snap", "refresh", "--time"])
+    assert "hold: 2315-06-30" in result.decode()
+
+
 def test_reset_hold_refresh():
     snap.hold_refresh()
     snap.hold_refresh(0)

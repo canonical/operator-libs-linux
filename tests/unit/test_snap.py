@@ -534,11 +534,26 @@ class TestSnapBareMethods(unittest.TestCase):
         except ValueError as e:
             self.assertEqual(str(e), "days must be an int between 1 and 90")
 
+    def test_hold_refresh_invalid_non_bool(self):
+        try:
+            snap.hold_refresh(forever="foobar")
+        except ValueError as e:
+            self.assertEqual(str(e), "forever must be a boolean")
+
     @patch("charms.operator_libs_linux.v1.snap.subprocess.check_call")
     def test_hold_refresh_reset(self, mock_subprocess):
         snap.hold_refresh(days=0)
         mock_subprocess.assert_called_with(
             ["snap", "set", "system", "refresh.hold="],
+            universal_newlines=True,
+        )
+
+    @patch("charms.operator_libs_linux.v1.snap.subprocess.check_call")
+    def test_hold_refresh_forever(self, mock_subprocess):
+        snap.hold_refresh(forever=True)
+
+        mock_subprocess.assert_called_with(
+            ["snap", "set", "system", "refresh.hold=forever"],
             universal_newlines=True,
         )
 
