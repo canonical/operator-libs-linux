@@ -523,22 +523,16 @@ class TestSnapBareMethods(unittest.TestCase):
             self.assertEqual(str(e), "Failed setting system config 'refresh.hold' to 'foobar'")
 
     def test_hold_refresh_invalid_too_high(self):
-        try:
+        with self.assertRaises(ValueError):
             snap.hold_refresh(days=120)
-        except ValueError as e:
-            self.assertEqual(str(e), "days must be an int between 1 and 90")
 
     def test_hold_refresh_invalid_non_int(self):
-        try:
+        with self.assertRaises(TypeError):
             snap.hold_refresh(days="foobar")
-        except ValueError as e:
-            self.assertEqual(str(e), "days must be an int between 1 and 90")
 
     def test_hold_refresh_invalid_non_bool(self):
-        try:
+        with self.assertRaises(TypeError):
             snap.hold_refresh(forever="foobar")
-        except ValueError as e:
-            self.assertEqual(str(e), "forever must be a boolean")
 
     @patch("charms.operator_libs_linux.v1.snap.subprocess.check_call")
     def test_hold_refresh_reset(self, mock_subprocess):

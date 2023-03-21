@@ -981,20 +981,22 @@ def hold_refresh(days: int = 90, forever: bool = False) -> bool:
 
     Args:
         days: number of days to hold system refreshes for. Maximum 90. Set to zero to remove hold.
-        forever: if set  to True, will set a hold forever.
+        forever: if True, will set a hold forever.
     """
     if not isinstance(forever, bool):
-        raise ValueError("forever must be a boolean")
-    # Currently the snap daemon can only hold for a maximum of 90 days
-    elif not isinstance(days, int) or days > 90:
-        raise ValueError("days must be an int between 1 and 90")
-    elif forever:
+        raise TypeError("forever must be a bool")
+    if not isinstance(days, int):
+        raise TypeError("days must be an int")
+    if forever:
         _system_set("refresh.hold", "forever")
         logger.info("Set system-wide snap refresh hold to: forever")
     elif days == 0:
         _system_set("refresh.hold", "")
         logger.info("Removed system-wide snap refresh hold")
     else:
+        # Currently the snap daemon can only hold for a maximum of 90 days
+        if not 1 <= days <= 90:
+            raise ValueError("days must be between 1 and 90")
         # Add the number of days to current time
         target_date = datetime.now(timezone.utc).astimezone() + timedelta(days=days)
         # Format for the correct datetime format
