@@ -517,28 +517,35 @@ class TestSnapBareMethods(unittest.TestCase):
     @patch("charms.operator_libs_linux.v1.snap.subprocess.check_call")
     def test_system_set_fail(self, mock_subprocess):
         mock_subprocess.side_effect = CalledProcessError(1, "foobar")
-        try:
+        with self.assertRaises(snap.SnapError):
             snap._system_set("refresh.hold", "foobar")
-        except snap.SnapError as e:
-            self.assertEqual(str(e), "Failed setting system config 'refresh.hold' to 'foobar'")
 
     def test_hold_refresh_invalid_too_high(self):
-        try:
+        with self.assertRaises(ValueError):
             snap.hold_refresh(days=120)
-        except ValueError as e:
-            self.assertEqual(str(e), "days must be an int between 1 and 90")
 
     def test_hold_refresh_invalid_non_int(self):
-        try:
+        with self.assertRaises(TypeError):
             snap.hold_refresh(days="foobar")
-        except ValueError as e:
-            self.assertEqual(str(e), "days must be an int between 1 and 90")
+
+    def test_hold_refresh_invalid_non_bool(self):
+        with self.assertRaises(TypeError):
+            snap.hold_refresh(forever="foobar")
 
     @patch("charms.operator_libs_linux.v1.snap.subprocess.check_call")
     def test_hold_refresh_reset(self, mock_subprocess):
         snap.hold_refresh(days=0)
         mock_subprocess.assert_called_with(
             ["snap", "set", "system", "refresh.hold="],
+            universal_newlines=True,
+        )
+
+    @patch("charms.operator_libs_linux.v1.snap.subprocess.check_call")
+    def test_hold_refresh_forever(self, mock_subprocess):
+        snap.hold_refresh(forever=True)
+
+        mock_subprocess.assert_called_with(
+            ["snap", "set", "system", "refresh.hold=forever"],
             universal_newlines=True,
         )
 
