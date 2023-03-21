@@ -517,10 +517,8 @@ class TestSnapBareMethods(unittest.TestCase):
     @patch("charms.operator_libs_linux.v1.snap.subprocess.check_call")
     def test_system_set_fail(self, mock_subprocess):
         mock_subprocess.side_effect = CalledProcessError(1, "foobar")
-        try:
+        with self.assertRaises(snap.SnapError):
             snap._system_set("refresh.hold", "foobar")
-        except snap.SnapError as e:
-            self.assertEqual(str(e), "Failed setting system config 'refresh.hold' to 'foobar'")
 
     def test_hold_refresh_invalid_too_high(self):
         with self.assertRaises(ValueError):
