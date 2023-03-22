@@ -72,6 +72,18 @@ class TestSystemD(unittest.TestCase):
         self.assertFalse(is_running)
 
     @with_mock_subp
+    def test_service_failed(self, make_mock):
+        mockp, kw = make_mock([0, 1])
+
+        is_failed = systemd.service_failed("mysql")
+        mockp.assert_called_with(["systemctl", "is-failed", "mysql", "--quiet"], **kw)
+        self.assertTrue(is_failed)
+
+        is_failed = systemd.service_failed("mysql")
+        mockp.assert_called_with(["systemctl", "is-failed", "mysql", "--quiet"], **kw)
+        self.assertFalse(is_failed)
+
+    @with_mock_subp
     def test_service_start(self, make_mock):
         mockp, kw = make_mock([0, 1])
 
