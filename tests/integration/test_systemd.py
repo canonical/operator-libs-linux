@@ -23,17 +23,16 @@ logger = logging.getLogger(__name__)
 
 
 def test_service():
-
     def create_service(name: str, start_command: str):
         """Create a custom service."""
         content = f"""[Unit]
         Description=Test Service
         After=multi-user.target
-    
+
         [Service]
         ExecStart=/usr/bin/bash -c "{start_command}"
         Type=simple
-    
+
         [Install]
         WantedBy=multi-user.target
         """
