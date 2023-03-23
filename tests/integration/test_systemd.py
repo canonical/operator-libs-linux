@@ -22,27 +22,27 @@ from charms.operator_libs_linux.v1.systemd import (
 logger = logging.getLogger(__name__)
 
 
-def create_service(name: str, start_command: str):
-    """Create a custom service."""
-    content = f"""[Unit]
-    Description=Test Service
-    After=multi-user.target
-
-    [Service]
-    ExecStart=/usr/bin/bash -c "{start_command}"
-    Type=simple
-
-    [Install]
-    WantedBy=multi-user.target
-    """
-
-    with open(f"/etc/systemd/system/{name}", "w+") as f:
-        f.writelines([f"{line.strip()}\n" for line in content.split("\n")])
-
-    service_restart(name)
-
-
 def test_service():
+
+    def create_service(name: str, start_command: str):
+        """Create a custom service."""
+        content = f"""[Unit]
+        Description=Test Service
+        After=multi-user.target
+    
+        [Service]
+        ExecStart=/usr/bin/bash -c "{start_command}"
+        Type=simple
+    
+        [Install]
+        WantedBy=multi-user.target
+        """
+
+        with open(f"/etc/systemd/system/{name}", "w+") as f:
+            f.writelines([f"{line.strip()}\n" for line in content.split("\n")])
+
+        service_restart(name)
+
     # Cron is pre-installed in the lxc images we are using.
     assert service_running("cron")
     # Foo is made up, and should not be running.
