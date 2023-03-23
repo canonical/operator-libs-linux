@@ -9,6 +9,7 @@ from subprocess import check_output
 from charms.operator_libs_linux.v1.systemd import (
     SystemdError,
     daemon_reload,
+    service_failed,
     service_pause,
     service_reload,
     service_restart,
@@ -22,10 +23,38 @@ logger = logging.getLogger(__name__)
 
 
 def test_service():
+    def create_service(name: str, start_command: str):
+        """Create a custom service."""
+        content = f"""[Unit]
+        Description=Test Service
+        After=multi-user.target
+
+        [Service]
+        ExecStart=/usr/bin/bash -c "{start_command}"
+        Type=simple
+
+        [Install]
+        WantedBy=multi-user.target
+        """
+
+        with open(f"/etc/systemd/system/{name}", "w+") as f:
+            f.writelines([f"{line.strip()}\n" for line in content.split("\n")])
+
+        service_restart(name)
+
     # Cron is pre-installed in the lxc images we are using.
     assert service_running("cron")
     # Foo is made up, and should not be running.
     assert not service_running("foo")
+
+    # test custom service with correct command
+    create_service("test.service", "while true; do echo; sleep 1; done")
+    assert service_running("test.service")
+    service_stop("test.service")
+
+    # test failed status
+    create_service("test.service", "bad command")
+    assert service_failed("test.service")
 
 
 def test_pause_and_resume():
