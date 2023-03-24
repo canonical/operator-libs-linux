@@ -343,6 +343,49 @@ class TestSnapCache(unittest.TestCase):
             capture_output=True,
         )
 
+    @patch("charms.operator_libs_linux.v1.snap.subprocess.check_output")
+    def test_snap_hold(self, mock_subprocess):
+        mock_subprocess.return_value = 0
+        foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
+
+        foo.hold(duration="72h")
+        mock_subprocess.assert_called_with(
+            [
+                "snap",
+                "refresh",
+                "foo",
+                "--hold=72h",
+            ],
+            universal_newlines=True,
+        )
+
+        foo.hold()
+        mock_subprocess.assert_called_with(
+            [
+                "snap",
+                "refresh",
+                "foo",
+                "--hold",
+            ],
+            universal_newlines=True,
+        )
+
+    @patch("charms.operator_libs_linux.v1.snap.subprocess.check_output")
+    def test_snap_unhold(self, mock_subprocess):
+        mock_subprocess.return_value = 0
+        foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
+
+        foo.unhold()
+        mock_subprocess.assert_called_with(
+            [
+                "snap",
+                "refresh",
+                "foo",
+                "--unhold",
+            ],
+            universal_newlines=True,
+        )
+
     @patch("charms.operator_libs_linux.v1.snap.SnapClient.get_installed_snap_apps")
     def test_apps_property(self, patched):
         s = SnapCacheTester()

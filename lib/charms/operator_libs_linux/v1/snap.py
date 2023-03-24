@@ -83,7 +83,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 10
+LIBPATCH = 11
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -392,6 +392,20 @@ class Snap(object):
             subprocess.run(_cmd, universal_newlines=True, check=True, capture_output=True)
         except CalledProcessError as e:
             raise SnapError("Could not {} for snap [{}]: {}".format(_cmd, self._name, e.stderr))
+
+    def hold(self, duration: Optional[str] = None) -> None:
+        """Add a refresh hold to a snap.
+
+        Args:
+            duration (str): (optional) duration of the hold.
+                Default `None`
+        """
+        args = f"--hold={duration}" if duration else "--hold"
+        self._snap("refresh", [args])
+
+    def unhold(self) -> None:
+        """Remove the refresh hold of a snap."""
+        self._snap("refresh", ["--unhold"])
 
     def restart(
         self, services: Optional[List[str]] = None, reload: Optional[bool] = False

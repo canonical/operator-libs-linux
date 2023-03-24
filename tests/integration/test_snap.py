@@ -138,6 +138,28 @@ def test_snap_logs():
     assert len(kp.logs(num_lines=15).splitlines()) >= 4
 
 
+def test_snap_hold_refresh():
+    cache = snap.SnapCache()
+    kp = cache["kube-proxy"]
+    kp.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
+
+    kp.hold(duration="24h")
+
+    result = check_output(["snap", "list"])
+    assert "held" in result.decode()
+
+
+def test_snap_unhold_refresh():
+    cache = snap.SnapCache()
+    kp = cache["kube-proxy"]
+    kp.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
+
+    kp.unhold()
+
+    result = check_output(["snap", "list"])
+    assert "held" not in result.decode()
+
+
 def test_snap_restart():
     cache = snap.SnapCache()
     kp = cache["kube-proxy"]
