@@ -397,8 +397,7 @@ class Snap(object):
         """Add a refresh hold to a snap.
 
         Args:
-            duration (str): (optional) duration of the hold.
-                Default `None`
+            duration (str): duration of the hold.
         """
         args = f"--hold={duration}" if duration else "--hold"
         self._snap("refresh", [args])
@@ -585,6 +584,12 @@ class Snap(object):
                 services[app["name"]] = SnapService(**app).as_dict()
 
         return services
+
+    @property
+    def held(self) -> bool:
+        """Report whether the snap has a hold."""
+        info = self._snap("info")
+        return "hold:" in info
 
 
 class _UnixSocketConnection(http.client.HTTPConnection):

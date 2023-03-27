@@ -144,9 +144,7 @@ def test_snap_hold_refresh():
     kp.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
 
     kp.hold(duration="24h")
-
-    result = check_output(["snap", "list"])
-    assert "held" in result.decode()
+    assert kp.held
 
 
 def test_snap_unhold_refresh():
@@ -155,9 +153,7 @@ def test_snap_unhold_refresh():
     kp.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
 
     kp.unhold()
-
-    result = check_output(["snap", "list"])
-    assert "held" not in result.decode()
+    assert not kp.held
 
 
 def test_snap_restart():
