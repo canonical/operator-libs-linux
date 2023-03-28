@@ -143,7 +143,7 @@ def test_snap_hold_refresh():
     kp = cache["kube-proxy"]
     kp.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
 
-    kp.hold(duration="24h")
+    kp.hold(duration=timedelta(hours=24))
     assert kp.held
 
 

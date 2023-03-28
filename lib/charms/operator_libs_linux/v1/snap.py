@@ -393,14 +393,17 @@ class Snap(object):
         except CalledProcessError as e:
             raise SnapError("Could not {} for snap [{}]: {}".format(_cmd, self._name, e.stderr))
 
-    def hold(self, duration: Optional[str] = None) -> None:
+    def hold(self, duration: Optional[timedelta] = None) -> None:
         """Add a refresh hold to a snap.
 
         Args:
-            duration (str): duration of the hold.
+            duration: duration for the hold, or None (the default) to hold this snap indefinitely.
         """
-        args = f"--hold={duration}" if duration else "--hold"
-        self._snap("refresh", [args])
+        hold_str = "forever"
+        if duration is not None:
+            seconds = round(duration.total_seconds())
+            hold_str = f"{seconds}s"
+        self._snap("refresh", [f"--hold={hold_str}"])
 
     def unhold(self) -> None:
         """Remove the refresh hold of a snap."""

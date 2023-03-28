@@ -344,20 +344,25 @@ class TestSnapCache(unittest.TestCase):
         )
 
     @patch("charms.operator_libs_linux.v1.snap.subprocess.check_output")
-    def test_snap_hold(self, mock_subprocess):
+    def test_snap_hold_timedelta(self, mock_subprocess):
         mock_subprocess.return_value = 0
         foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
 
-        foo.hold(duration="72h")
+        foo.hold(duration=datetime.timedelta(hours=72))
         mock_subprocess.assert_called_with(
             [
                 "snap",
                 "refresh",
                 "foo",
-                "--hold=72h",
+                "--hold=259200s",
             ],
             universal_newlines=True,
         )
+
+    @patch("charms.operator_libs_linux.v1.snap.subprocess.check_output")
+    def test_snap_hold_forever(self, mock_subprocess):
+        mock_subprocess.return_value = 0
+        foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
 
         foo.hold()
         mock_subprocess.assert_called_with(
@@ -365,7 +370,7 @@ class TestSnapCache(unittest.TestCase):
                 "snap",
                 "refresh",
                 "foo",
-                "--hold",
+                "--hold=forever",
             ],
             universal_newlines=True,
         )
