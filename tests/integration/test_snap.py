@@ -4,6 +4,7 @@
 
 
 import logging
+import time
 from datetime import datetime, timedelta
 from subprocess import CalledProcessError, check_output
 
@@ -138,24 +139,6 @@ def test_snap_logs():
     assert len(kp.logs(num_lines=15).splitlines()) >= 4
 
 
-def test_snap_hold_refresh():
-    cache = snap.SnapCache()
-    kp = cache["kube-proxy"]
-    kp.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
-
-    kp.hold(duration=timedelta(hours=24))
-    assert kp.held
-
-
-def test_snap_unhold_refresh():
-    cache = snap.SnapCache()
-    kp = cache["kube-proxy"]
-    kp.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
-
-    kp.unhold()
-    assert not kp.held
-
-
 def test_snap_restart():
     cache = snap.SnapCache()
     kp = cache["kube-proxy"]
@@ -165,6 +148,26 @@ def test_snap_restart():
         kp.restart()
     except CalledProcessError as e:
         pytest.fail(e.stderr)
+
+
+def test_snap_hold_refresh():
+    cache = snap.SnapCache()
+    hw = cache["hello-world"]
+    hw.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
+
+    hw.hold(duration=timedelta(hours=24))
+    time.sleep(40)
+    assert hw.held
+
+
+def test_snap_unhold_refresh():
+    cache = snap.SnapCache()
+    hw = cache["hello-world"]
+    hw.ensure(snap.SnapState.Latest, channel="latest/stable")
+
+    hw.unhold()
+    time.sleep(40)
+    assert not hw.held
 
 
 def test_snap_connect():
