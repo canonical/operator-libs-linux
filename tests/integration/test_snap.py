@@ -149,6 +149,24 @@ def test_snap_restart():
         pytest.fail(e.stderr)
 
 
+def test_snap_hold_refresh():
+    cache = snap.SnapCache()
+    hw = cache["hello-world"]
+    hw.ensure(snap.SnapState.Latest, channel="latest/stable")
+
+    hw.hold(duration=timedelta(hours=24))
+    assert hw.held
+
+
+def test_snap_unhold_refresh():
+    cache = snap.SnapCache()
+    hw = cache["hello-world"]
+    hw.ensure(snap.SnapState.Latest, channel="latest/stable")
+
+    hw.unhold()
+    assert not hw.held
+
+
 def test_snap_connect():
     cache = snap.SnapCache()
     vlc = cache["vlc"]
