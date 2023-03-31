@@ -153,10 +153,9 @@ def test_snap_restart():
 def test_snap_hold_refresh():
     cache = snap.SnapCache()
     hw = cache["hello-world"]
-    hw.ensure(snap.SnapState.Latest, classic=True, channel="latest/stable")
+    hw.ensure(snap.SnapState.Latest, channel="latest/stable")
 
     hw.hold(duration=timedelta(hours=24))
-    time.sleep(40)
     assert hw.held
 
 
@@ -166,7 +165,6 @@ def test_snap_unhold_refresh():
     hw.ensure(snap.SnapState.Latest, channel="latest/stable")
 
     hw.unhold()
-    time.sleep(40)
     assert not hw.held
 
 
