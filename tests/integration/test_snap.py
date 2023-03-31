@@ -4,7 +4,6 @@
 
 
 import logging
-import time
 from datetime import datetime, timedelta
 from subprocess import CalledProcessError, check_output
 
