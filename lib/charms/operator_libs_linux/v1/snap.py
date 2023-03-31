@@ -83,7 +83,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 11
+LIBPATCH = 12
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -423,12 +423,15 @@ class Snap(object):
         args = ["restart", "--reload"] if reload else ["restart"]
         self._snap_daemons(args, services)
 
-    def _install(self, channel: Optional[str] = "", cohort: Optional[str] = "") -> None:
+    def _install(
+        self, channel: Optional[str] = "", cohort: Optional[str] = "", revision: Optional[str] = ""
+    ) -> None:
         """Add a snap to the system.
 
         Args:
           channel: the channel to install from
           cohort: optional, the key of a cohort that this snap belongs to
+          revision: optional, the revision of the snap to install
         """
         cohort = cohort or self._cohort
 
@@ -437,6 +440,8 @@ class Snap(object):
             args.append("--classic")
         if channel:
             args.append('--channel="{}"'.format(channel))
+        if revision:
+            args.append('--revision="{}"'.format(revision))
         if cohort:
             args.append('--cohort="{}"'.format(cohort))
 
@@ -446,6 +451,7 @@ class Snap(object):
         self,
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
+        revision: Optional[str] = "",
         leave_cohort: Optional[bool] = False,
     ) -> None:
         """Refresh a snap.
@@ -453,11 +459,15 @@ class Snap(object):
         Args:
           channel: the channel to install from
           cohort: optionally, specify a cohort.
+          revision: optionally, specify the revision of the snap to refresh
           leave_cohort: leave the current cohort.
         """
         args = []
         if channel:
             args.append('--channel="{}"'.format(channel))
+
+        if revision:
+            args.append('--revision="{}"'.format(revision))
 
         if not cohort:
             cohort = self._cohort
@@ -485,6 +495,7 @@ class Snap(object):
         classic: Optional[bool] = False,
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
+        revision: Optional[str] = "",
     ):
         """Ensure that a snap is in a given state.
 
@@ -493,6 +504,7 @@ class Snap(object):
           classic: an (Optional) boolean indicating whether classic confinement should be used
           channel: the channel to install from
           cohort: optional. Specify the key of a snap cohort.
+          revision: optional. the revision of the snap to install/refresh
 
         Raises:
           SnapError if an error is encountered
@@ -511,10 +523,10 @@ class Snap(object):
             # We are installing or refreshing a snap.
             if self._state not in (SnapState.Present, SnapState.Latest):
                 # The snap is not installed, so we install it.
-                self._install(channel, cohort)
+                self._install(channel, cohort, revision)
             else:
                 # The snap is installed, but we are changing it (e.g., switching channels).
-                self._refresh(channel, cohort)
+                self._refresh(channel, cohort, revision)
 
         self._update_snap_apps()
         self._state = state
