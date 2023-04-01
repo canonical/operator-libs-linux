@@ -4,6 +4,7 @@
 
 
 import logging
+import re
 from datetime import datetime, timedelta
 from subprocess import CalledProcessError, check_output, run
 
@@ -109,10 +110,23 @@ def test_snap_ensure_revision():
     assert get_command_path("juju") == ""
 
     # Install the snap with a specific revision
-    juju.ensure(snap.SnapState.Present, revision=1)
+    snap_info_juju = run(
+        ["snap", "info", "juju"], capture_output=True, encoding="utf-8"
+    ).stdout.split("\n")
+    edge_revision = None
+    for line in snap_info_juju:
+        match = re.search(r"latest/edge.*\((\d+)\)", line)
+
+        if match:
+            edge_revision = int(match.group(1))
+            break
+
+    assert edge_revision is not None
+
+    juju.ensure(snap.SnapState.Present, revision=edge_revision)
 
     assert get_command_path("juju") == "/snap/bin/juju"
-    assert juju.revision == "1"
+    assert juju.revision == edge_revision
 
     snap_info_juju = (
         run(
@@ -124,7 +138,7 @@ def test_snap_ensure_revision():
         .split("\n")
     )
     assert "installed:" in snap_info_juju[-1]
-    assert "(1)" in snap_info_juju[-1]
+    assert "({})".format(edge_revision) in snap_info_juju[-1]
 
 
 def test_snap_start():
