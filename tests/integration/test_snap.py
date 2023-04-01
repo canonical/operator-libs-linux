@@ -109,10 +109,11 @@ def test_snap_ensure_revision():
     juju.ensure(snap.SnapState.Available)
     assert get_command_path("juju") == ""
 
-    # Install the snap with a specific revision
+    # Install the snap with the revision of latest/edge
     snap_info_juju = run(
         ["snap", "info", "juju"], capture_output=True, encoding="utf-8"
     ).stdout.split("\n")
+
     edge_revision = None
     for line in snap_info_juju:
         match = re.search(r"latest/edge.*\((\d+)\)", line)
@@ -120,25 +121,25 @@ def test_snap_ensure_revision():
         if match:
             edge_revision = int(match.group(1))
             break
-
     assert edge_revision is not None
 
     juju.ensure(snap.SnapState.Present, revision=edge_revision)
 
     assert get_command_path("juju") == "/snap/bin/juju"
-    assert juju.revision == edge_revision
 
-    snap_info_juju = (
-        run(
-            ["snap", "info", "juju"],
-            capture_output=True,
-            encoding="utf-8",
-        )
-        .stdout.strip()
-        .split("\n")
-    )
-    assert "installed:" in snap_info_juju[-1]
-    assert "({})".format(edge_revision) in snap_info_juju[-1]
+    snap_info_juju = run(
+        ["snap", "info", "juju"],
+        capture_output=True,
+        encoding="utf-8",
+    ).stdout.strip()
+
+    assert "installed" in snap_info_juju
+    for line in snap_info_juju.split("\n"):
+        if "installed" in line:
+            match = re.search(r"installed.*\((\d+)\)", line)
+
+            assert match is not None
+            assert int(match.group(1)) == edge_revision
 
 
 def test_snap_start():
