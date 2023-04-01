@@ -5,7 +5,7 @@
 
 import logging
 from datetime import datetime, timedelta
-from subprocess import CalledProcessError, check_output
+from subprocess import CalledProcessError, check_output, run
 
 import pytest
 from charms.operator_libs_linux.v1 import snap
@@ -114,13 +114,18 @@ def test_snap_ensure_revision():
     assert get_command_path("juju") == "/snap/bin/juju"
     assert juju.revision == "1"
 
-    snap_info_juju = subprocess.run(
-        ["snap", "info", "juju"],
-        capture_output=True,
-        encoding="utf-8",
-    ).stdout.strip().split("\n")
+    snap_info_juju = (
+        run(
+            ["snap", "info", "juju"],
+            capture_output=True,
+            encoding="utf-8",
+        )
+        .stdout.strip()
+        .split("\n")
+    )
     assert "installed:" in snap_info_juju[-1]
     assert "(1)" in snap_info_juju[-1]
+
 
 def test_snap_start():
     cache = snap.SnapCache()
