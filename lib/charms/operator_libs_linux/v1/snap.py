@@ -222,7 +222,7 @@ class Snap(object):
         name,
         state: SnapState,
         channel: str,
-        revision: str,
+        revision: int,
         confinement: str,
         apps: Optional[List[Dict[str, str]]] = None,
         cohort: Optional[str] = "",
@@ -424,7 +424,10 @@ class Snap(object):
         self._snap_daemons(args, services)
 
     def _install(
-        self, channel: Optional[str] = "", cohort: Optional[str] = "", revision: Optional[str] = ""
+        self,
+        channel: Optional[str] = "",
+        cohort: Optional[str] = "",
+        revision: Optional[int] = None,
     ) -> None:
         """Add a snap to the system.
 
@@ -451,7 +454,7 @@ class Snap(object):
         self,
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
-        revision: Optional[str] = "",
+        revision: Optional[int] = None,
         leave_cohort: Optional[bool] = False,
     ) -> None:
         """Refresh a snap.
@@ -495,7 +498,7 @@ class Snap(object):
         classic: Optional[bool] = False,
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
-        revision: Optional[str] = "",
+        revision: Optional[int] = None,
     ):
         """Ensure that a snap is in a given state.
 
@@ -569,7 +572,7 @@ class Snap(object):
         self._state = state
 
     @property
-    def revision(self) -> str:
+    def revision(self) -> int:
         """Returns the revision for a snap."""
         return self._revision
 
@@ -822,7 +825,7 @@ class SnapCache(Mapping):
                 name=i["name"],
                 state=SnapState.Latest,
                 channel=i["channel"],
-                revision=i["revision"],
+                revision=int(i["revision"]),
                 confinement=i["confinement"],
                 apps=i.get("apps", None),
             )
@@ -840,7 +843,7 @@ class SnapCache(Mapping):
             name=info["name"],
             state=SnapState.Available,
             channel=info["channel"],
-            revision=info["revision"],
+            revision=int(info["revision"]),
             confinement=info["confinement"],
             apps=None,
         )

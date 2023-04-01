@@ -101,6 +101,27 @@ def test_new_snap_ensure():
     vlc.ensure(snap.SnapState.Latest, channel="edge")
 
 
+def test_snap_ensure_revision():
+    juju = snap.SnapCache()["juju"]
+
+    # Verify that the snap is not installed
+    juju.ensure(snap.SnapState.Available)
+    assert get_command_path("juju") == ""
+
+    # Install the snap with a specific revision
+    juju.ensure(snap.SnapState.Present, revision=1)
+
+    assert get_command_path("juju") == "/snap/bin/juju"
+    assert juju.revision == "1"
+
+    snap_info_juju = subprocess.run(
+        ["snap", "info", "juju"],
+        capture_output=True,
+        encoding="utf-8",
+    ).stdout.strip().split("\n")
+    assert "installed:" in snap_info_juju[-1]
+    assert "(1)" in snap_info_juju[-1]
+
 def test_snap_start():
     cache = snap.SnapCache()
     kp = cache["kube-proxy"]
