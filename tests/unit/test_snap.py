@@ -480,8 +480,7 @@ class TestSnapBareMethods(unittest.TestCase):
 
         baz = snap.add("curl", classic=True, revision=123)
         mock_subprocess.assert_called_with(
-            ["snap", "install", "curl", "--classic", '--revision="123"'],
-            universal_newlines=True
+            ["snap", "install", "curl", "--classic", '--revision="123"'], universal_newlines=True
         )
         self.assertTrue(baz.present)
 
