@@ -509,6 +509,9 @@ class Snap(object):
           cohort: optional. Specify the key of a snap cohort.
           revision: optional. the revision of the snap to install/refresh
 
+        While both channel and revision could be specified, the underlying snap install/refresh
+        command will determine which one takes precedence (revision at this time)
+
         Raises:
           SnapError if an error is encountered
         """
@@ -853,9 +856,10 @@ class SnapCache(Mapping):
 def add(
     snap_names: Union[str, List[str]],
     state: Union[str, SnapState] = SnapState.Latest,
-    channel: Optional[str] = "latest",
+    channel: Optional[str] = "",
     classic: Optional[bool] = False,
     cohort: Optional[str] = "",
+    revision: Optional[int] = None,
 ) -> Union[Snap, List[Snap]]:
     """Add a snap to the system.
 
@@ -867,10 +871,14 @@ def add(
         classic: an (Optional) boolean specifying whether it should be added with classic
             confinement. Default `False`
         cohort: an (Optional) string specifying the snap cohort to use
+        revision: an (Optional) integer specifying the snap revision to use
 
     Raises:
         SnapError if some snaps failed to install or were not found.
     """
+    if not channel and not revision:
+        channel = "latest"
+
     snap_names = [snap_names] if type(snap_names) is str else snap_names
     if not snap_names:
         raise TypeError("Expected at least one snap to add, received zero!")
@@ -878,7 +886,7 @@ def add(
     if type(state) is str:
         state = SnapState(state)
 
-    return _wrap_snap_operations(snap_names, state, channel, classic, cohort)
+    return _wrap_snap_operations(snap_names, state, channel, classic, cohort, revision)
 
 
 @_cache_init
@@ -902,9 +910,10 @@ def remove(snap_names: Union[str, List[str]]) -> Union[Snap, List[Snap]]:
 def ensure(
     snap_names: Union[str, List[str]],
     state: str,
-    channel: Optional[str] = "latest",
+    channel: Optional[str] = "",
     classic: Optional[bool] = False,
     cohort: Optional[str] = "",
+    revision: Optional[int] = None,
 ) -> Union[Snap, List[Snap]]:
     """Ensure specified snaps are in a given state on the system.
 
@@ -915,12 +924,19 @@ def ensure(
         classic: an (Optional) boolean specifying whether it should be added with classic
             confinement. Default `False`
         cohort: an (Optional) string specifying the snap cohort to use
+        revision: an (Optional) integer specifying the snap revision to use
+
+    When both channel and revision are specified, the underlying snap install/refresh
+    command will determine the precedence (revision at the time of adding this)
 
     Raises:
         SnapError if the snap is not in the cache.
     """
-    if state in ("present", "latest"):
-        return add(snap_names, SnapState(state), channel, classic, cohort)
+    if not revision and not channel:
+        channel = "latest"
+
+    if state in ("present", "latest") or revision:
+        return add(snap_names, SnapState(state), channel, classic, cohort, revision)
     else:
         return remove(snap_names)
 
@@ -931,6 +947,7 @@ def _wrap_snap_operations(
     channel: str,
     classic: bool,
     cohort: Optional[str] = "",
+    revision: Optional[int] = None,
 ) -> Union[Snap, List[Snap]]:
     """Wrap common operations for bare commands."""
     snaps = {"success": [], "failed": []}
@@ -943,7 +960,9 @@ def _wrap_snap_operations(
             if state is SnapState.Absent:
                 snap.ensure(state=SnapState.Absent)
             else:
-                snap.ensure(state=state, classic=classic, channel=channel, cohort=cohort)
+                snap.ensure(
+                    state=state, classic=classic, channel=channel, cohort=cohort, revision=revision
+                )
             snaps["success"].append(snap)
         except SnapError as e:
             logger.warning("Failed to {} snap {}: {}!".format(op, s, e.message))

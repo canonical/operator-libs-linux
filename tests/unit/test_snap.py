@@ -472,11 +472,18 @@ class TestSnapBareMethods(unittest.TestCase):
             ["snap", "install", "curl", "--classic", '--channel="latest"'],
             universal_newlines=True,
         )
-        self.assertEqual(foo.present, True)
+        self.assertTrue(foo.present)
 
         bar = snap.remove("curl")
         mock_subprocess.assert_called_with(["snap", "remove", "curl"], universal_newlines=True)
-        self.assertEqual(bar.present, False)
+        self.assertFalse(bar.present)
+
+        baz = snap.add("curl", classic=True, revision=123)
+        mock_subprocess.assert_called_with(
+            ["snap", "install", "curl", "--classic", '--revision="123"'],
+            universal_newlines=True
+        )
+        self.assertTrue(baz.present)
 
     @patch("charms.operator_libs_linux.v1.snap.subprocess")
     def test_cohort(self, mock_subprocess):
@@ -514,11 +521,18 @@ class TestSnapBareMethods(unittest.TestCase):
             ["snap", "install", "curl", "--classic", '--channel="latest/test"'],
             universal_newlines=True,
         )
-        self.assertEqual(foo.present, True)
+        self.assertTrue(foo.present)
 
         bar = snap.ensure("curl", "absent")
         mock_subprocess.assert_called_with(["snap", "remove", "curl"], universal_newlines=True)
-        self.assertEqual(bar.present, False)
+        self.assertFalse(bar.present)
+
+        baz = snap.ensure("curl", "present", classic=True, revision=123)
+        mock_subprocess.assert_called_with(
+            ["snap", "install", "curl", "--classic", '--revision="123"'],
+            universal_newlines=True,
+        )
+        self.assertTrue(baz.present)
 
     @patch("charms.operator_libs_linux.v1.snap.subprocess.check_output")
     def test_raises_snap_not_found_error(self, mock_subprocess):
