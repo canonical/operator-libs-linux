@@ -415,7 +415,7 @@ class Snap(object):
         """Restarts a snap's services.
 
         Args:
-            services (list): (optional) list of individual snap services to show logs from.
+            services (list): (optional) list of individual snap services to restart.
                 (otherwise all)
             reload (bool): (optional) flag to use the service reload command, if available.
                 Default `False`
