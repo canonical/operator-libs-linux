@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from subprocess import CalledProcessError, check_output, run
 
 import pytest
-from charms.operator_libs_linux.v1 import snap
+from charms.operator_libs_linux.v2 import snap
 from helpers import get_command_path
 
 logger = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ def test_snap_ensure_revision():
         match = re.search(r"latest/edge.*\((\d+)\)", line)
 
         if match:
-            edge_revision = int(match.group(1))
+            edge_revision = match.group(1)
             break
     assert edge_revision is not None
 
@@ -139,7 +139,7 @@ def test_snap_ensure_revision():
             match = re.search(r"installed.*\((\d+)\)", line)
 
             assert match is not None
-            assert int(match.group(1)) == edge_revision
+            assert match.group(1) == edge_revision
 
 
 def test_snap_start():
