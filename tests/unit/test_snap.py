@@ -661,3 +661,21 @@ class TestSnapBareMethods(unittest.TestCase):
                 universal_newlines=True,
             )
             mock_subprocess.reset_mock()
+
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
+    def test_alias(self, mock_subprocess):
+        mock_subprocess.return_value = 0
+        foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
+        foo.alias("bar", "baz")
+        mock_subprocess.assert_called_once_with(
+            ["snap", "alias", "foo.bar", "baz"],
+            universal_newlines=True,
+        )
+        mock_subprocess.reset_mock()
+
+        foo.alias("bar")
+        mock_subprocess.assert_called_once_with(
+            ["snap", "alias", "foo.bar", "bar"],
+            universal_newlines=True,
+        )
+        mock_subprocess.reset_mock()
