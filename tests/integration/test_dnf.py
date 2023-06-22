@@ -27,8 +27,8 @@ def test_query_dnf_and_package() -> None:
     assert package.arch == "x86_64"
     assert package.epoch is None
     assert package.version == "22.05.9"
-    assert package.release == "3.el9"
-    assert package.full_version == "22.05.6-3.el9"
+    assert package.release == "1.el9"
+    assert package.full_version == "22.05.9-1.el9"
     assert package.repo == "epel"
 
 
