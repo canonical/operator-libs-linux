@@ -273,10 +273,7 @@ class Snap(object):
           SnapError if there is a problem encountered
         """
         optargs = optargs or []
-        if command == "alias":
-            _cmd = ["snap", command, *optargs]
-        else:
-            _cmd = ["snap", command, self._name, *optargs]
+        _cmd = ["snap", command, self._name, *optargs]
         try:
             return subprocess.check_output(_cmd, universal_newlines=True)
         except CalledProcessError as e:
@@ -412,16 +409,24 @@ class Snap(object):
         """Remove the refresh hold of a snap."""
         self._snap("refresh", ["--unhold"])
 
-    def alias(self, application: str, alias: str = None) -> None:
+    def alias(self, application: str, alias: Optional[str] = None) -> None:
         """Create an alias for a given application.
 
         Args:
             application: application to get an alias.
             alias: (optional) name of the alias
         """
-        if not alias:
+        if alias is None:
             alias = application
-        self._snap("alias", [f"{self.name}.{application}", alias])
+        _cmd = ["snap", "alias", f"{self.name}.{application}", alias]
+        try:
+            subprocess.check_output(_cmd, universal_newlines=True)
+        except CalledProcessError as e:
+            raise SnapError(
+                "Snap: {!r}; command {!r} failed with output = {!r}".format(
+                    self._name, _cmd, e.output
+                )
+            )
 
     def restart(
         self, services: Optional[List[str]] = None, reload: Optional[bool] = False

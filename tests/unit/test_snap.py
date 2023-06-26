@@ -664,7 +664,7 @@ class TestSnapBareMethods(unittest.TestCase):
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
     def test_alias(self, mock_subprocess):
-        mock_subprocess.return_value = 0
+        mock_subprocess.return_value = ""
         foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
         foo.alias("bar", "baz")
         mock_subprocess.assert_called_once_with(
@@ -676,6 +676,25 @@ class TestSnapBareMethods(unittest.TestCase):
         foo.alias("bar")
         mock_subprocess.assert_called_once_with(
             ["snap", "alias", "foo.bar", "bar"],
+            universal_newlines=True,
+        )
+        mock_subprocess.reset_mock()
+
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
+    def test_alias_raises_snap_error(self, mock_subprocess):
+        mock_subprocess.side_effect = CalledProcessError(
+            returncode=1, cmd=["snap", "alias", "foo.bar", "baz"]
+        )
+        foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
+        with self.assertRaises(snap.SnapError) as ctx:
+            foo.alias("bar", "baz")
+        self.assertEqual("<charms.operator_libs_linux.v2.snap.SnapError>", ctx.exception.name)
+        self.assertEqual(
+            "Snap: 'foo'; command ['snap', 'alias', 'foo.bar', 'baz'] failed with output = None",
+            ctx.exception.message,
+        )
+        mock_subprocess.assert_called_once_with(
+            ["snap", "alias", "foo.bar", "baz"],
             universal_newlines=True,
         )
         mock_subprocess.reset_mock()
