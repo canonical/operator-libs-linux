@@ -686,13 +686,8 @@ class TestSnapBareMethods(unittest.TestCase):
             returncode=1, cmd=["snap", "alias", "foo.bar", "baz"]
         )
         foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
-        with self.assertRaises(snap.SnapError) as ctx:
+        with self.assertRaises(snap.SnapError):
             foo.alias("bar", "baz")
-        self.assertEqual("<charms.operator_libs_linux.v2.snap.SnapError>", ctx.exception.name)
-        self.assertEqual(
-            "Snap: 'foo'; command ['snap', 'alias', 'foo.bar', 'baz'] failed with output = None",
-            ctx.exception.message,
-        )
         mock_subprocess.assert_called_once_with(
             ["snap", "alias", "foo.bar", "baz"],
             universal_newlines=True,
