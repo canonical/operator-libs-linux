@@ -237,3 +237,12 @@ def test_reset_hold_refresh():
     snap.hold_refresh(0)
     result = check_output(["snap", "refresh", "--time"])
     assert "hold: " not in result.decode()
+
+
+def test_alias():
+    cache = snap.SnapCache()
+    lxd = cache["lxd"]
+    lxd.alias("lxc", "testlxc")
+    result = check_output(["snap", "aliases"], text=True)
+    found = any(line.split() == ["lxd.lxc", "testlxc", "manual"] for line in result.splitlines())
+    assert found, result
