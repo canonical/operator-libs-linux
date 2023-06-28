@@ -243,10 +243,6 @@ def test_alias():
     cache = snap.SnapCache()
     lxd = cache["lxd"]
     lxd.alias("lxc", "testlxc")
-    result = check_output(["snap", "aliases"])
-    found_alias = False
-    for line in result.decode().split("\n")[1:]:
-        if ["lxd.lxc", "testlxc", "manual"] == [val for val in line.split(" ") if val]:
-            found_alias = True
-            break
-    assert found_alias
+    result = check_output(["snap", "aliases"], text=True)
+    found = any(line.split() == ["lxd.lxc", "testlxc", "manual"] for line in result.splitlines())
+    assert found, result
