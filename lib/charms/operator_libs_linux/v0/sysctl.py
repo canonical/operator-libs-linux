@@ -169,11 +169,12 @@ class SysctlConfig:
         if not self.validate():
             raise ValidationError()
 
-        # snapshot = self._create_snapshot()
+        snapshot = self._create_snapshot()
+        print(f"CREATED SNAPSHOT: {snapshot}")
         try:
             self._apply()
         except SysctlPermissionError:
-            # self._restore_snapshot(snapshot)
+            self._restore_snapshot(snapshot)
             raise
         except ValidationError:
             raise
@@ -217,24 +218,28 @@ class SysctlConfig:
             logger.error(msg)
             raise SysctlPermissionError(msg)
 
-    def _create_snapshot(self) -> None:
-        """"""
-        # TODO
-        # keys = [param.name for param in self.config_params]
-        # written_values = [self._sysctl([key, "-n"]) for key in keys]
-        return
+    def _create_snapshot(self) -> list[ConfigOption]:
+        """Create a snaphot of config options that are going to be set."""
+        keys = [param.name for param in self.config_params]
+        return [ConfigOption(key, self._sysctl([key, "-n"])[0]) for key in keys]
 
-    def _restore_snapshot(self, snapshot) -> None:
-        """"""
-        # TODO
+    def _restore_snapshot(self, snapshot: list[ConfigOption]) -> None:
+        """Restore a snapshot to the machine."""
+        for param in snapshot:
+            self._sysctl([param.string_format])
 
-    def _sysctl(self, cmd: list[str]) -> list:
+    def _sysctl(self, cmd: list[str]) -> list[str]:
         """Execute a sysctl command."""
         cmd = ["sysctl"] + cmd
         print(f"Calling: {cmd}")
         # 'sysctl: permission denied on key "vm.max_map_count", ignoring'
-        return ["net.ipv6.conf.all.accept_redirects = 0"]
+        return ["net.ipv6.conf.all.accept_redirects = 0", 'sysctl: permission denied on key "vm.max_map_count", ignoring']
         # try:
         #     return check_output(cmd, stderr=STDOUT, universal_newlines=True).splitlines()
         # except CalledProcessError as e:
         #     raise SysctlError(f"Error executing '{cmd}': {e.output}")
+
+    def _conflicting_options() -> list[str]:
+        """Gets if there are config options on them."""
+        # TODO
+
