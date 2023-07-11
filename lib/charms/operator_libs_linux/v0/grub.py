@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Simple library for managing Linux kernel configuration via grub.
+"""Simple library for managing Linux kernel configuration via GRUB.
 
 This library is only used for setting additional parameters that will be stored in the
 "/etc/default/grub.d/95-juju-charm.cfg" config file and not for editing other
@@ -32,7 +32,7 @@ class UbuntuCharm(CharmBase):
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.remove, self._on_remove)
         self.grub = grub.GrubConfig(self.meta.name)
-        log.debug("found keys %s in grub config file", self.grub.keys())
+        log.debug("found keys %s in GRUB config file", self.grub.keys())
 
     def _on_install(self, _):
         try:
@@ -44,18 +44,19 @@ class UbuntuCharm(CharmBase):
 
     def _on_update_status(self, _):
         if self.grub["GRUB_CMDLINE_LINUX_DEFAULT"] != '"$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"':
-            self.unit.status = BlockedStatus("wrong grub configuration")
+            self.unit.status = BlockedStatus("wrong GRUB configuration")
 
     def _on_remove(self, _):
         self.grub.remove()
 """
 
 import filecmp
+import io
 import logging
 import os
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Set
+from typing import Dict, Mapping, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +73,12 @@ LIBPATCH = 1
 GRUB_DIRECTORY = Path("/etc/default/grub.d/")
 CHARM_CONFIG_PREFIX = "90-juju"
 GRUB_CONFIG = GRUB_DIRECTORY / "95-juju-charm.cfg"
-CONFIG_HEADER = f"""# This config file was produced by grub lib v{LIBAPI}.{LIBPATCH}.
+CONFIG_HEADER = f"""# This config file was produced by GRUB lib v{LIBAPI}.{LIBPATCH}.
 # https://charmhub.io/operator-libs-linux/libraries/grub
 """
 FILE_LINE_IN_DESCRIPTION = "#   {path}"
 CONFIG_DESCRIPTION = """
-# This file represents the output of the grub lib, which can combine multiple
+# This file represents the output of the GRUB lib, which can combine multiple
 # configurations into a single file like this.
 #
 # Original files:
@@ -89,24 +90,20 @@ CONFIG_DESCRIPTION = """
 #   info -f grub -n 'Simple configuration'
 """
 
+# TODO: use shlex
+
 
 class ValidationError(ValueError):
     """Exception representing value validation error."""
 
     def __init__(self, key: str, message: str) -> None:
-        self._key = key
-        self._message = message
+        self.key = key
+        self.message = message
         super().__init__(message)
 
-    @property
-    def key(self) -> str:
-        """Get name of key, which cause this error."""
-        return self._key
-
-    @property
-    def message(self) -> str:
-        """Get error message."""
-        return self._message
+    def __str__(self) -> str:
+        """Return string representation of error."""
+        return self.message
 
 
 class IsContainerError(Exception):
@@ -117,14 +114,10 @@ class ApplyError(Exception):
     """Exception if applying new config failed."""
 
 
-def _parse_config(data: str) -> Dict[str, str]:
-    """Parse config file lines.
-
-    This function is capable to update single key value if it's used with $ symbol.
-    """
+def _parse_config(stream: io.TextIOWrapper) -> Dict[str, str]:
+    """Parse config file lines."""
     config = {}
-    lines = data.splitlines()
-    for line in lines:
+    for line in stream:
         line = line.strip()
         if not line or line.startswith("#"):
             logger.debug("skipping line `%s`", line)
@@ -142,27 +135,26 @@ def _parse_config(data: str) -> Dict[str, str]:
 def _load_config(path: Path) -> Dict[str, str]:
     """Load config file from /etc/default/grub.d/ directory."""
     if not path.exists():
-        raise FileNotFoundError("grub config file %s was not found", path)
+        raise FileNotFoundError("GRUB config file %s was not found", path)
 
     with open(path, "r", encoding="UTF-8") as file:
-        data = file.read()
-        config = _parse_config(data)
+        config = _parse_config(file)
 
-    logger.info("grub config file %s was loaded", path)
+    logger.info("GRUB config file %s was loaded", path)
     logger.debug("config file %s", config)
     return config
 
 
 def _save_config(path: Path, config: Dict[str, str], header: str = CONFIG_HEADER) -> None:
-    """Save grub config file."""
+    """Save GRUB config file."""
     if path.exists():
-        logger.debug("grub config %s already exist and it will overwritten", path)
+        logger.debug("GRUB config %s already exist and it will overwritten", path)
 
     context = [f"{key}={value}" for key, value in config.items()]
     with open(path, "w", encoding="UTF-8") as file:
         file.writelines([header, *context])
 
-    logger.info("grub config file %s was saved", path)
+    logger.info("GRUB config file %s was saved", path)
 
 
 def check_update_grub() -> bool:
@@ -192,21 +184,17 @@ def is_container() -> bool:
         return False
 
 
-class GrubConfig(Mapping[str, str]):
+class Config(Mapping[str, str]):
     """Grub config object.
 
-    This object will load current configuration option for grub and provide option
-    to update it with simple validation.
-
-    There is only one public function `update`, which should handle everything. It will
-    raise exception if there is already different value configured and return set of
-    changed keys to help charm check which keys where changed.
+    This object will load current configuration option for GRUB and provide option
+    to update it with simple validation, remove charm option and apply those changes.
     """
 
     _lazy_data: Optional[Dict[str, str]] = None
 
     def __init__(self, charm_name: Optional[str] = None) -> None:
-        """Initialize the grub config."""
+        """Initialize the GRUB config."""
         self._charm_name = charm_name
 
     def __contains__(self, key: str) -> bool:
@@ -232,14 +220,14 @@ class GrubConfig(Mapping[str, str]):
             try:
                 self._lazy_data = _load_config(GRUB_CONFIG)
             except FileNotFoundError:
-                logger.debug("there is no grub config file yet")
+                logger.debug("there is no GRUB config file yet")
                 self._lazy_data = {}
 
         return self._lazy_data
 
     def _save_grub_configuration(self) -> None:
         """Save current gru configuration."""
-        logger.info("saving new grub config to %s", GRUB_CONFIG)
+        logger.info("saving new GRUB config to %s", GRUB_CONFIG)
         applied_configs = {self.path, *self.applied_configs}  # using set to drop duplicity
         registered_configs = os.linesep.join(
             FILE_LINE_IN_DESCRIPTION.format(path=path) for path in applied_configs
@@ -247,7 +235,7 @@ class GrubConfig(Mapping[str, str]):
         header = CONFIG_HEADER + CONFIG_DESCRIPTION.format(configs=registered_configs)
         _save_config(GRUB_CONFIG, self._data, header)
 
-    def _set_value(self, key: str, value: str) -> bool:
+    def _set_value(self, key: str, value: str, blocked_keys: Set[str]) -> bool:
         """Set new value for key."""
         logger.debug("setting new value %s for key %s", value, key)
         current_value = self._data.get(key)
@@ -255,7 +243,7 @@ class GrubConfig(Mapping[str, str]):
             self._data[key] = value
             return True
 
-        if current_value != value:
+        if current_value != value and key in blocked_keys:
             logger.warning(
                 "tries to overwrite key %s, which has value %s, with value %s",
                 key,
@@ -272,12 +260,28 @@ class GrubConfig(Mapping[str, str]):
         """Update data in object."""
         logger.debug("updating current config")
         changed_keys = set()
+        blocked_keys = self.blocked_keys
         for key, value in config.items():
-            changed = self._set_value(key, value)
+            changed = self._set_value(key, value, blocked_keys)
             if changed:
                 changed_keys.add(key)
 
         return changed_keys
+
+    @property
+    def applied_configs(self) -> Dict[Path, Dict[str, str]]:
+        """Return list of charms configs which registered config in LIB_CONFIG_DIRECTORY."""
+        configs = {}
+        for path in sorted(GRUB_DIRECTORY.glob(f"{CHARM_CONFIG_PREFIX}-*")):
+            configs[path] = _load_config(path)
+            logger.debug("load config file %s", path)
+
+        return configs
+
+    @property
+    def blocked_keys(self) -> Set[str]:
+        """Get set of configured keys by other charms."""
+        return {key for config in self.applied_configs.values() for key in config}
 
     @property
     def charm_name(self) -> str:
@@ -292,21 +296,10 @@ class GrubConfig(Mapping[str, str]):
         """Return path for charm config."""
         return GRUB_DIRECTORY / f"{CHARM_CONFIG_PREFIX}-{self.charm_name}"
 
-    @property
-    def applied_configs(self) -> List[Path]:
-        """Return list of charms which registered config in LIB_CONFIG_DIRECTORY."""
-        return sorted(
-            [
-                config.absolute()
-                for config in GRUB_DIRECTORY.glob(f"{CHARM_CONFIG_PREFIX}-*")
-                if config.is_file()
-            ]
-        )
-
     def apply(self):
         """Check if an update to /boot/grub/grub.cfg is available."""
         if not check_update_grub():
-            logger.info("no available grub updates found")
+            logger.info("no available GRUB updates found")
             return
 
         try:
@@ -319,7 +312,7 @@ class GrubConfig(Mapping[str, str]):
         """Remove config for charm.
 
         This function will remove config file for charm and re-create the `95-juju-charm.cfg`
-        grub config file without changes made by this charm.
+        GRUB config file without changes made by this charm.
         """
         if not self.path.exists():
             logger.debug("there is no charm config file %s", self.path)
@@ -328,9 +321,7 @@ class GrubConfig(Mapping[str, str]):
         self.path.unlink()
         logger.info("charm config file %s was removed", self.path)
         config = {}
-        for path in self.applied_configs:
-            _config = _load_config(path)
-            logger.debug("load config file %s", path)
+        for _config in self.applied_configs.values():
             config.update(_config)
 
         changed_keys = set(self._data) - set(config.keys())
@@ -344,7 +335,7 @@ class GrubConfig(Mapping[str, str]):
     def update(self, config: Dict[str, str], apply: bool = True) -> Set[str]:
         """Update the Grub configuration."""
         if is_container():
-            raise IsContainerError("Could not configure grub config on container.")
+            raise IsContainerError("Could not configure GRUB config on container.")
 
         snapshot = self._data.copy()
         try:
