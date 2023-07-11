@@ -14,11 +14,43 @@
 
 """Simple library for managing Linux kernel configuration via grub.
 
-NOTE: This library is not capable to read grub config file containes
+This library is only used for setting additional parameters that will be stored in the
+"/etc/default/grub.d/95-juju-charm.cfg" config file and not for editing other
+configuration files. It's intended to be used in charms to help configure the machine.
 
-TODO: add more detailed description
+Configurations for individual charms will be stored in "/etc/default/grub.d/90-juju-<charm>",
+but these configurations will only have informational value as all configurations will be merged
+to "/etc/default/grub.d/95-juju-charm.cfg".
+
+Example of use:
+
+```python
+class UbuntuCharm(CharmBase):
+    def __init__(self, *args):
+        ...
+        self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.update_status, self._on_update_status)
+        self.framework.observe(self.on.remove, self._on_remove)
+        self.grub = grub.GrubConfig(self.meta.name)
+        log.debug("found keys %s in grub config file", self.grub.keys())
+
+    def _on_install(self, _):
+        try:
+            self.grub.update(
+                {"GRUB_CMDLINE_LINUX_DEFAULT": '"$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"'}
+            )
+        except grub.ValidationError as error:
+            self.unit.status = BlockedStatus(f"[{error.key}] {error.message}")
+
+    def _on_update_status(self, _):
+        if self.grub["GRUB_CMDLINE_LINUX_DEFAULT"] != '"$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"':
+            self.unit.status = BlockedStatus("wrong grub configuration")
+
+    def _on_remove(self, _):
+        self.grub.remove()
 """
 
+import filecmp
 import logging
 import os
 import subprocess
@@ -37,10 +69,10 @@ LIBAPI = 0
 # to 0 if you are raising the major API version
 LIBPATCH = 1
 
-LIB_CONFIG_DIRECTORY = Path("/var/lib/charm-grub/")
-GRUB_CONFIG = Path("/etc/default/grub.d/") / "95-juju-charm.cfg"
-CONFIG_HEADER = f"""
-# This config file was produced by grub lib v{LIBAPI}.{LIBPATCH}.
+GRUB_DIRECTORY = Path("/etc/default/grub.d/")
+CHARM_CONFIG_PREFIX = "90-juju"
+GRUB_CONFIG = GRUB_DIRECTORY / "95-juju-charm.cfg"
+CONFIG_HEADER = f"""# This config file was produced by grub lib v{LIBAPI}.{LIBPATCH}.
 # https://charmhub.io/operator-libs-linux/libraries/grub
 """
 FILE_LINE_IN_DESCRIPTION = "#   {path}"
@@ -49,15 +81,13 @@ CONFIG_DESCRIPTION = """
 # configurations into a single file like this.
 #
 # Original files:
-#  {configs}
+{configs}
 #
 # If you change this file, run 'update-grub' afterwards to update
 # /boot/grub/grub.cfg.
 # For full documentation of the options in this file, see:
 #   info -f grub -n 'Simple configuration'
 """
-
-# TODO: add better description to lib
 
 
 class ValidationError(ValueError):
@@ -135,10 +165,31 @@ def _save_config(path: Path, config: Dict[str, str], header: str = CONFIG_HEADER
     logger.info("grub config file %s was saved", path)
 
 
+def check_update_grub() -> bool:
+    """Check if an update to /boot/grub/grub.cfg is available."""
+    main_grub_cfg = Path("/boot/grub/grub.cfg")
+    tmp_path = Path("/tmp/tmp_grub.cfg")
+    try:
+        subprocess.check_call(
+            ["/usr/sbin/grub-mkconfig", "-o", f"{tmp_path}"], stderr=subprocess.STDOUT
+        )
+    except subprocess.CalledProcessError as error:
+        logger.exception(error)
+        raise
+
+    return not filecmp.cmp(main_grub_cfg, tmp_path)
+
+
 def is_container() -> bool:
     """Help function to see if local machine is container."""
-    # TODO: implement it
-    return False
+    try:
+        output = subprocess.check_output(
+            ["/usr/bin/systemd-detect-virt", "--container"], stderr=subprocess.STDOUT
+        ).decode()
+        logger.debug("detect virt type %s", output)
+        return True
+    except subprocess.CalledProcessError:
+        return False
 
 
 class GrubConfig(Mapping[str, str]):
@@ -177,20 +228,14 @@ class GrubConfig(Mapping[str, str]):
     @property
     def _data(self) -> Dict[str, str]:
         """Data property."""
-        data = self._lazy_data
-        if data is None:
-            data = self._lazy_data = _load_config(GRUB_CONFIG)
+        if self._lazy_data is None:
+            try:
+                self._lazy_data = _load_config(GRUB_CONFIG)
+            except FileNotFoundError:
+                logger.debug("there is no grub config file yet")
+                self._lazy_data = {}
 
-        return data
-
-    def _apply(self):
-        """Check if an update to /boot/grub/grub.cfg is available."""
-        try:
-            subprocess.check_call(f"grub-mkconfig -o {GRUB_CONFIG}", stderr=subprocess.STDOUT)
-            subprocess.check_call(["/usr/sbin/update-grub"], stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as error:
-            logger.exception(error)
-            raise ApplyError("New config check failed.") from error
+        return self._lazy_data
 
     def _save_grub_configuration(self) -> None:
         """Save current gru configuration."""
@@ -218,7 +263,7 @@ class GrubConfig(Mapping[str, str]):
                 value,
             )
             raise ValidationError(
-                f"key {key} already exists and its value is {current_value}", key
+                key, f"key {key} already exists and its value is {current_value}"
             )
 
         return False
@@ -245,21 +290,41 @@ class GrubConfig(Mapping[str, str]):
     @property
     def path(self) -> Path:
         """Return path for charm config."""
-        return LIB_CONFIG_DIRECTORY / self.charm_name
+        return GRUB_DIRECTORY / f"{CHARM_CONFIG_PREFIX}-{self.charm_name}"
 
     @property
     def applied_configs(self) -> List[Path]:
         """Return list of charms which registered config in LIB_CONFIG_DIRECTORY."""
         return sorted(
-            [config.absolute() for config in LIB_CONFIG_DIRECTORY.glob("*") if config.is_file()]
+            [
+                config.absolute()
+                for config in GRUB_DIRECTORY.glob(f"{CHARM_CONFIG_PREFIX}-*")
+                if config.is_file()
+            ]
         )
 
-    def remove(self) -> None:
+    def apply(self):
+        """Check if an update to /boot/grub/grub.cfg is available."""
+        if not check_update_grub():
+            logger.info("no available grub updates found")
+            return
+
+        try:
+            subprocess.check_call(["/usr/sbin/update-grub"], stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as error:
+            logger.exception(error)
+            raise ApplyError("New config check failed.") from error
+
+    def remove(self, apply: bool = True) -> Set[str]:
         """Remove config for charm.
 
         This function will remove config file for charm and re-create the `95-juju-charm.cfg`
         grub config file without changes made by this charm.
         """
+        if not self.path.exists():
+            logger.debug("there is no charm config file %s", self.path)
+            return set()
+
         self.path.unlink()
         logger.info("charm config file %s was removed", self.path)
         config = {}
@@ -268,11 +333,15 @@ class GrubConfig(Mapping[str, str]):
             logger.debug("load config file %s", path)
             config.update(_config)
 
+        changed_keys = set(self._data) - set(config.keys())
         self._lazy_data = config
         self._save_grub_configuration()
-        self._apply()
+        if apply:
+            self.apply()
 
-    def update(self, config: Dict[str, str]) -> Set[str]:
+        return changed_keys
+
+    def update(self, config: Dict[str, str], apply: bool = True) -> Set[str]:
         """Update the Grub configuration."""
         if is_container():
             raise IsContainerError("Could not configure grub config on container.")
@@ -280,8 +349,10 @@ class GrubConfig(Mapping[str, str]):
         snapshot = self._data.copy()
         try:
             changed_keys = self._update(config)
-            self._save_grub_configuration()
-            self._apply()
+            if changed_keys:
+                self._save_grub_configuration()
+                if apply:
+                    self.apply()
         except ValidationError:
             self._lazy_data = snapshot
             raise
@@ -290,6 +361,6 @@ class GrubConfig(Mapping[str, str]):
             self._save_grub_configuration()  # save snapshot copy of grub config
             raise
 
-        logger.debug("saving copy of charm config to %s", LIB_CONFIG_DIRECTORY)
-        _save_config(LIB_CONFIG_DIRECTORY / self.charm_name, config)
+        logger.debug("saving copy of charm config to %s", GRUB_DIRECTORY)
+        _save_config(self.path, config)
         return changed_keys

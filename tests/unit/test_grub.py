@@ -9,17 +9,16 @@ from unittest import mock
 import charms.operator_libs_linux.v0.grub as grub
 import pytest
 
-GRUB_CONFIG_EXAMPLE_DESCRIPTION = grub.CONFIG_DESCRIPTION.format(
-    configs=grub.FILE_LINE_IN_DESCRIPTION.format(path="/tmp/test-charm")
-)
-GRUB_CONFIG_EXAMPLE = f"""
-{grub.CONFIG_HEADER}
-{GRUB_CONFIG_EXAMPLE_DESCRIPTION}
-
+GRUB_CONFIG_EXAMPLE_BODY = """
 GRUB_RECORDFAIL_TIMEOUT=0
 GRUB_TIMEOUT=0
 GRUB_TERMINAL=console
 GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"
+"""
+GRUB_CONFIG_EXAMPLE = f"""
+{grub.CONFIG_HEADER}
+{grub.CONFIG_DESCRIPTION.format(configs="#  /tmp/test-path")}
+{GRUB_CONFIG_EXAMPLE_BODY}
 """
 EXP_GRUB_CONFIG = {
     "GRUB_CMDLINE_LINUX_DEFAULT": '"$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"',
@@ -39,6 +38,22 @@ def test_validation_error():
     assert error.message == "test message"
 
 
+@pytest.mark.parametrize(
+    "output, exp_result",
+    [
+        (mock.MagicMock(return_value=b"lxd"), True),
+        (mock.MagicMock(side_effect=subprocess.CalledProcessError(1, [])), False),
+    ],
+)
+def test_is_container_true(output, exp_result):
+    """Test helper function to validate if machine is container."""
+    with mock.patch("subprocess.check_output", new=output) as mock_check_output:
+        assert grub.is_container() == exp_result
+        mock_check_output.assert_called_once_with(
+            ["/usr/bin/systemd-detect-virt", "--container"], stderr=subprocess.STDOUT
+        )
+
+
 class BaseTestGrubLib(unittest.TestCase):
     def setUp(self) -> None:
         tmp_dir = tempfile.TemporaryDirectory()
@@ -46,8 +61,7 @@ class BaseTestGrubLib(unittest.TestCase):
         self.addCleanup(tmp_dir.cleanup)
 
         # configured paths
-        grub.LIB_CONFIG_DIRECTORY = self.tmp_dir
-        grub.GRUB_CONFIG = self.tmp_dir / "95-juju-charm.cfg"
+        grub.GRUB_DIRECTORY = self.tmp_dir
 
         # change logger
         mocked_logger = mock.patch.object(grub, "logger")
@@ -120,101 +134,133 @@ class TestGrubUtils(BaseTestGrubLib):
             "grub config %s already exist and it will overwritten", path
         )
 
+    @mock.patch("subprocess.check_call")
+    @mock.patch("filecmp.cmp")
+    def test_check_update_grub(self, mock_filecmp, mock_check_call):
+        """Test check update function."""
+        grub.check_update_grub()
+        mock_check_call.assert_called_once_with(
+            ["/usr/sbin/grub-mkconfig", "-o", "/tmp/tmp_grub.cfg"], stderr=subprocess.STDOUT
+        )
+        mock_filecmp.assert_called_once_with(
+            Path("/boot/grub/grub.cfg"), Path("/tmp/tmp_grub.cfg")
+        )
+
+    @mock.patch("subprocess.check_call")
+    @mock.patch("filecmp.cmp")
+    def test_check_update_grub_failure(self, mock_filecmp, mock_check_call):
+        """Test check update function."""
+        mock_check_call.side_effect = subprocess.CalledProcessError(1, [])
+
+        with self.assertRaises(subprocess.CalledProcessError):
+            grub.check_update_grub()
+
 
 class TestGrubConfig(BaseTestGrubLib):
     def setUp(self) -> None:
         super().setUp()
+        # load config
         mocker_load_config = mock.patch.object(grub, "_load_config")
-        self.mock_load_config = mocker_load_config.start()
-        self.mock_load_config.return_value = EXP_GRUB_CONFIG
+        self.load_config = mocker_load_config.start()
         self.addCleanup(mocker_load_config.stop)
+        # save config
+        mocker_save_config = mock.patch.object(grub, "_save_config")
+        self.save_config = mocker_save_config.start()
+        self.addCleanup(mocker_save_config.stop)
+        # is_container
+        mocker_is_container = mock.patch.object(grub, "is_container")
+        self.is_container = mocker_is_container.start()
+        self.is_container.return_value = False
+        self.addCleanup(mocker_is_container.stop)
+        # check_update_grub
+        mocker_check_update_grub = mock.patch.object(grub, "check_update_grub")
+        self.check_update_grub = mocker_check_update_grub.start()
+        self.addCleanup(mocker_check_update_grub.stop)
+
+        self.name = "charm-a"
+        self.path = self.tmp_dir / f"90-juju-{self.name}"
+        with open(self.path, "w") as file:
+            # create example of charm-a config
+            file.write(GRUB_CONFIG_EXAMPLE_BODY)
+        self.config = grub.GrubConfig(self.name)
+        self.config._lazy_data = EXP_GRUB_CONFIG.copy()
 
     def test_lazy_data_not_loaded(self):
         """Test data not loaded."""
-        _ = grub.GrubConfig()
-
-        self.mock_load_config.assert_not_called()
+        self.load_config.assert_not_called()
 
     def test__contains__(self):
         """Tets config __contains__ function."""
-        config = grub.GrubConfig()
-        self.assertIn("GRUB_TIMEOUT", config)
+        self.assertIn("GRUB_TIMEOUT", self.config)
 
     def test__len__(self):
         """Tets config __len__ function."""
-        config = grub.GrubConfig()
-        self.assertEqual(len(config), 4)
+        self.assertEqual(len(self.config), 4)
 
     def test__iter__(self):
         """Tets config __iter__ function."""
-        config = grub.GrubConfig()
-        self.assertListEqual(list(config), list(EXP_GRUB_CONFIG.keys()))
+        self.assertListEqual(list(self.config), list(EXP_GRUB_CONFIG.keys()))
 
     def test__getitem__(self):
         """Tets config __getitem__ function."""
-        config = grub.GrubConfig()
         for key, value in EXP_GRUB_CONFIG.items():
-            self.assertEqual(config[key], value)
+            self.assertEqual(self.config[key], value)
 
     def test_data(self):
         """Test data not loaded."""
-        config = grub.GrubConfig()
-        assert "test" not in config  # this will call config._data once
+        self.load_config.return_value = EXP_GRUB_CONFIG
+        self.config._lazy_data = None
+        assert "test" not in self.config  # this will call config._data once
 
-        self.mock_load_config.assert_called_once_with(grub.GRUB_CONFIG)
-        self.assertDictEqual(config._data, EXP_GRUB_CONFIG)
+        self.load_config.assert_called_once_with(grub.GRUB_CONFIG)
+        self.assertDictEqual(self.config._data, EXP_GRUB_CONFIG)
 
-    @mock.patch.object(grub, "_save_config")
-    def test_save_grub_config(self, mock_save_config):
+    def test_data_no_file(self):
+        """Test data not loaded."""
+        self.config._lazy_data = None
+        self.load_config.side_effect = FileNotFoundError()
+        assert "test" not in self.config  # this will call config._data once
+
+        self.load_config.assert_called_once_with(grub.GRUB_CONFIG)
+        self.assertDictEqual(self.config._data, {})
+
+    def test_save_grub_config(self):
         """Test save grub config."""
-        charm = "charm-c"
-        exp_path = self.tmp_dir / charm
-        exp_configs = [self.tmp_dir / "charm-a", self.tmp_dir / "charm-b"]
+        exp_configs = [self.tmp_dir / "90-juju-charm-b", self.tmp_dir / "90-juju-charm-c"]
+        [path.touch() for path in exp_configs]  # create files
         exp_data = {"GRUB_TIMEOUT": "1"}
 
-        with mock.patch.object(
-            grub.GrubConfig, "path", new=mock.PropertyMock(return_value=exp_path)
-        ) and mock.patch.object(
-            grub.GrubConfig, "applied_configs", new=mock.PropertyMock(return_value=exp_configs)
-        ):
-            config = grub.GrubConfig(charm)
-            config._lazy_data = exp_data
-            config._save_grub_configuration()
+        self.config._lazy_data = exp_data
+        self.config._save_grub_configuration()
 
-        mock_save_config.assert_called_once_with(grub.GRUB_CONFIG, exp_data, mock.ANY)
-        _, _, header = mock_save_config.call_args[0]
-        self.assertIn(str(exp_path), header)
+        self.save_config.assert_called_once_with(grub.GRUB_CONFIG, exp_data, mock.ANY)
+        _, _, header = self.save_config.call_args[0]
+        self.assertIn(str(self.config.path), header)
         for exp_config_path in exp_configs:
             self.assertIn(str(exp_config_path), header)
 
     def test_set_new_value(self):
         """Test set new value in config."""
-        config = grub.GrubConfig()
-        changed = config._set_value("GRUB_NEW_KEY", "1")
-
+        changed = self.config._set_value("GRUB_NEW_KEY", "1")
         self.assertTrue(changed)
 
     def test_set_existing_value_without_change(self):
         """Test set new value in config."""
-        config = grub.GrubConfig()
-        changed = config._set_value("GRUB_TIMEOUT", "0")
-
+        changed = self.config._set_value("GRUB_TIMEOUT", "0")
         self.assertFalse(changed)
 
     def test_set_existing_value_with_change(self):
         """Test set new value in config."""
-        config = grub.GrubConfig()
         with pytest.raises(grub.ValidationError):
-            config._set_value("GRUB_TIMEOUT", "1")
+            self.config._set_value("GRUB_TIMEOUT", "1")
 
     def test_update_data(self):
         """Test update GrubConfig _data."""
         data = {"GRUB_TIMEOUT": "1", "GRUB_RECORDFAIL_TIMEOUT": "0"}
         new_data = {"GRUB_NEW_KEY": "test", "GRUB_RECORDFAIL_TIMEOUT": "0"}
 
-        config = grub.GrubConfig("charm-a")
-        config._lazy_data = data
-        changed_keys = config._update(new_data)
+        self.config._lazy_data = data
+        changed_keys = self.config._update(new_data)
         self.assertEqual({"GRUB_NEW_KEY"}, changed_keys)
 
     @mock.patch.object(grub, "os")
@@ -235,45 +281,95 @@ class TestGrubConfig(BaseTestGrubLib):
 
     def test_path(self):
         """Test path property."""
-        exp_charm = "charm-a"
-
-        config = grub.GrubConfig(exp_charm)
-        self.assertEqual(config.path, self.tmp_dir / exp_charm)
+        self.assertEqual(self.config.path, self.tmp_dir / f"90-juju-{self.name}")
 
     def test_applied_configs(self):
         """Test registered_configs property."""
-        exp_configs = [self.tmp_dir / "charm-a", self.tmp_dir / "charm-b"]
-        [path.touch() for path in exp_configs]
+        exp_configs = [
+            self.path,
+            self.tmp_dir / "90-juju-charm-b",
+            self.tmp_dir / "90-juju-charm-c",
+        ]
+        [path.touch() for path in exp_configs]  # create files
 
-        config = grub.GrubConfig("charm-d")
-        self.assertEqual(config.applied_configs, exp_configs)
+        self.assertEqual(self.config.applied_configs, exp_configs)
 
-    @mock.patch.object(grub, "_load_config")
-    @mock.patch.object(grub.GrubConfig, "_apply")
+    @mock.patch("subprocess.check_call")
+    def test_apply_without_changes(self, mock_call):
+        """Test applying grub config without any changes."""
+        self.check_update_grub.return_value = False
+        self.config.apply()
+
+        self.check_update_grub.assert_called_once()
+        mock_call.assert_not_called()
+
+    @mock.patch("subprocess.check_call")
+    def test_apply_with_new_changes(self, mock_call):
+        """Test applying grub config."""
+        self.check_update_grub.return_value = True
+        self.config.apply()
+
+        self.check_update_grub.assert_called_once()
+        mock_call.assert_called_once_with(["/usr/sbin/update-grub"], stderr=subprocess.STDOUT)
+
+    @mock.patch("subprocess.check_call")
+    def test_apply_failure(self, mock_call):
+        """Test applying grub config failure."""
+        mock_call.side_effect = subprocess.CalledProcessError(1, [])
+        with self.assertRaises(grub.ApplyError):
+            self.config.apply()
+
+    @mock.patch.object(grub.GrubConfig, "apply")
     @mock.patch.object(grub.GrubConfig, "_save_grub_configuration")
-    def test_remove(self, mock_save, mock_apply, mock_load_config):
+    def test_remove_no_config(self, mock_save, mock_apply):
+        """Test removing when there is no charm config."""
+        self.config.path.unlink()  # remove charm config file
+        changed_keys = self.config.remove()
+
+        self.assertSetEqual(changed_keys, set())
+        mock_save.assert_not_called()
+        mock_apply.assert_not_called()
+
+    @mock.patch.object(grub.GrubConfig, "apply")
+    @mock.patch.object(grub.GrubConfig, "_save_grub_configuration")
+    def test_remove_no_apply(self, mock_save, mock_apply):
+        """Test removing without applying."""
+        changed_keys = self.config.remove(apply=False)
+
+        self.assertSetEqual(changed_keys, set(EXP_GRUB_CONFIG.keys()))
+        mock_save.assert_called_once()
+        mock_apply.assert_not_called()
+
+    @mock.patch.object(grub.GrubConfig, "apply")
+    @mock.patch.object(grub.GrubConfig, "_save_grub_configuration")
+    def test_remove(self, mock_save, mock_apply):
         """Test removing config for current charm."""
-        exp_charm = "charm-a"
+        exp_changed_keys = {"GRUB_RECORDFAIL_TIMEOUT"}
         exp_configs = {
-            "charm-a": {"GRUB_RECORDFAIL_TIMEOUT": "0"},
+            self.name: EXP_GRUB_CONFIG,
             "charm-b": {"GRUB_TIMEOUT": "0"},
             "charm-c": {
                 "GRUB_TERMINAL": "console",
                 "GRUB_CMDLINE_LINUX_DEFAULT": '"$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"',
             },
         }
-        mock_load_config.side_effect = reversed(exp_configs.values())
-        [(self.tmp_dir / charm).touch() for charm in exp_configs]  # create files
+        self.load_config.side_effect = [exp_configs["charm-b"], exp_configs["charm-c"]]
+        (self.tmp_dir / "90-juju-charm-b").touch()
+        (self.tmp_dir / "90-juju-charm-c").touch()
 
-        config = grub.GrubConfig(exp_charm)
-        config.remove()
+        changed_keys = self.config.remove()
 
-        self.assertFalse((self.tmp_dir / exp_charm).exists())
-        mock_load_config.assert_has_calls(
-            [mock.call(self.tmp_dir / charm) for charm in exp_configs if charm != exp_charm]
+        self.assertFalse((self.tmp_dir / self.name).exists())
+        self.load_config.assert_has_calls(
+            [
+                mock.call(self.tmp_dir / f"90-juju-{charm}")
+                for charm in exp_configs
+                if charm != self.name
+            ]
         )
+        self.assertSetEqual(changed_keys, exp_changed_keys)
         self.assertDictEqual(
-            config._data,
+            self.config._data,
             {
                 "GRUB_TIMEOUT": "0",
                 "GRUB_TERMINAL": "console",
@@ -283,69 +379,79 @@ class TestGrubConfig(BaseTestGrubLib):
         mock_save.assert_called_once()
         mock_apply.assert_called_once()
 
-    @mock.patch.object(grub, "is_container", return_value=True)
-    def test_update_on_container(self, _):
+    @mock.patch.object(grub.GrubConfig, "apply")
+    @mock.patch.object(grub.GrubConfig, "_save_grub_configuration")
+    def test_update_on_container(self, mock_save, mock_apply):
         """Test update current grub config on container."""
-        config = grub.GrubConfig("charm-a")
+        self.is_container.return_value = True
+
         with self.assertRaises(grub.IsContainerError):
-            config.update({"GRUB_TIMEOUT": "1"})
+            self.config.update({"GRUB_TIMEOUT": "0"})
 
-        self.assertDictEqual(config._data, EXP_GRUB_CONFIG)
-
-    @mock.patch.object(grub, "is_container", return_value=False)
-    @mock.patch.object(grub.GrubConfig, "_save_grub_configuration")
-    def test_update_with_validation_failure(self, mock_save, _):
-        """Test update current grub config with validation error."""
-        config = grub.GrubConfig("charm-a")
-        with self.assertRaises(grub.ValidationError):
-            config.update({"GRUB_TIMEOUT": "1"})
-
-        self.assertDictEqual(config._data, EXP_GRUB_CONFIG)
         mock_save.assert_not_called()
+        mock_apply.assert_not_called()
+        self.assertDictEqual(self.config._data, EXP_GRUB_CONFIG, "config was changed")
 
-    @mock.patch.object(grub, "is_container", return_value=False)
-    @mock.patch.object(
-        grub.subprocess,
-        "check_call",
-        side_effect=[subprocess.CalledProcessError(1, ["echo"]), None],
-    )
+    @mock.patch.object(grub.GrubConfig, "apply")
     @mock.patch.object(grub.GrubConfig, "_save_grub_configuration")
-    def test_update_with_apply_failure_due_mkconfig(self, mock_save, *_):
-        """Test update current grub config with apply error due mkconfig failure."""
-        config = grub.GrubConfig("charm-a")
+    def test_update_validation_failure(self, mock_save, mock_apply):
+        """Test update current grub config with validation failure."""
+        with self.assertRaises(grub.ValidationError):
+            # trying to set already existing key with different value -> ValidationError
+            self.config.update({"GRUB_TIMEOUT": "1"})
+
+        mock_save.assert_not_called()
+        mock_apply.assert_not_called()
+        self.assertDictEqual(self.config._data, EXP_GRUB_CONFIG, "config was changed")
+
+    @mock.patch.object(grub.GrubConfig, "apply")
+    @mock.patch.object(grub.GrubConfig, "_save_grub_configuration")
+    def test_update_apply_failure(self, mock_save, mock_apply):
+        """Test update current grub config with applied failure."""
+        mock_apply.side_effect = grub.ApplyError("failed to apply")
+
         with self.assertRaises(grub.ApplyError):
-            config.update({"GRUB_TIMEOUT": "0"})
+            self.config.update({"GRUB_NEW_KEY": "1"})
 
-        self.assertDictEqual(config._data, EXP_GRUB_CONFIG)
-        self.assertEqual(len(mock_save.mock_calls), 2)
+        mock_save.assert_has_calls(
+            [mock.call()] * 2,
+            "it should be called once before apply and one after snapshot restore",
+        )
+        mock_apply.assert_called_once()
+        self.assertDictEqual(self.config._data, EXP_GRUB_CONFIG, "snapshot was not restored")
 
-    @mock.patch.object(grub, "is_container", return_value=False)
-    @mock.patch.object(
-        grub.subprocess,
-        "check_call",
-        side_effect=[None, subprocess.CalledProcessError(1, ["echo"])],
-    )
+    @mock.patch.object(grub.GrubConfig, "apply")
     @mock.patch.object(grub.GrubConfig, "_save_grub_configuration")
-    def test_update_with_apply_failure_due_grub_update(self, mock_save, *_):
-        """Test update current grub config with apply error due grub update failure."""
-        config = grub.GrubConfig("charm-a")
-        with self.assertRaises(grub.ApplyError):
-            config.update({"GRUB_TIMEOUT": "0"})
+    def test_update_without_changes(self, mock_save, mock_apply):
+        """Test update current grub config without any changes."""
+        changed_keys = self.config.update({"GRUB_TIMEOUT": "0"})
 
-        self.assertDictEqual(config._data, EXP_GRUB_CONFIG)
-        self.assertEqual(len(mock_save.mock_calls), 2)
+        self.assertSetEqual(changed_keys, set())
+        mock_save.assert_not_called()
+        mock_apply.assert_not_called()
+        self.save_config.assert_called_once_with(self.path, mock.ANY)
+        self.assertDictEqual(self.config._data, EXP_GRUB_CONFIG)
 
-    @mock.patch.object(grub, "is_container", return_value=False)
-    @mock.patch.object(grub.subprocess, "check_call")
-    @mock.patch.object(grub, "_save_config")
+    @mock.patch.object(grub.GrubConfig, "apply")
     @mock.patch.object(grub.GrubConfig, "_save_grub_configuration")
-    def test_update(self, mock_save, mock_save_config, *_):
-        """Test update current grub config."""
-        exp_charm = "charm-a"
-        exp_config = {"GRUB_TIMEOUT": "0"}
-        config = grub.GrubConfig(exp_charm)
-        config.update(exp_config)
+    def test_update(self, mock_save, mock_apply):
+        """Test update current grub config without applying it."""
+        new_config = {"GRUB_NEW_KEY": "1"}
+        exp_config = {**EXP_GRUB_CONFIG, **new_config}
 
-        self.assertDictEqual(config._data, EXP_GRUB_CONFIG)
+        self.config.update(new_config)
+
         mock_save.assert_called_once()
-        mock_save_config.assert_called_once_with(self.tmp_dir / exp_charm, exp_config)
+        mock_apply.assert_called_once()
+        self.save_config.assert_called_once_with(self.path, new_config)
+        self.assertDictEqual(self.config._data, exp_config)
+
+    @mock.patch.object(grub.GrubConfig, "apply")
+    @mock.patch.object(grub.GrubConfig, "_save_grub_configuration")
+    def test_update_without_apply(self, mock_save, mock_apply):
+        """Test update current grub config without applying it."""
+        self.config.update({"GRUB_NEW_KEY": "1"}, apply=False)
+
+        mock_save.assert_called_once()
+        mock_apply.assert_not_called()
+        self.save_config.assert_called_once_with(self.path, mock.ANY)
