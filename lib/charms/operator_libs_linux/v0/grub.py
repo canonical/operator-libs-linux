@@ -239,11 +239,11 @@ class Config(Mapping[str, str]):
         """Set new value for key."""
         logger.debug("setting new value %s for key %s", value, key)
         current_value = self._data.get(key)
-        if current_value is None:
-            self._data[key] = value
-            return True
+        if current_value == value:
+            return False
 
-        if current_value != value and key in blocked_keys:
+        # validation
+        if key in self and current_value != value and key in blocked_keys:
             logger.warning(
                 "tries to overwrite key %s, which has value %s, with value %s",
                 key,
@@ -254,7 +254,8 @@ class Config(Mapping[str, str]):
                 key, f"key {key} already exists and its value is {current_value}"
             )
 
-        return False
+        self._data[key] = value
+        return True
 
     def _update(self, config: Dict[str, str]) -> Set[str]:
         """Update data in object."""
@@ -281,7 +282,12 @@ class Config(Mapping[str, str]):
     @property
     def blocked_keys(self) -> Set[str]:
         """Get set of configured keys by other charms."""
-        return {key for config in self.applied_configs.values() for key in config}
+        return {
+            key
+            for path, config in self.applied_configs.items()
+            if path != self.path
+            for key in config
+        }
 
     @property
     def charm_name(self) -> str:
