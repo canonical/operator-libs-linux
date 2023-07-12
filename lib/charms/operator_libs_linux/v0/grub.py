@@ -54,6 +54,7 @@ import filecmp
 import io
 import logging
 import os
+import shlex
 import subprocess
 from pathlib import Path
 from typing import Dict, Mapping, Optional, Set
@@ -90,16 +91,14 @@ CONFIG_DESCRIPTION = """
 #   info -f grub -n 'Simple configuration'
 """
 
-# TODO: use shlex
-
 
 class ValidationError(ValueError):
     """Exception representing value validation error."""
 
     def __init__(self, key: str, message: str) -> None:
+        super().__init__(message)
         self.key = key
         self.message = message
-        super().__init__(message)
 
     def __str__(self) -> str:
         """Return string representation of error."""
@@ -127,7 +126,7 @@ def _parse_config(stream: io.TextIOWrapper) -> Dict[str, str]:
         if key in config:
             logger.warning("key %s is duplicated in config", key)
 
-        config[key] = value
+        config[key] = shlex.quote(value)
 
     return config
 
@@ -150,7 +149,7 @@ def _save_config(path: Path, config: Dict[str, str], header: str = CONFIG_HEADER
     if path.exists():
         logger.debug("GRUB config %s already exist and it will overwritten", path)
 
-    context = [f"{key}={value}" for key, value in config.items()]
+    context = [f"{key}={shlex.quote(value)}" for key, value in config.items()]
     with open(path, "w", encoding="UTF-8") as file:
         file.writelines([header, *context])
 
@@ -158,7 +157,7 @@ def _save_config(path: Path, config: Dict[str, str], header: str = CONFIG_HEADER
 
 
 def check_update_grub() -> bool:
-    """Check if an update to /boot/grub/grub.cfg is available."""
+    """Report whether an update to /boot/grub/grub.cfg is available."""
     main_grub_cfg = Path("/boot/grub/grub.cfg")
     tmp_path = Path("/tmp/tmp_grub.cfg")
     try:
@@ -173,7 +172,7 @@ def check_update_grub() -> bool:
 
 
 def is_container() -> bool:
-    """Help function to see if local machine is container."""
+    """Report whether the local machine is a container."""
     try:
         output = subprocess.check_output(
             ["/usr/bin/systemd-detect-virt", "--container"], stderr=subprocess.STDOUT
@@ -185,7 +184,7 @@ def is_container() -> bool:
 
 
 class Config(Mapping[str, str]):
-    """Grub config object.
+    """Manages GRUB configuration.
 
     This object will load current configuration option for GRUB and provide option
     to update it with simple validation, remove charm option and apply those changes.
@@ -193,7 +192,7 @@ class Config(Mapping[str, str]):
 
     _lazy_data: Optional[Dict[str, str]] = None
 
-    def __init__(self, charm_name: Optional[str] = None) -> None:
+    def __init__(self, charm_name: str) -> None:
         """Initialize the GRUB config."""
         self._charm_name = charm_name
 
@@ -292,9 +291,6 @@ class Config(Mapping[str, str]):
     @property
     def charm_name(self) -> str:
         """Get charm name or use value obtained from JUJU_UNIT_NAME env."""
-        if self._charm_name is None:
-            self._charm_name, *_ = os.getenv("JUJU_UNIT_NAME", "unknown").split("/")
-
         return self._charm_name
 
     @property

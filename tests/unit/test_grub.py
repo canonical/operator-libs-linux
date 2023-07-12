@@ -22,7 +22,7 @@ GRUB_CONFIG_EXAMPLE = f"""
 {GRUB_CONFIG_EXAMPLE_BODY}
 """
 EXP_GRUB_CONFIG = {
-    "GRUB_CMDLINE_LINUX_DEFAULT": '"$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"',
+    "GRUB_CMDLINE_LINUX_DEFAULT": "'\"$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G\"'",
     "GRUB_RECORDFAIL_TIMEOUT": "0",
     "GRUB_TERMINAL": "console",
     "GRUB_TIMEOUT": "0",
@@ -93,7 +93,7 @@ class TestGrubUtils(BaseTestGrubLib):
             "key %s is duplicated in config", "GRUB_CMDLINE_LINUX_DEFAULT"
         )
         self.assertEqual(
-            result["GRUB_CMDLINE_LINUX_DEFAULT"], '"$GRUB_CMDLINE_LINUX_DEFAULT pti=on"'
+            result["GRUB_CMDLINE_LINUX_DEFAULT"], "'\"$GRUB_CMDLINE_LINUX_DEFAULT pti=on\"'"
         )
 
     def test_load_config_not_exists(self):
@@ -125,7 +125,7 @@ class TestGrubUtils(BaseTestGrubLib):
             grub._save_config(path, {"test": '"1234"'})
 
         mock_open.assert_called_once_with(path, "w", encoding="UTF-8")
-        mock_open.return_value.writelines.assert_called_once_with([mock.ANY, 'test="1234"'])
+        mock_open.return_value.writelines.assert_called_once_with([mock.ANY, "test='\"1234\"'"])
 
     def test_save_config_overwrite(self):
         """Test overwriting if GRUB config already exist."""
@@ -299,22 +299,6 @@ class TestGrubConfig(BaseTestGrubLib):
 
         self.assertSetEqual(blocked_keys, {"B", "C", "D"})
 
-    @mock.patch.object(grub, "os")
-    def test_charm_name(self, mock_os):
-        """Test define charm name or using value from JUJU_UNIT_NAME env."""
-        exp_charm_name = "test-charm"
-        mock_os.getenv.return_value = exp_charm_name
-
-        # define charm name in init
-        config = grub.Config(exp_charm_name)
-        self.assertEqual(config.charm_name, exp_charm_name)
-        mock_os.assert_not_called()
-
-        # get charm name from env
-        config = grub.Config()
-        self.assertEqual(config.charm_name, exp_charm_name)
-        mock_os.getenv.assert_called_once_with("JUJU_UNIT_NAME", "unknown")
-
     def test_path(self):
         """Test path property."""
         self.assertEqual(self.config.path, self.tmp_dir / f"90-juju-{self.name}")
@@ -478,7 +462,7 @@ class TestGrubConfig(BaseTestGrubLib):
     @mock.patch.object(grub.Config, "_save_grub_configuration")
     def test_update_same_charm(self, *_):
         """Test update current GRUB config twice with different values.
-        
+
         This test is simulating the scenario, when same charm want to change it's own
         values.
         """
