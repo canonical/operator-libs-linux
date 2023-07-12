@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Handler for the sysctl config
-"""
+"""Handler for the sysctl config."""
 
+import glob
 import logging
 import os
 import re
-import glob
-from dataclasses import dataclass
+from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output
+from typing import Dict, Mapping, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -35,39 +35,12 @@ LIBAPI = 0
 LIBPATCH = 2
 
 
-SYSCTL_DIRECTORY = "/home/raul/workspace/operator-libs-linux"
-SYSCTL_FILENAME = f"{SYSCTL_DIRECTORY}/95-juju-sysctl.conf"
+SYSCTL_DIRECTORY = Path("/etc/sysctl.d")
+SYSCTL_FILENAME = Path(f"{SYSCTL_DIRECTORY}/95-juju-sysctl.conf")
 SYSCTL_HEADER = f"""# This config file was produced by sysctl lib v{LIBAPI}.{LIBPATCH}
 #
 # This file represents the output of the sysctl lib, which can combine multiple
-# configurations into a single file like this with the help of validation rules. Such
-# rules are used to automatically resolve simple conflicts between two or more charms
-# on one host and is defined as a comment after the configuration option, see example
-# below.
-#
-# Description of validation rules to check if values are valid.
-#   - "range(a,b)" - all numbers between 'a' (included) and 'b' (excluded)
-#   - "a|b|c" - choices 'a', 'b' and 'c'
-#   - "*" - any value
-#   - "" or no comment - only current value, same as "<current value>"
-#   - "disable" - This value will be ignored in any validation and should only be used by
-#                 the charm operator manually or via a charm to override any system
-#                 configuration.
-# Examples:
-# # any value in [10, 50] is valid value
-# vm.swappiness=10  # range(10,51)
-#
-# # 60 and 80 are valid values
-# vm.dirty_ratio = 80  # 60|80
-#
-# # any value is valid
-# vm.dirty_background_ratio = 3  # *
-#
-# # only value 1 is valid value
-# net.ipv6.conf.all.use_tempaddr = 1
-#
-# # validation is disabled
-# net.ipv6.conf.default.use_tempaddr = 0  # disable
+# configurations into a single file like.
 """
 
 
@@ -88,6 +61,7 @@ class Error(Exception):
         """Return the message passed as an argument."""
         return self.args[0]
 
+
 class SysctlError(Error):
     """Raised when there's an error running sysctl command."""
 
@@ -97,46 +71,48 @@ class SysctlPermissionError(Error):
 
 
 class ValidationError(Error):
-    """Raised when there's an error in the validation process."""
+    """Exception representing value validation error."""
 
 
-@dataclass()
-class ConfigOption:
-    """Definition of a config option.
-    
-    NOTE: this class can be extended to handle the rule tied to each option.
-    """
-    name: str
-    value: int
-
-    @property
-    def string_format(self) -> str:
-        return f"{self.name}={self.value}"
-
-
-class SysctlConfig:
+class SysctlConfig(Mapping[str, int]):
     """Represents the state of the config that a charm wants to enforce."""
 
-    def __init__(self, config_params: dict, app_name: str) -> None:
-        self.config_params = config_params
-        self.app_name = app_name
+    def __init__(self, name: Optional[str] = None) -> None:
+        self.name = name
+        self._data = self._load_data()
+
+    def __contains__(self, key: str) -> bool:
+        """Check if key is in config."""
+        return key in self._data
+
+    def __len__(self):
+        """Get size of config."""
+        return len(self._data)
+
+    def __iter__(self):
+        """Iterate over config."""
+        return iter(self._data)
+
+    def __getitem__(self, key: str) -> int:
+        """Get value for key form config."""
+        return self._data[key]
 
     @property
-    def config_params(self) -> list[ConfigOption]:
-        """Config options passed to the lib."""
-        return self._config_params
+    def name(self) -> str:
+        """Name used to create the lib file."""
+        return self._name
 
-    @config_params.setter
-    def config_params(self, value: dict):
-        result = []
-        for k, v in value.items():
-            result += [ConfigOption(k, v["value"])]
-        self._config_params = result
+    @name.setter
+    def name(self, value: str):
+        if value is None:
+            self._name, *_ = os.getenv("JUJU_UNIT_NAME", "unknown").split("/")
+        else:
+            self._name = value
 
     @property
-    def charm_filepath(self) -> str:
+    def charm_filepath(self) -> Path:
         """Name for resulting charm config file."""
-        return f"{SYSCTL_DIRECTORY}/90-juju-{self.app_name}"
+        return Path(f"{SYSCTL_DIRECTORY}/90-juju-{self.name}")
 
     @property
     def charm_config_exists(self) -> bool:
@@ -148,52 +124,61 @@ class SysctlConfig:
         """Return whether a merged config file exists."""
         return os.path.exists(SYSCTL_FILENAME)
 
-    @property
-    def merged_config(self) -> list[ConfigOption] | None:
-        """Return applied internal config."""
-        if not self.merged_config_exists:
-            return None
+    def update(self, config: Dict[str, dict]) -> None:
+        """Update sysctl config options with a desired set of config params."""
+        self._parse_config(config)
 
-        with open(SYSCTL_FILENAME, "r") as f:
-            return [ConfigOption(param.strip(), value.strip())
-                    for line in f.read().splitlines()
-                    if line and not line.startswith('#')
-                    for param, value in [line.split('=')]]
-
-    def update(self) -> None:
-        """Update sysctl config options."""
+        # NOTE: case where own charm calls update() more than once. Remove first so
+        # we don't get validation errors.
         if self.charm_config_exists:
-            return
-        self._create_charm_file()
+            self.remove()
 
-        if not self.validate():
-            raise ValidationError()
+        conflict = self._validate()
+        if conflict:
+            msg = f"Validation error for keys: {conflict}"
+            raise ValidationError(msg)
 
         snapshot = self._create_snapshot()
-        print(f"CREATED SNAPSHOT: {snapshot}")
+        logger.debug(f"Created snapshot for keys: {snapshot}")
         try:
             self._apply()
         except SysctlPermissionError:
             self._restore_snapshot(snapshot)
             raise
-        except ValidationError:
+        except SysctlError:
             raise
+
+        self._create_charm_file()
         self._merge()
 
-    def validate(self) -> bool:
+    def remove(self) -> None:
+        """Remove config for charm."""
+        self.charm_filepath.unlink(missing_ok=True)
+        logger.info("charm config file %s was removed", self.charm_filepath)
+        self._merge()
+
+    def _validate(self) -> list[str]:
         """Validate the desired config params against merged ones."""
-        return True
+        common_keys = set(self._data.keys()) & set(self._desired_config.keys())
+        confict_keys = []
+        for key in common_keys:
+            if self._data[key] != self._desired_config[key]:
+                msg = f"Values for key '{key}' are different: {self._data[key]} != {self._desired_config[key]}"
+                logger.warning(msg)
+                confict_keys.append(key)
+
+        return confict_keys
 
     def _create_charm_file(self) -> None:
         """Write the charm file."""
-        charm_params = [f"{param.string_format}\n" for param in self.config_params]
+        charm_params = [f"{key}={value}\n" for key, value in self._desired_config.items()]
         with open(self.charm_filepath, "w") as f:
             f.writelines(charm_params)
 
     def _merge(self) -> None:
         """Create the merged sysctl file."""
         # get all files that start by 90-juju-
-        charm_files = [f for f in glob.glob(f"{SYSCTL_DIRECTORY}/90-juju-*")]
+        charm_files = list(glob.glob(f"{SYSCTL_DIRECTORY}/90-juju-*"))
         data = [SYSCTL_HEADER]
         for path in charm_files:
             with open(path, "r") as f:
@@ -201,45 +186,58 @@ class SysctlConfig:
         with open(SYSCTL_FILENAME, "w") as f:
             f.writelines(data)
 
-    def _apply(self) -> list[str] | None:
-        """Apply values to machine.
+        # Reload data with newly created file.
+        self._data = self._load_data()
 
-        Returns:
-            none or the list of keys that failed to apply.
-        """
-        cmd = ["-p", self.charm_filepath]
+    def _apply(self) -> None:
+        """Apply values to machine."""
+        cmd = [f"{key}={value}" for key, value in self._desired_config.items()]
         result = self._sysctl(cmd)
-        expr = re.compile(r'^sysctl: permission denied on key \"([a-z_\.]+)\", ignoring$')
+        expr = re.compile(r"^sysctl: permission denied on key \"([a-z_\.]+)\", ignoring$")
         failed_values = [expr.match(line) for line in result if expr.match(line)]
+        logger.debug(f"Failed values: {failed_values}")
 
-        print(failed_values)
         if failed_values:
-            msg = f"Unable to set params: {[f[0] for f in failed_values]}"
+            msg = f"Unable to set params: {[f.group(1) for f in failed_values]}"
             logger.error(msg)
             raise SysctlPermissionError(msg)
 
-    def _create_snapshot(self) -> list[ConfigOption]:
+    def _create_snapshot(self) -> Dict[str, int]:
         """Create a snaphot of config options that are going to be set."""
-        keys = [param.name for param in self.config_params]
-        return [ConfigOption(key, self._sysctl([key, "-n"])[0]) for key in keys]
+        return {key: int(self._sysctl([key, "-n"])[0]) for key in self._desired_config.keys()}
 
-    def _restore_snapshot(self, snapshot: list[ConfigOption]) -> None:
+    def _restore_snapshot(self, snapshot: Dict[str, int]) -> None:
         """Restore a snapshot to the machine."""
-        for param in snapshot:
-            self._sysctl([param.string_format])
+        values = [f"{key}={value}" for key, value in snapshot.items()]
+        self._sysctl(values)
 
     def _sysctl(self, cmd: list[str]) -> list[str]:
         """Execute a sysctl command."""
         cmd = ["sysctl"] + cmd
-        print(f"Calling: {cmd}")
-        # 'sysctl: permission denied on key "vm.max_map_count", ignoring'
-        return ["net.ipv6.conf.all.accept_redirects = 0", 'sysctl: permission denied on key "vm.max_map_count", ignoring']
-        # try:
-        #     return check_output(cmd, stderr=STDOUT, universal_newlines=True).splitlines()
-        # except CalledProcessError as e:
-        #     raise SysctlError(f"Error executing '{cmd}': {e.output}")
+        logger.debug(f"Executing sysctl command: {cmd}")
+        try:
+            return check_output(cmd, stderr=STDOUT, universal_newlines=True).splitlines()
+        except CalledProcessError as e:
+            msg = f"Error executing '{cmd}': {e.stdout}"
+            logger.error(msg)
+            raise SysctlError(msg)
 
-    def _conflicting_options() -> list[str]:
-        """Gets if there are config options on them."""
-        # TODO
+    def _parse_config(self, config: Dict[str, dict]) -> None:
+        """Parse a config passed to the lib."""
+        result = {}
+        for k, v in config.items():
+            result[k] = v["value"]
+        self._desired_config: Dict[str, int] = result
 
+    def _load_data(self) -> Dict[str, int]:
+        """Get merged config."""
+        if not self.merged_config_exists:
+            return {}
+
+        with open(SYSCTL_FILENAME, "r") as f:
+            return {
+                param.strip(): int(value.strip())
+                for line in f.read().splitlines()
+                if line and not line.startswith("#")
+                for param, value in [line.split("=")]
+            }
