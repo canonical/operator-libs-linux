@@ -20,7 +20,7 @@ import os
 import re
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output
-from typing import Dict, Mapping, Optional
+from typing import Dict, Mapping
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +74,10 @@ class ValidationError(Error):
     """Exception representing value validation error."""
 
 
-class SysctlConfig(Mapping[str, int]):
+class Config(Mapping[str, int]):
     """Represents the state of the config that a charm wants to enforce."""
 
-    def __init__(self, name: Optional[str] = None) -> None:
+    def __init__(self, name: str) -> None:
         self.name = name
         self._data = self._load_data()
 
@@ -96,18 +96,6 @@ class SysctlConfig(Mapping[str, int]):
     def __getitem__(self, key: str) -> int:
         """Get value for key form config."""
         return self._data[key]
-
-    @property
-    def name(self) -> str:
-        """Name used to create the lib file."""
-        return self._name
-
-    @name.setter
-    def name(self, value: str):
-        if value is None:
-            self._name, *_ = os.getenv("JUJU_UNIT_NAME", "unknown").split("/")
-        else:
-            self._name = value
 
     @property
     def charm_filepath(self) -> Path:
