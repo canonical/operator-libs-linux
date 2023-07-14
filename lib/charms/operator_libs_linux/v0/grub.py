@@ -219,7 +219,7 @@ class Config(Mapping[str, str]):
             try:
                 self._lazy_data = _load_config(GRUB_CONFIG)
             except FileNotFoundError:
-                logger.debug("there is no GRUB config file yet")
+                logger.debug("there is no GRUB config file %s yet", GRUB_CONFIG)
                 self._lazy_data = {}
 
         return self._lazy_data
@@ -236,15 +236,16 @@ class Config(Mapping[str, str]):
 
     def _set_value(self, key: str, value: str, blocked_keys: Set[str]) -> bool:
         """Set new value for key."""
-        logger.debug("setting new value %s for key %s", value, key)
+        logger.debug("[%s] setting new value %s for key %s", self.charm_name, value, key)
         current_value = self._data.get(key)
         if current_value == value:
             return False
 
         # validation
         if key in self and current_value != value and key in blocked_keys:
-            logger.warning(
-                "tries to overwrite key %s, which has value %s, with value %s",
+            logger.error(
+                "[%s] tries to overwrite key %s, which has value %s, with value %s",
+                self.charm_name,
                 key,
                 current_value,
                 value,
@@ -258,7 +259,7 @@ class Config(Mapping[str, str]):
 
     def _update(self, config: Dict[str, str]) -> Set[str]:
         """Update data in object."""
-        logger.debug("updating current config")
+        logger.debug("[%s] updating current config", self.charm_name)
         changed_keys = set()
         blocked_keys = self.blocked_keys
         for key, value in config.items():
@@ -301,13 +302,15 @@ class Config(Mapping[str, str]):
     def apply(self):
         """Check if an update to /boot/grub/grub.cfg is available."""
         if not check_update_grub():
-            logger.info("no available GRUB updates found")
+            logger.info("[%s] no available GRUB updates found", self.charm_name)
             return
 
         try:
             subprocess.check_call(["/usr/sbin/update-grub"], stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as error:
-            logger.exception(error)
+            logger.error(
+                "[%s] applying GRUB config failed with errors: %s", self.charm_name, error.stdout
+            )
             raise ApplyError("New config check failed.") from error
 
     def remove(self, apply: bool = True) -> Set[str]:
@@ -317,11 +320,11 @@ class Config(Mapping[str, str]):
         GRUB config file without changes made by this charm.
         """
         if not self.path.exists():
-            logger.debug("there is no charm config file %s", self.path)
+            logger.debug("[%s] there is no charm config file %s", self.charm_name, self.path)
             return set()
 
         self.path.unlink()
-        logger.info("charm config file %s was removed", self.path)
+        logger.info("[%s] charm config file %s was removed", self.charm_name, self.path)
         config = {}
         for _config in self.applied_configs.values():
             config.update(_config)
@@ -346,14 +349,22 @@ class Config(Mapping[str, str]):
                 self._save_grub_configuration()
                 if apply:
                     self.apply()
-        except ValidationError:
+        except ValidationError as error:
+            logger.error("[%s] validation failed with message: %s", self.charm_name, error.message)
             self._lazy_data = snapshot
+            logger.info("[%s] restored snapshot for Config object", self.charm_name)
             raise
-        except ApplyError:
+        except ApplyError as error:
+            logger.error(
+                "[%s] applying new GRUB config failed with error: %s", self.charm_name, error
+            )
             self._lazy_data = snapshot
             self._save_grub_configuration()  # save snapshot copy of grub config
+            logger.info(
+                "[%s] restored snapshot for Config object and GRUB configuration", self.charm_name
+            )
             raise
 
-        logger.debug("saving copy of charm config to %s", GRUB_DIRECTORY)
+        logger.debug("[%s] saving copy of charm config to %s", self.charm_name, GRUB_DIRECTORY)
         _save_config(self.path, config)
         return changed_keys

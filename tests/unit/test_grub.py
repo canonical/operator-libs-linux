@@ -49,7 +49,7 @@ def test_validation_error():
         (mock.MagicMock(side_effect=subprocess.CalledProcessError(1, [])), False),
     ],
 )
-def test_is_container_true(output, exp_result):
+def test_is_container(output, exp_result):
     """Test helper function to validate if machine is container."""
     with mock.patch("subprocess.check_output", new=output) as mock_check_output:
         assert grub.is_container() == exp_result
@@ -160,6 +160,8 @@ class TestGrubUtils(BaseTestGrubLib):
         with self.assertRaises(subprocess.CalledProcessError):
             grub.check_update_grub()
 
+        mock_filecmp.assert_not_called()
+
 
 class TestGrubConfig(BaseTestGrubLib):
     def setUp(self) -> None:
@@ -256,8 +258,8 @@ class TestGrubConfig(BaseTestGrubLib):
 
     def test_set_existing_value_with_change(self):
         """Test set existing key with new value."""
-        changed = self.config._set_value("GRUB_TIMEOUT", "0", set())
-        self.assertFalse(changed)
+        changed = self.config._set_value("GRUB_TIMEOUT", "1", set())
+        self.assertTrue(changed)
 
     def test_set_blocked_key(self):
         """Test set new value in config."""
