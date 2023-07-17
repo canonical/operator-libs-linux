@@ -48,6 +48,7 @@ class UbuntuCharm(CharmBase):
 
     def _on_remove(self, _):
         self.grub.remove()
+```
 """
 
 import filecmp
@@ -126,7 +127,7 @@ def _parse_config(stream: io.TextIOWrapper) -> Dict[str, str]:
         if key in config:
             logger.warning("key %s is duplicated in config", key)
 
-        config[key] = shlex.quote(value)
+        config[key], *_ = shlex.split(value)
 
     return config
 
@@ -225,7 +226,7 @@ class Config(Mapping[str, str]):
         return self._lazy_data
 
     def _save_grub_configuration(self) -> None:
-        """Save current gru configuration."""
+        """Save current GRUB configuration."""
         logger.info("saving new GRUB config to %s", GRUB_CONFIG)
         applied_configs = {self.path, *self.applied_configs}  # using set to drop duplicity
         registered_configs = os.linesep.join(

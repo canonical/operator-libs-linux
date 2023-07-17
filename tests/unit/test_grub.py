@@ -19,10 +19,11 @@ GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"
 GRUB_CONFIG_EXAMPLE = f"""
 {grub.CONFIG_HEADER}
 {grub.CONFIG_DESCRIPTION.format(configs="#  /tmp/test-path")}
+# test commented line
 {GRUB_CONFIG_EXAMPLE_BODY}
 """
 EXP_GRUB_CONFIG = {
-    "GRUB_CMDLINE_LINUX_DEFAULT": "'\"$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G\"'",
+    "GRUB_CMDLINE_LINUX_DEFAULT": "$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G",
     "GRUB_RECORDFAIL_TIMEOUT": "0",
     "GRUB_TERMINAL": "console",
     "GRUB_TIMEOUT": "0",
@@ -93,7 +94,8 @@ class TestGrubUtils(BaseTestGrubLib):
             "key %s is duplicated in config", "GRUB_CMDLINE_LINUX_DEFAULT"
         )
         self.assertEqual(
-            result["GRUB_CMDLINE_LINUX_DEFAULT"], "'\"$GRUB_CMDLINE_LINUX_DEFAULT pti=on\"'"
+            result["GRUB_CMDLINE_LINUX_DEFAULT"],
+            "$GRUB_CMDLINE_LINUX_DEFAULT pti=on",
         )
 
     def test_load_config_not_exists(self):
