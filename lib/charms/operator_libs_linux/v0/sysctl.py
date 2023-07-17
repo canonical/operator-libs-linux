@@ -12,15 +12,57 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Handler for the sysctl config."""
+"""Handler for the sysctl config.
 
-import glob
+A charm using the sysctl lib will need a data structure like the following:
+```yaml
+vm.swappiness:
+  value: 1
+vm.max_map_count:
+  value: 262144
+vm.dirty_ratio:
+  value: 80
+vm.dirty_background_ratio:
+  value: 5
+net.ipv4.tcp_max_syn_backlog:
+  value: 4096
+```
+
+Now, it can use that template within the charm, or just declare the values directly:
+
+```python
+from charms.operator_libs_linux.v0 import sysctl
+
+class MyCharm(CharmBase):
+
+    def __init__(self, *args):
+        ...
+        self.sysctl = sysctl.Config(self.meta.name)
+
+        self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.remove, self._on_remove)
+
+    def _on_install(self, _):
+        # Altenatively, read the values from a template
+        sysctl_data = {"net.ipv4.tcp_max_syn_backlog": {"value": 4096}}
+
+        try:
+            self.sysctl.update(config=sysctl_data)
+        except (sysctl.SysctlPermissionError, sysctl.ValidationError) as e:
+            logger.error(f"Error setting values on sysctl: {e.message}")
+            self.unit.status = BlockedStatus("Sysctl config not possible")
+        except sysctl.SysctlError:
+            logger.error("Error on sysctl")
+
+    def _on_remove(self, _):
+        self.sysctl.remove()
+"""
+
 import logging
-import os
 import re
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output
-from typing import Dict, Mapping
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +76,7 @@ LIBAPI = 0
 # to 0 if you are raising the major API version
 LIBPATCH = 2
 
-
+CHARM_FILENAME_PREFIX = "90-juju-"
 SYSCTL_DIRECTORY = Path("/etc/sysctl.d")
 SYSCTL_FILENAME = Path(f"{SYSCTL_DIRECTORY}/95-juju-sysctl.conf")
 SYSCTL_HEADER = f"""# This config file was produced by sysctl lib v{LIBAPI}.{LIBPATCH}
@@ -74,7 +116,7 @@ class ValidationError(Error):
     """Exception representing value validation error."""
 
 
-class Config(Mapping[str, int]):
+class Config(Dict):
     """Represents the state of the config that a charm wants to enforce."""
 
     def __init__(self, name: str) -> None:
@@ -100,40 +142,34 @@ class Config(Mapping[str, int]):
     @property
     def charm_filepath(self) -> Path:
         """Name for resulting charm config file."""
-        return Path(f"{SYSCTL_DIRECTORY}/90-juju-{self.name}")
-
-    @property
-    def charm_config_exists(self) -> bool:
-        """Return whether the charm config file exists."""
-        return os.path.exists(self.charm_filepath)
-
-    @property
-    def merged_config_exists(self) -> bool:
-        """Return whether a merged config file exists."""
-        return os.path.exists(SYSCTL_FILENAME)
+        return SYSCTL_DIRECTORY / f"{CHARM_FILENAME_PREFIX}{self.name}"
 
     def update(self, config: Dict[str, dict]) -> None:
-        """Update sysctl config options with a desired set of config params."""
+        """Update sysctl config options with a desired set of config params.
+
+        Args:
+            config: dictionary with keys to update:
+        ```
+        {"vm.swappiness": {"value": 10}, ...}
+        ```
+        """
         self._parse_config(config)
 
         # NOTE: case where own charm calls update() more than once. Remove first so
         # we don't get validation errors.
-        if self.charm_config_exists:
+        if self.charm_filepath.exists():
             self.remove()
 
         conflict = self._validate()
         if conflict:
-            msg = f"Validation error for keys: {conflict}"
-            raise ValidationError(msg)
+            raise ValidationError(f"Validation error for keys: {conflict}")
 
         snapshot = self._create_snapshot()
-        logger.debug(f"Created snapshot for keys: {snapshot}")
+        logger.debug("Created snapshot for keys: %s", snapshot)
         try:
             self._apply()
         except SysctlPermissionError:
             self._restore_snapshot(snapshot)
-            raise
-        except SysctlError:
             raise
 
         self._create_charm_file()
@@ -142,17 +178,21 @@ class Config(Mapping[str, int]):
     def remove(self) -> None:
         """Remove config for charm."""
         self.charm_filepath.unlink(missing_ok=True)
-        logger.info("charm config file %s was removed", self.charm_filepath)
+        logger.info("Charm config file %s was removed", self.charm_filepath)
         self._merge()
 
-    def _validate(self) -> list[str]:
+    def _validate(self) -> List[str]:
         """Validate the desired config params against merged ones."""
         common_keys = set(self._data.keys()) & set(self._desired_config.keys())
         confict_keys = []
         for key in common_keys:
             if self._data[key] != self._desired_config[key]:
-                msg = f"Values for key '{key}' are different: {self._data[key]} != {self._desired_config[key]}"
-                logger.warning(msg)
+                logger.warning(
+                    "Values for key '%s' are different: %s != %s",
+                    key,
+                    self._data[key],
+                    self._desired_config[key],
+                )
                 confict_keys.append(key)
 
         return confict_keys
@@ -166,9 +206,8 @@ class Config(Mapping[str, int]):
     def _merge(self) -> None:
         """Create the merged sysctl file."""
         # get all files that start by 90-juju-
-        charm_files = list(glob.glob(f"{SYSCTL_DIRECTORY}/90-juju-*"))
         data = [SYSCTL_HEADER]
-        for path in charm_files:
+        for path in SYSCTL_DIRECTORY.glob(f"{CHARM_FILENAME_PREFIX}*"):
             with open(path, "r") as f:
                 data += f.readlines()
         with open(SYSCTL_FILENAME, "w") as f:
@@ -183,7 +222,7 @@ class Config(Mapping[str, int]):
         result = self._sysctl(cmd)
         expr = re.compile(r"^sysctl: permission denied on key \"([a-z_\.]+)\", ignoring$")
         failed_values = [expr.match(line) for line in result if expr.match(line)]
-        logger.debug(f"Failed values: {failed_values}")
+        logger.debug("Failed values: %s", failed_values)
 
         if failed_values:
             msg = f"Unable to set params: {[f.group(1) for f in failed_values]}"
@@ -199,10 +238,10 @@ class Config(Mapping[str, int]):
         values = [f"{key}={value}" for key, value in snapshot.items()]
         self._sysctl(values)
 
-    def _sysctl(self, cmd: list[str]) -> list[str]:
+    def _sysctl(self, cmd: List[str]) -> List[str]:
         """Execute a sysctl command."""
         cmd = ["sysctl"] + cmd
-        logger.debug(f"Executing sysctl command: {cmd}")
+        logger.debug("Executing sysctl command: %s", cmd)
         try:
             return check_output(cmd, stderr=STDOUT, universal_newlines=True).splitlines()
         except CalledProcessError as e:
@@ -213,19 +252,26 @@ class Config(Mapping[str, int]):
     def _parse_config(self, config: Dict[str, dict]) -> None:
         """Parse a config passed to the lib."""
         result = {}
-        for k, v in config.items():
-            result[k] = v["value"]
+        for key, value in config.items():
+            result[key] = int(value["value"])
         self._desired_config: Dict[str, int] = result
 
     def _load_data(self) -> Dict[str, int]:
         """Get merged config."""
-        if not self.merged_config_exists:
-            return {}
+        config = {}
+        if not SYSCTL_FILENAME.exists():
+            return config
 
         with open(SYSCTL_FILENAME, "r") as f:
-            return {
-                param.strip(): int(value.strip())
-                for line in f.read().splitlines()
-                if line and not line.startswith("#")
-                for param, value in [line.split("=")]
-            }
+            for line in f:
+                config.update(self._parse_line(line))
+
+        return config
+
+    def _parse_line(self, line: str) -> Dict[str, int]:
+        """Parse a line from juju-sysctl.conf file."""
+        if line.startswith("#") or line == "\n":
+            return {}
+
+        param, value = line.split("=")
+        return {param.strip(): int(value.strip())}
