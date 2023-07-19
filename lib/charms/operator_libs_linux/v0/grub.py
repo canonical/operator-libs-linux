@@ -37,13 +37,13 @@ class UbuntuCharm(CharmBase):
     def _on_install(self, _):
         try:
             self.grub.update(
-                {"GRUB_CMDLINE_LINUX_DEFAULT": '"$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"'}
+                {"GRUB_CMDLINE_LINUX_DEFAULT": "$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"}
             )
         except grub.ValidationError as error:
             self.unit.status = BlockedStatus(f"[{error.key}] {error.message}")
 
     def _on_update_status(self, _):
-        if self.grub["GRUB_CMDLINE_LINUX_DEFAULT"] != '"$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"':
+        if self.grub["GRUB_CMDLINE_LINUX_DEFAULT"] != "$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G":
             self.unit.status = BlockedStatus("wrong GRUB configuration")
 
     def _on_remove(self, _):
@@ -58,7 +58,7 @@ import os
 import shlex
 import subprocess
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Set
+from typing import Dict, Mapping, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +114,17 @@ class ApplyError(Exception):
     """Exception if applying new config failed."""
 
 
+def _split_config_line(line: str) -> Tuple[str, str]:
+    """Split GRUB config line to obtain key and value."""
+    key, raw_value = line.split("=", 1)
+    value, *not_expected_values = shlex.split(raw_value)
+    if not_expected_values:
+        logger.error("unexpected value %s for %s key", raw_value, key)
+        raise ValueError(f"unexpected value {raw_value} for {key} key")
+
+    return key, value
+
+
 def _parse_config(stream: io.TextIOWrapper) -> Dict[str, str]:
     """Parse config file lines."""
     config = {}
@@ -123,11 +134,11 @@ def _parse_config(stream: io.TextIOWrapper) -> Dict[str, str]:
             logger.debug("skipping line `%s`", line)
             continue
 
-        key, value = line.split("=", 1)
+        key, value = _split_config_line(line)
         if key in config:
             logger.warning("key %s is duplicated in config", key)
 
-        config[key], *_ = shlex.split(value)
+        config[key] = value
 
     return config
 

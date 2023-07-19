@@ -75,6 +75,17 @@ class BaseTestGrubLib(unittest.TestCase):
 
 
 class TestGrubUtils(BaseTestGrubLib):
+    def test_split_config_line(self):
+        """Tets splitting single line."""
+        key, value = grub._split_config_line('test="1234"')
+        assert key == "test"
+        assert value == "1234"
+
+    def test_split_config_line_failed(self):
+        """Tets splitting single line."""
+        with self.assertRaises(ValueError):
+            grub._split_config_line('test="1234" "5678"')
+
     def test_parse_config(self):
         """Test parsing example GRUB config with skipping duplicated key."""
         stream = io.StringIO(GRUB_CONFIG_EXAMPLE)
