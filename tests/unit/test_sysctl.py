@@ -125,7 +125,7 @@ class TestSysctlConfig(unittest.TestCase):
 
         mock_exist.assert_called()
         mock_file.assert_called_with(Path("/etc/sysctl.d/95-juju-sysctl.conf"), "r")
-        assert config._data == {"vm.swappiness": 0, "vm.max_map_count": 262144}
+        assert config._data == {"vm.swappiness": "0", "vm.max_map_count": "262144"}
 
     @patch("pathlib.Path.exists")
     def test_load_data_no_path(self, mock_exist):
@@ -314,7 +314,7 @@ class TestSysctlConfig(unittest.TestCase):
 
         config._parse_config({"key1": {"value": "10"}, "key2": {"value": "20"}})
 
-        self.assertEqual(config._desired_config, {"key1": 10, "key2": 20})
+        self.assertEqual(config._desired_config, {"key1": "10", "key2": "20"})
 
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
     def test_class_methods(self, mock_load):
