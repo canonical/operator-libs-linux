@@ -153,6 +153,29 @@ class TestSysctlConfig(unittest.TestCase):
         mock_file.assert_has_calls(expected_calls, any_order=True)
         mock_file.return_value.writelines.assert_called_once_with(TEST_MULTIPLE_MERGED_FILE)
 
+    @patch("builtins.open", new_callable=mock_open, read_data=TEST_OTHER_CHARM_FILE)
+    @patch("pathlib.Path.glob")
+    @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
+    def test_merge_without_own_file(self, mock_load, mock_glob, mock_file):
+        mock_glob.return_value = [
+            "/etc/sysctl.d/90-juju-othercharm",
+            "/etc/sysctl.d/90-juju-test"
+        ]
+        mock_load.return_value = self.loaded_values
+        config = sysctl.Config("test")
+
+        config._merge(add_own_charm=False)
+        mock_glob.assert_called_with("90-juju-*")
+
+        expected_calls = [
+            call("/etc/sysctl.d/90-juju-othercharm", "r"),
+            call(Path("/etc/sysctl.d/95-juju-sysctl.conf"), "w"),
+        ]
+
+        assert call("/etc/sysctl.d/90-juju-test", "r") not in mock_file.mock_calls
+        mock_file.assert_has_calls(expected_calls, any_order=True)
+        mock_file.return_value.writelines.assert_called_once_with(TEST_MULTIPLE_MERGED_FILE)
+
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
     def test_validate_different_keys(self, mock_load):
         mock_load.return_value = self.loaded_values
