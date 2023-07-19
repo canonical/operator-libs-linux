@@ -59,7 +59,7 @@ def check_output_side_effects(*args, **kwargs):
 class TestSysctlConfig(unittest.TestCase):
     def setUp(self) -> None:
         self.desired_values = {"vm.swappiness": {"value": 0}}
-        self.loaded_values = {"vm.swappiness": 60, "vm.max_map_count": 25500}
+        self.loaded_values = {"vm.swappiness": "60", "vm.max_map_count": "25500"}
 
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.glob")
@@ -76,7 +76,7 @@ class TestSysctlConfig(unittest.TestCase):
 
         config.update({"vm.max_map_count": {"value": 25500}})
 
-        self.assertEqual(config._desired_config, {"vm.max_map_count": 25500})
+        self.assertEqual(config._desired_config, {"vm.max_map_count": "25500"})
         mock_file.assert_called_with(Path("/etc/sysctl.d/95-juju-sysctl.conf"), "w")
         mock_file.return_value.writelines.assert_called_once_with(TEST_UPDATE_MERGED_FILE)
 
@@ -178,7 +178,7 @@ class TestSysctlConfig(unittest.TestCase):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config("test")
 
-        config._desired_config = {"non_conflicting": 0}
+        config._desired_config = {"non_conflicting": "0"}
         result = config._validate()
 
         assert result == []
@@ -188,7 +188,7 @@ class TestSysctlConfig(unittest.TestCase):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config("test")
 
-        config._desired_config = {"vm.swappiness": 60}
+        config._desired_config = {"vm.swappiness": "60"}
         result = config._validate()
 
         assert result == []
@@ -198,7 +198,7 @@ class TestSysctlConfig(unittest.TestCase):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config("test")
 
-        config._desired_config = {"vm.swappiness": 1}
+        config._desired_config = {"vm.swappiness": "1"}
         result = config._validate()
 
         assert result == ["vm.swappiness"]
@@ -209,7 +209,7 @@ class TestSysctlConfig(unittest.TestCase):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config("test")
 
-        config._desired_config = {"vm.swappiness": 0, "other_value": 10}
+        config._desired_config = {"vm.swappiness": "0", "other_value": "10"}
         config._create_charm_file()
 
         mock_file.assert_called_with(Path("/etc/sysctl.d/90-juju-test"), "w")
@@ -224,12 +224,12 @@ class TestSysctlConfig(unittest.TestCase):
         mock_output.side_effect = check_output_side_effects
         config = sysctl.Config("test")
 
-        config._desired_config = {"vm.swappiness": 0, "other_value": 10}
+        config._desired_config = {"vm.swappiness": "0", "other_value": "10"}
         snapshot = config._create_snapshot()
 
         assert mock_output.called_with(["sysctl", "vm.swappiness", "-n"])
         assert mock_output.called_with(["sysctl", "other_value", "-n"])
-        assert snapshot == {"vm.swappiness": 1, "other_value": 5}
+        assert snapshot == {"vm.swappiness": "1", "other_value": "5"}
 
     @patch("charms.operator_libs_linux.v0.sysctl.check_output")
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
@@ -238,7 +238,7 @@ class TestSysctlConfig(unittest.TestCase):
         mock_output.side_effect = check_output_side_effects
         config = sysctl.Config("test")
 
-        snapshot = {"vm.swappiness": 1, "other_value": 5}
+        snapshot = {"vm.swappiness": "1", "other_value": "5"}
         config._restore_snapshot(snapshot)
 
         assert mock_output.called_with(["sysctl", "vm.swappiness=1", "other_value=5"])
@@ -275,7 +275,7 @@ class TestSysctlConfig(unittest.TestCase):
         mock_sysctl.return_value = ["vm.swappiness = 0"]
         config = sysctl.Config("test")
 
-        config._desired_config = {"vm.swappiness": 0}
+        config._desired_config = {"vm.swappiness": "0"}
         config._apply()
 
         assert mock_sysctl.called_with(["vm.swappiness=0"])
@@ -287,7 +287,7 @@ class TestSysctlConfig(unittest.TestCase):
         mock_sysctl.return_value = [permission_failure_output]
         config = sysctl.Config("test")
 
-        config._desired_config = {"vm.swappiness": 0}
+        config._desired_config = {"vm.swappiness": "0"}
         with self.assertRaises(sysctl.SysctlPermissionError) as e:
             config._apply()
 
@@ -301,7 +301,7 @@ class TestSysctlConfig(unittest.TestCase):
         mock_sysctl.return_value = [permission_failure_output]
         config = sysctl.Config("test")
 
-        config._desired_config = {"vm.swappiness": 0, "net.ipv4.tcp_max_syn_backlog": 4096}
+        config._desired_config = {"vm.swappiness": "0", "net.ipv4.tcp_max_syn_backlog": "4096"}
         with self.assertRaises(sysctl.SysctlPermissionError) as e:
             config._apply()
 
@@ -312,7 +312,7 @@ class TestSysctlConfig(unittest.TestCase):
     def test_parse_config(self, _):
         config = sysctl.Config("test")
 
-        config._parse_config({"key1": {"value": "10"}, "key2": {"value": "20"}})
+        config._parse_config({"key1": {"value": 10}, "key2": {"value": "20"}})
 
         self.assertEqual(config._desired_config, {"key1": "10", "key2": "20"})
 
