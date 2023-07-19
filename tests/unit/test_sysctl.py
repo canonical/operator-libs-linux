@@ -157,10 +157,7 @@ class TestSysctlConfig(unittest.TestCase):
     @patch("pathlib.Path.glob")
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
     def test_merge_without_own_file(self, mock_load, mock_glob, mock_file):
-        mock_glob.return_value = [
-            "/etc/sysctl.d/90-juju-othercharm",
-            "/etc/sysctl.d/90-juju-test"
-        ]
+        mock_glob.return_value = ["/etc/sysctl.d/90-juju-othercharm", "/etc/sysctl.d/90-juju-test"]
         mock_load.return_value = self.loaded_values
         config = sysctl.Config("test")
 
