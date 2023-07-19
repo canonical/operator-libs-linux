@@ -196,7 +196,7 @@ class Config(Dict):
     def _validate(self) -> List[str]:
         """Validate the desired config params against merged ones."""
         common_keys = set(self._data.keys()) & set(self._desired_config.keys())
-        confict_keys = []
+        conflict_keys = []
         for key in common_keys:
             if self._data[key] != self._desired_config[key]:
                 logger.warning(
@@ -205,9 +205,9 @@ class Config(Dict):
                     self._data[key],
                     self._desired_config[key],
                 )
-                confict_keys.append(key)
+                conflict_keys.append(key)
 
-        return confict_keys
+        return conflict_keys
 
     def _create_charm_file(self) -> None:
         """Write the charm file."""
@@ -251,7 +251,7 @@ class Config(Dict):
 
     def _create_snapshot(self) -> Dict[str, str]:
         """Create a snaphot of config options that are going to be set."""
-        return {key: int(self._sysctl([key, "-n"])[0]) for key in self._desired_config.keys()}
+        return {key: self._sysctl([key, "-n"])[0] for key in self._desired_config.keys()}
 
     def _restore_snapshot(self, snapshot: Dict[str, str]) -> None:
         """Restore a snapshot to the machine."""
