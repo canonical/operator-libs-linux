@@ -280,14 +280,10 @@ class Config(Dict):
 
         with open(SYSCTL_FILENAME, "r") as f:
             for line in f:
-                config.update(self._parse_line(line))
+                if line.startswith(("#", ";")) or not line.strip() or "=" not in line:
+                    continue
+
+                key, _, value = line.partition("=")
+                config[key.strip()] = value.strip()
 
         return config
-
-    def _parse_line(self, line: str) -> Tuple[str, str]:
-        """Parse a line from juju-sysctl.conf file."""
-        if line.startswith(("#", ";")) or not line.strip() or "=" not in line:
-            return {}
-
-        param, _, value = line.partition("=")
-        return {param.strip(): value.strip()}
