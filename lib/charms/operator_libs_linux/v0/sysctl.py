@@ -102,26 +102,17 @@ SYSCTL_HEADER = f"""# This config file was produced by sysctl lib v{LIBAPI}.{LIB
 class Error(Exception):
     """Base class of most errors raised by this library."""
 
-    def __repr__(self):
-        """Represent the Error."""
-        return "<{}.{} {}>".format(type(self).__module__, type(self).__name__, self.args)
-
-    @property
-    def name(self):
-        """Return a string representation of the model plus class."""
-        return "<{}.{}>".format(type(self).__module__, type(self).__name__)
-
     @property
     def message(self):
         """Return the message passed as an argument."""
         return self.args[0]
 
 
-class SysctlError(Error):
+class CommandError(Error):
     """Raised when there's an error running sysctl command."""
 
 
-class SysctlPermissionError(Error):
+class ApplyError(Error):
     """Raised when there's an error applying values in sysctl."""
 
 
@@ -180,7 +171,7 @@ class Config(Dict):
         logger.debug("Created snapshot for keys: %s", snapshot)
         try:
             self._apply()
-        except SysctlPermissionError:
+        except ApplyError:
             self._restore_snapshot(snapshot)
             raise
 
@@ -247,7 +238,7 @@ class Config(Dict):
         if failed_values:
             msg = f"Unable to set params: {[f.group(1) for f in failed_values]}"
             logger.error(msg)
-            raise SysctlPermissionError(msg)
+            raise ApplyError(msg)
 
     def _create_snapshot(self) -> Dict[str, str]:
         """Create a snaphot of config options that are going to be set."""
@@ -267,7 +258,7 @@ class Config(Dict):
         except CalledProcessError as e:
             msg = f"Error executing '{cmd}': {e.stdout}"
             logger.error(msg)
-            raise SysctlError(msg)
+            raise CommandError(msg)
 
     def _parse_config(self, config: Dict[str, dict]) -> None:
         """Parse a config passed to the lib."""
