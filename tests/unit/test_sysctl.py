@@ -36,10 +36,10 @@ TEST_UPDATE_MERGED_FILE = [
 
 
 def check_output_side_effects(*args, **kwargs):
-    if args[0] == ["sysctl", "vm.swappiness", "-n"]:
+    if args[0] == ["sysctl", "-n", "vm.swappiness"]:
         return "1"
-    elif args[0] == ["sysctl", "other_value", "-n"]:
-        return "5"
+    if args[0] == ["sysctl", "-n", "vm.swappiness", "other_value"]:
+        return "1\n5"
     elif args[0] == ["sysctl", "vm.swappiness=1", "other_value=5"]:
         return "1\n5"
     elif args[0] == ["sysctl", "vm.swappiness=0"]:
@@ -50,7 +50,7 @@ def check_output_side_effects(*args, **kwargs):
         raise CalledProcessError(returncode=1, cmd=args[0], output="error on command")
 
     # Tests on 'update()'
-    elif args[0] == ["sysctl", "vm.max_map_count", "-n"]:
+    elif args[0] == ["sysctl", "-n", "vm.max_map_count"]:
         return "25000"
     elif args[0] == ["sysctl", "vm.max_map_count=25500"]:
         return "25500"
@@ -58,7 +58,6 @@ def check_output_side_effects(*args, **kwargs):
 
 class TestSysctlConfig(unittest.TestCase):
     def setUp(self) -> None:
-        self.desired_values = {"vm.swappiness": {"value": 0}}
         self.loaded_values = {"vm.swappiness": "60", "vm.max_map_count": "25500"}
 
     @patch("pathlib.Path.exists")
@@ -99,7 +98,7 @@ class TestSysctlConfig(unittest.TestCase):
         mock_exists.return_value = False
         config = sysctl.Config("test")
 
-        with self.assertRaises(sysctl.SysctlPermissionError) as e:
+        with self.assertRaises(sysctl.ApplyError) as e:
             config.update(
                 {"vm.swappiness": {"value": 0}, "net.ipv4.tcp_max_syn_backlog": {"value": 4096}}
             )
@@ -250,9 +249,9 @@ class TestSysctlConfig(unittest.TestCase):
         mock_output.side_effect = check_output_side_effects
         config = sysctl.Config("test")
 
-        result = config._sysctl(["vm.swappiness", "-n"])
+        result = config._sysctl(["-n", "vm.swappiness"])
 
-        assert mock_output.called_with(["sysctl", "vm.swappiness", "-n"])
+        assert mock_output.called_with(["sysctl", "-n", "vm.swappiness"])
         assert result == ["1"]
 
     @patch("charms.operator_libs_linux.v0.sysctl.check_output")
@@ -262,7 +261,7 @@ class TestSysctlConfig(unittest.TestCase):
         mock_output.side_effect = check_output_side_effects
         config = sysctl.Config("test")
 
-        with self.assertRaises(sysctl.SysctlError) as e:
+        with self.assertRaises(sysctl.CommandError) as e:
             config._sysctl(["exception"])
 
         assert mock_output.called_with(["sysctl", "exception"])
@@ -288,7 +287,7 @@ class TestSysctlConfig(unittest.TestCase):
         config = sysctl.Config("test")
 
         config._desired_config = {"vm.swappiness": "0"}
-        with self.assertRaises(sysctl.SysctlPermissionError) as e:
+        with self.assertRaises(sysctl.ApplyError) as e:
             config._apply()
 
         assert mock_sysctl.called_with(["vm.swappiness=0"])
@@ -302,7 +301,7 @@ class TestSysctlConfig(unittest.TestCase):
         config = sysctl.Config("test")
 
         config._desired_config = {"vm.swappiness": "0", "net.ipv4.tcp_max_syn_backlog": "4096"}
-        with self.assertRaises(sysctl.SysctlPermissionError) as e:
+        with self.assertRaises(sysctl.ApplyError) as e:
             config._apply()
 
         assert mock_sysctl.called_with(["vm.swappiness=0", "net.ipv4.tcp_max_syn_backlog=4096"])

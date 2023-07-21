@@ -75,7 +75,7 @@ import logging
 import re
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ LIBPATCH = 2
 
 CHARM_FILENAME_PREFIX = "90-juju-"
 SYSCTL_DIRECTORY = Path("/etc/sysctl.d")
-SYSCTL_FILENAME = Path(f"{SYSCTL_DIRECTORY}/95-juju-sysctl.conf")
+SYSCTL_FILENAME = SYSCTL_DIRECTORY / "95-juju-sysctl.conf"
 SYSCTL_HEADER = f"""# This config file was produced by sysctl lib v{LIBAPI}.{LIBPATCH}
 #
 # This file represents the output of the sysctl lib, which can combine multiple
@@ -122,6 +122,8 @@ class ValidationError(Error):
 
 class Config(Dict):
     """Represents the state of the config that a charm wants to enforce."""
+
+    _apply_re = re.compile(r"sysctl: permission denied on key \"([a-z_\.]+)\", ignoring$")
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -231,8 +233,9 @@ class Config(Dict):
         """Apply values to machine."""
         cmd = [f"{key}={value}" for key, value in self._desired_config.items()]
         result = self._sysctl(cmd)
-        expr = re.compile(r"^sysctl: permission denied on key \"([a-z_\.]+)\", ignoring$")
-        failed_values = [expr.match(line) for line in result if expr.match(line)]
+        failed_values = [
+            self._apply_re.match(line) for line in result if self._apply_re.match(line)
+        ]
         logger.debug("Failed values: %s", failed_values)
 
         if failed_values:
@@ -242,7 +245,9 @@ class Config(Dict):
 
     def _create_snapshot(self) -> Dict[str, str]:
         """Create a snaphot of config options that are going to be set."""
-        return {key: self._sysctl([key, "-n"])[0] for key in self._desired_config.keys()}
+        cmd = ["-n"] + list(self._desired_config.keys())
+        values = self._sysctl(cmd)
+        return dict(zip(list(self._desired_config.keys()), values))
 
     def _restore_snapshot(self, snapshot: Dict[str, str]) -> None:
         """Restore a snapshot to the machine."""
@@ -279,10 +284,10 @@ class Config(Dict):
 
         return config
 
-    def _parse_line(self, line: str) -> Dict[str, str]:
+    def _parse_line(self, line: str) -> Tuple[str, str]:
         """Parse a line from juju-sysctl.conf file."""
-        if line.startswith("#") or line == "\n":
+        if line.startswith(("#", ";")) or not line.strip() or "=" not in line:
             return {}
 
-        param, value = line.split("=")
+        param, _, value = line.partition("=")
         return {param.strip(): value.strip()}
