@@ -75,7 +75,7 @@ import logging
 import re
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
