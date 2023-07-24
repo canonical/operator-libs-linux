@@ -76,13 +76,13 @@ class BaseTestGrubLib(unittest.TestCase):
 
 class TestGrubUtils(BaseTestGrubLib):
     def test_split_config_line(self):
-        """Tets splitting single line."""
+        """Test splitting single line."""
         key, value = grub._split_config_line('test="1234"')
         assert key == "test"
         assert value == "1234"
 
     def test_split_config_line_failed(self):
-        """Tets splitting single line."""
+        """Test splitting single line."""
         with self.assertRaises(ValueError):
             grub._split_config_line('test="1234" "5678"')
 
@@ -210,19 +210,19 @@ class TestGrubConfig(BaseTestGrubLib):
         self.load_config.assert_not_called()
 
     def test__contains__(self):
-        """Tets config __contains__ function."""
+        """Test config __contains__ function."""
         self.assertIn("GRUB_TIMEOUT", self.config)
 
     def test__len__(self):
-        """Tets config __len__ function."""
+        """Test config __len__ function."""
         self.assertEqual(len(self.config), 4)
 
     def test__iter__(self):
-        """Tets config __iter__ function."""
+        """Test config __iter__ function."""
         self.assertListEqual(list(self.config), list(EXP_GRUB_CONFIG.keys()))
 
     def test__getitem__(self):
-        """Tets config __getitem__ function."""
+        """Test config __getitem__ function."""
         for key, value in EXP_GRUB_CONFIG.items():
             self.assertEqual(self.config[key], value)
 
