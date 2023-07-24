@@ -13,7 +13,8 @@ partial_permission_failure_output = """sysctl: permission denied on key "vm.swap
 net.ipv4.tcp_max_syn_backlog = 4096
 """
 
-TEST_OTHER_CHARM_FILE = """vm.swappiness=60
+TEST_OTHER_CHARM_FILE = """# othercharm
+vm.swappiness=60
 net.ipv4.tcp_max_syn_backlog=4096
 """
 TEST_MERGED_FILE = """# This config file was produced by sysctl lib v0.1
@@ -26,11 +27,13 @@ vm.swappiness=0
 """
 TEST_MULTIPLE_MERGED_FILE = [
     "# This config file was produced by sysctl lib v0.2\n#\n# This file represents the output of the sysctl lib, which can combine multiple\n# configurations into a single file like.\n",
+    "# othercharm\n",
     "vm.swappiness=60\n",
     "net.ipv4.tcp_max_syn_backlog=4096\n",
 ]
 TEST_UPDATE_MERGED_FILE = [
     "# This config file was produced by sysctl lib v0.2\n#\n# This file represents the output of the sysctl lib, which can combine multiple\n# configurations into a single file like.\n",
+    "# test\n",
     "vm.max_map_count=25500\n",
 ]
 
@@ -62,7 +65,7 @@ class TestSysctlConfig(unittest.TestCase):
 
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.glob")
-    @patch("builtins.open", new_callable=mock_open, read_data="vm.max_map_count=25500\n")
+    @patch("builtins.open", new_callable=mock_open, read_data="# test\nvm.max_map_count=25500\n")
     @patch("charms.operator_libs_linux.v0.sysctl.check_output")
     @patch("charms.operator_libs_linux.v0.sysctl.Config._create_charm_file")
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
@@ -213,7 +216,7 @@ class TestSysctlConfig(unittest.TestCase):
 
         mock_file.assert_called_with(Path("/etc/sysctl.d/90-juju-test"), "w")
         mock_file.return_value.writelines.assert_called_once_with(
-            ["vm.swappiness=0\n", "other_value=10\n"]
+            ["# test\n", "vm.swappiness=0\n", "other_value=10\n"]
         )
 
     @patch("charms.operator_libs_linux.v0.sysctl.check_output")

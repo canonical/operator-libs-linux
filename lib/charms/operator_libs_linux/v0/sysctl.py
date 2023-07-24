@@ -181,7 +181,11 @@ class Config(Dict):
         self._merge()
 
     def remove(self) -> None:
-        """Remove config for charm."""
+        """Remove config for charm.
+
+        The removal process won't apply any sysctl configuration. It will only merge files from
+        remaining charms.
+        """
         self.charm_filepath.unlink(missing_ok=True)
         logger.info("Charm config file %s was removed", self.charm_filepath)
         self._merge()
@@ -204,7 +208,9 @@ class Config(Dict):
 
     def _create_charm_file(self) -> None:
         """Write the charm file."""
-        charm_params = [f"{key}={value}\n" for key, value in self._desired_config.items()]
+        charm_params = [f"# {self.name}\n"] + [
+            f"{key}={value}\n" for key, value in self._desired_config.items()
+        ]
         with open(self.charm_filepath, "w") as f:
             f.writelines(charm_params)
 
