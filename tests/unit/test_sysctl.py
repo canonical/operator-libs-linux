@@ -1,10 +1,11 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import tempfile
 import unittest
 from pathlib import Path
 from subprocess import CalledProcessError
-from unittest.mock import call, mock_open, patch
+from unittest.mock import patch
 
 from charms.operator_libs_linux.v0 import sysctl
 
@@ -17,7 +18,15 @@ TEST_OTHER_CHARM_FILE = """# othercharm
 vm.swappiness=60
 net.ipv4.tcp_max_syn_backlog=4096
 """
-TEST_MERGED_FILE = """# This config file was produced by sysctl lib v0.1
+TEST_OTHER_CHARM_MERGED = """# This config file was produced by sysctl lib v0.2
+#
+# This file represents the output of the sysctl lib, which can combine multiple
+# configurations into a single file like.
+# othercharm
+vm.swappiness=60
+net.ipv4.tcp_max_syn_backlog=4096
+"""
+TEST_MERGED_FILE = """# This config file was produced by sysctl lib v0.2
 #
 # This file represents the output of the sysctl lib, which can combine multiple
 # configurations into a single file like.
@@ -25,17 +34,13 @@ vm.max_map_count = 262144
 vm.swappiness=0
 
 """
-TEST_MULTIPLE_MERGED_FILE = [
-    "# This config file was produced by sysctl lib v0.2\n#\n# This file represents the output of the sysctl lib, which can combine multiple\n# configurations into a single file like.\n",
-    "# othercharm\n",
-    "vm.swappiness=60\n",
-    "net.ipv4.tcp_max_syn_backlog=4096\n",
-]
-TEST_UPDATE_MERGED_FILE = [
-    "# This config file was produced by sysctl lib v0.2\n#\n# This file represents the output of the sysctl lib, which can combine multiple\n# configurations into a single file like.\n",
-    "# test\n",
-    "vm.max_map_count=25500\n",
-]
+TEST_UPDATE_MERGED_FILE = """# This config file was produced by sysctl lib v0.2
+#
+# This file represents the output of the sysctl lib, which can combine multiple
+# configurations into a single file like.
+# test
+vm.max_map_count=25500
+"""
 
 
 def check_output_side_effects(*args, **kwargs):
@@ -61,32 +66,30 @@ def check_output_side_effects(*args, **kwargs):
 
 class TestSysctlConfig(unittest.TestCase):
     def setUp(self) -> None:
+        tmp_dir = tempfile.TemporaryDirectory()
+        self.tmp_dir = Path(tmp_dir.name)
+        self.addCleanup(tmp_dir.cleanup)
+
+        # configured paths
+        sysctl.SYSCTL_DIRECTORY = self.tmp_dir
+        sysctl.SYSCTL_FILENAME = self.tmp_dir / "95-juju-sysctl.conf"
+
         self.loaded_values = {"vm.swappiness": "60", "vm.max_map_count": "25500"}
 
-    @patch("pathlib.Path.exists")
-    @patch("pathlib.Path.glob")
-    @patch("builtins.open", new_callable=mock_open, read_data="# test\nvm.max_map_count=25500\n")
     @patch("charms.operator_libs_linux.v0.sysctl.check_output")
-    @patch("charms.operator_libs_linux.v0.sysctl.Config._create_charm_file")
-    @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
-    def test_update_new_values(self, mock_load, _, mock_output, mock_file, mock_glob, mock_exists):
-        mock_load.return_value = {}
-        mock_exists.return_value = False
-        mock_glob.return_value = ["/etc/sysctl.d/90-juju-test"]
+    def test_update_new_values(self, mock_output):
         mock_output.side_effect = check_output_side_effects
         config = sysctl.Config("test")
 
         config.configure({"vm.max_map_count": "25500"})
 
         self.assertEqual(config._desired_config, {"vm.max_map_count": "25500"})
-        mock_file.assert_called_with(Path("/etc/sysctl.d/95-juju-sysctl.conf"), "w")
-        mock_file.return_value.writelines.assert_called_once_with(TEST_UPDATE_MERGED_FILE)
+        with open(self.tmp_dir / "95-juju-sysctl.conf", "r") as f:
+            assert f.read() == TEST_UPDATE_MERGED_FILE
 
-    @patch("pathlib.Path.exists")
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
-    def test_update_with_validation_error(self, mock_load, mock_exists):
+    def test_update_with_validation_error(self, mock_load):
         mock_load.return_value = self.loaded_values
-        mock_exists.return_value = False
         config = sysctl.Config("test")
 
         with self.assertRaises(sysctl.ValidationError) as e:
@@ -94,11 +97,7 @@ class TestSysctlConfig(unittest.TestCase):
 
         self.assertEqual(e.exception.message, "Validation error for keys: ['vm.max_map_count']")
 
-    @patch("pathlib.Path.exists")
-    @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
-    def test_update_with_permission_error(self, mock_load, mock_exists):
-        mock_load.return_value = {}
-        mock_exists.return_value = False
+    def test_update_with_permission_error(self):
         config = sysctl.Config("test")
 
         with self.assertRaises(sysctl.ApplyError) as e:
@@ -118,60 +117,47 @@ class TestSysctlConfig(unittest.TestCase):
         mock_unlink.assert_called()
         mock_merge.assert_called()
 
-    @patch("pathlib.Path.exists")
-    @patch("builtins.open", new_callable=mock_open, read_data=TEST_MERGED_FILE)
-    def test_load_data(self, mock_file, mock_exist):
+    def test_load_data(self):
+        with open(self.tmp_dir / "95-juju-sysctl.conf", "w") as f:
+            f.write(TEST_MERGED_FILE)
+
         config = sysctl.Config(name="test")
 
-        mock_exist.assert_called()
-        mock_file.assert_called_with(Path("/etc/sysctl.d/95-juju-sysctl.conf"), "r")
         assert config._data == {"vm.swappiness": "0", "vm.max_map_count": "262144"}
 
-    @patch("pathlib.Path.exists")
-    def test_load_data_no_path(self, mock_exist):
-        mock_exist.return_value = False
+    def test_load_data_no_path(self):
         config = sysctl.Config(name="test")
 
-        mock_exist.assert_called()
         assert len(config) == 0
 
-    @patch("builtins.open", new_callable=mock_open, read_data=TEST_OTHER_CHARM_FILE)
-    @patch("pathlib.Path.glob")
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
-    def test_merge(self, mock_load, mock_glob, mock_file):
-        mock_glob.return_value = ["/etc/sysctl.d/90-juju-othercharm"]
+    def test_merge(self, mock_load):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config("test")
+        with open(self.tmp_dir / "90-juju-othercharm", "w") as f:
+            f.write == TEST_OTHER_CHARM_FILE
 
         config._merge()
-        mock_glob.assert_called_with("90-juju-*")
 
-        expected_calls = [
-            call("/etc/sysctl.d/90-juju-othercharm", "r"),
-            call(Path("/etc/sysctl.d/95-juju-sysctl.conf"), "w"),
-        ]
-        mock_file.assert_has_calls(expected_calls, any_order=True)
-        mock_file.return_value.writelines.assert_called_once_with(TEST_MULTIPLE_MERGED_FILE)
+        assert (self.tmp_dir / "95-juju-sysctl.conf").exists
+        with open(self.tmp_dir / "95-juju-sysctl.conf", "r") as f:
+            f.read == TEST_OTHER_CHARM_MERGED
 
-    @patch("builtins.open", new_callable=mock_open, read_data=TEST_OTHER_CHARM_FILE)
-    @patch("pathlib.Path.glob")
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
-    def test_merge_without_own_file(self, mock_load, mock_glob, mock_file):
-        mock_glob.return_value = ["/etc/sysctl.d/90-juju-othercharm", "/etc/sysctl.d/90-juju-test"]
+    def test_merge_without_own_file(self, mock_load):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config("test")
 
+        with open(self.tmp_dir / "90-juju-test", "w") as f:
+            f.write == "# test\nvalue=1\n"
+        with open(self.tmp_dir / "90-juju-othercharm", "w") as f:
+            f.write == TEST_OTHER_CHARM_FILE
+
         config._merge(add_own_charm=False)
-        mock_glob.assert_called_with("90-juju-*")
 
-        expected_calls = [
-            call("/etc/sysctl.d/90-juju-othercharm", "r"),
-            call(Path("/etc/sysctl.d/95-juju-sysctl.conf"), "w"),
-        ]
-
-        assert call("/etc/sysctl.d/90-juju-test", "r") not in mock_file.mock_calls
-        mock_file.assert_has_calls(expected_calls, any_order=True)
-        mock_file.return_value.writelines.assert_called_once_with(TEST_MULTIPLE_MERGED_FILE)
+        assert (self.tmp_dir / "95-juju-sysctl.conf").exists
+        with open(self.tmp_dir / "95-juju-sysctl.conf", "r") as f:
+            f.read == TEST_OTHER_CHARM_MERGED
 
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
     def test_validate_different_keys(self, mock_load):
@@ -203,16 +189,14 @@ class TestSysctlConfig(unittest.TestCase):
 
         assert result == ["vm.swappiness"]
 
-    @patch("builtins.open", new_callable=mock_open)
-    @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
-    def test_create_charm_file(self, mock_load, mock_file):
-        mock_load.return_value = self.loaded_values
+    def test_create_charm_file(self):
         config = sysctl.Config("test")
 
         config._desired_config = {"vm.swappiness": "0", "other_value": "10"}
         config._create_charm_file()
 
-        mock_file.assert_called_with(Path("/etc/sysctl.d/90-juju-test"), "w")
+        with open(self.tmp_dir / "90-juju-test", "r") as f:
+            assert f.read() == "# test\nvm.swappiness=0\nother_value=10\n"
 
     @patch("charms.operator_libs_linux.v0.sysctl.check_output")
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")

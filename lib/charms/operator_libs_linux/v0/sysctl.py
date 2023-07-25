@@ -206,6 +206,7 @@ class Config(Dict):
     def _create_charm_file(self) -> None:
         """Write the charm file."""
         with open(self.charm_filepath, "w") as f:
+            f.write(f"# {self.name}\n")
             for key, value in self._desired_config.items():
                 f.write(f"{key}={value}\n")
 
