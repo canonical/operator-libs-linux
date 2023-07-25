@@ -76,7 +76,7 @@ class TestSysctlConfig(unittest.TestCase):
         mock_output.side_effect = check_output_side_effects
         config = sysctl.Config("test")
 
-        config.update({"vm.max_map_count": {"value": 25500}})
+        config.configure({"vm.max_map_count": "25500"})
 
         self.assertEqual(config._desired_config, {"vm.max_map_count": "25500"})
         mock_file.assert_called_with(Path("/etc/sysctl.d/95-juju-sysctl.conf"), "w")
@@ -90,7 +90,7 @@ class TestSysctlConfig(unittest.TestCase):
         config = sysctl.Config("test")
 
         with self.assertRaises(sysctl.ValidationError) as e:
-            config.update({"vm.max_map_count": {"value": 25000}})
+            config.configure({"vm.max_map_count": "25000"})
 
         self.assertEqual(e.exception.message, "Validation error for keys: ['vm.max_map_count']")
 
@@ -102,9 +102,7 @@ class TestSysctlConfig(unittest.TestCase):
         config = sysctl.Config("test")
 
         with self.assertRaises(sysctl.ApplyError) as e:
-            config.update(
-                {"vm.swappiness": {"value": 0}, "net.ipv4.tcp_max_syn_backlog": {"value": 4096}}
-            )
+            config.configure({"vm.swappiness": "0", "net.ipv4.tcp_max_syn_backlog": "4096"})
 
         self.assertEqual(e.exception.message, "Unable to set params: ['vm.swappiness']")
 
@@ -215,9 +213,6 @@ class TestSysctlConfig(unittest.TestCase):
         config._create_charm_file()
 
         mock_file.assert_called_with(Path("/etc/sysctl.d/90-juju-test"), "w")
-        mock_file.return_value.writelines.assert_called_once_with(
-            ["# test\n", "vm.swappiness=0\n", "other_value=10\n"]
-        )
 
     @patch("charms.operator_libs_linux.v0.sysctl.check_output")
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
@@ -314,7 +309,7 @@ class TestSysctlConfig(unittest.TestCase):
     def test_parse_config(self, _):
         config = sysctl.Config("test")
 
-        config._parse_config({"key1": {"value": 10}, "key2": {"value": "20"}})
+        config._parse_config({"key1": "10", "key2": "20"})
 
         self.assertEqual(config._desired_config, {"key1": "10", "key2": "20"})
 

@@ -14,30 +14,27 @@
 
 """Handler for the sysctl config.
 
-This library allows your charm to create and update sysctl config options to the machine.
+This library allows your charm to create and configure sysctl options to the machine.
 
 Validation and merge capabilities are added, for situations where more than one application
 are setting values. The following files can be created:
 
 - /etc/sysctl.d/90-juju-<app-name>
-    Requirements from one application requesting to update the values.
+    Requirements from one application requesting to configure the values.
 
 - /etc/sysctl.d/95-juju-sysctl.conf
     Merged file resulting from all other `90-juju-*` application files.
 
 
 A charm using the sysctl lib will need a data structure like the following:
-```yaml
-vm.swappiness:
-  value: 1
-vm.max_map_count:
-  value: 262144
-vm.dirty_ratio:
-  value: 80
-vm.dirty_background_ratio:
-  value: 5
-net.ipv4.tcp_max_syn_backlog:
-  value: 4096
+```
+{
+"vm.swappiness": "1",
+"vm.max_map_count": "262144",
+"vm.dirty_ratio": "80",
+"vm.dirty_background_ratio": "5",
+"net.ipv4.tcp_max_syn_backlog": "4096",
+}
 ```
 
 Now, it can use that template within the charm, or just declare the values directly:
@@ -56,10 +53,10 @@ class MyCharm(CharmBase):
 
     def _on_install(self, _):
         # Altenatively, read the values from a template
-        sysctl_data = {"net.ipv4.tcp_max_syn_backlog": {"value": 4096}}
+        sysctl_data = {"net.ipv4.tcp_max_syn_backlog": "4096"}}
 
         try:
-            self.sysctl.update(config=sysctl_data)
+            self.sysctl.configure(config=sysctl_data)
         except (sysctl.SysctlPermissionError, sysctl.ValidationError) as e:
             logger.error(f"Error setting values on sysctl: {e.message}")
             self.unit.status = BlockedStatus("Sysctl config not possible")
@@ -150,18 +147,18 @@ class Config(Dict):
         """Name for resulting charm config file."""
         return SYSCTL_DIRECTORY / f"{CHARM_FILENAME_PREFIX}{self.name}"
 
-    def update(self, config: Dict[str, dict]) -> None:
-        """Update sysctl config options with a desired set of config params.
+    def configure(self, config: Dict[str, str]) -> None:
+        """Configure sysctl options with a desired set of params.
 
         Args:
-            config: dictionary with keys to update:
+            config: dictionary with keys to configure:
         ```
-        {"vm.swappiness": {"value": 10}, ...}
+        {"vm.swappiness": "10", ...}
         ```
         """
         self._parse_config(config)
 
-        # NOTE: case where own charm calls update() more than once.
+        # NOTE: case where own charm calls configure() more than once.
         if self.charm_filepath.exists():
             self._merge(add_own_charm=False)
 
@@ -208,11 +205,9 @@ class Config(Dict):
 
     def _create_charm_file(self) -> None:
         """Write the charm file."""
-        charm_params = [f"# {self.name}\n"] + [
-            f"{key}={value}\n" for key, value in self._desired_config.items()
-        ]
         with open(self.charm_filepath, "w") as f:
-            f.writelines(charm_params)
+            for key, value in self._desired_config.items():
+                f.write(f"{key}={value}\n")
 
     def _merge(self, add_own_charm=True) -> None:
         """Create the merged sysctl file.
@@ -250,7 +245,7 @@ class Config(Dict):
             raise ApplyError(msg)
 
     def _create_snapshot(self) -> Dict[str, str]:
-        """Create a snaphot of config options that are going to be set."""
+        """Create a snapshot of config options that are going to be set."""
         cmd = ["-n"] + list(self._desired_config.keys())
         values = self._sysctl(cmd)
         return dict(zip(list(self._desired_config.keys()), values))
@@ -271,12 +266,9 @@ class Config(Dict):
             logger.error(msg)
             raise CommandError(msg)
 
-    def _parse_config(self, config: Dict[str, dict]) -> None:
+    def _parse_config(self, config: Dict[str, str]) -> None:
         """Parse a config passed to the lib."""
-        result = {}
-        for key, value in config.items():
-            result[key] = str(value["value"])
-        self._desired_config: Dict[str, str] = result
+        self._desired_config = {k: str(v) for k, v in config.items()}
 
     def _load_data(self) -> Dict[str, str]:
         """Get merged config."""
