@@ -57,10 +57,10 @@ class MyCharm(CharmBase):
 
         try:
             self.sysctl.configure(config=sysctl_data)
-        except (sysctl.SysctlPermissionError, sysctl.ValidationError) as e:
+        except (sysctl.ApplyError, sysctl.ValidationError) as e:
             logger.error(f"Error setting values on sysctl: {e.message}")
             self.unit.status = BlockedStatus("Sysctl config not possible")
-        except sysctl.SysctlError:
+        except sysctl.CommandError:
             logger.error("Error on sysctl")
 
     def _on_remove(self, _):
@@ -84,7 +84,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 CHARM_FILENAME_PREFIX = "90-juju-"
 SYSCTL_DIRECTORY = Path("/etc/sysctl.d")
