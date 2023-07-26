@@ -57,10 +57,10 @@ class MyCharm(CharmBase):
 
         try:
             self.sysctl.configure(config=sysctl_data)
-        except (sysctl.SysctlPermissionError, sysctl.ValidationError) as e:
+        except (sysctl.ApplyError, sysctl.ValidationError) as e:
             logger.error(f"Error setting values on sysctl: {e.message}")
             self.unit.status = BlockedStatus("Sysctl config not possible")
-        except sysctl.SysctlError:
+        except sysctl.CommandError:
             logger.error("Error on sysctl")
 
     def _on_remove(self, _):
