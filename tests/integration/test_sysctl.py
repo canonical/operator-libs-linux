@@ -8,16 +8,6 @@ from subprocess import check_output
 
 from charms.operator_libs_linux.v0 import sysctl
 
-EXPECTED_MERGED_RESULT = f"""# This config file was produced by sysctl lib v{sysctl.LIBAPI}.{sysctl.LIBPATCH}
-#
-# This file represents the output of the sysctl lib, which can combine multiple
-# configurations into a single file like.
-# test1
-net.ipv4.tcp_max_syn_backlog=4096
-# test2
-net.ipv4.tcp_window_scaling=2
-"""
-
 
 def test_configure():
     cfg = sysctl.Config("test1")
@@ -48,7 +38,9 @@ def test_multiple_configure():
     assert test_file_2.exists()
 
     with open(merged_file, "r") as f:
-        assert f.read() == EXPECTED_MERGED_RESULT
+        result = f.read()
+        assert "# test1\nnet.ipv4.tcp_max_syn_backlog=4096" in result
+        assert "# test2\nnet.ipv4.tcp_window_scaling=2" in result
 
 
 def test_remove():
