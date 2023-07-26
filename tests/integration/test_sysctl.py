@@ -8,7 +8,7 @@ from subprocess import check_output
 
 from charms.operator_libs_linux.v0 import sysctl
 
-EXPECTED_MERGED_RESULT = """# This config file was produced by sysctl lib v0.3
+EXPECTED_MERGED_RESULT = f"""# This config file was produced by sysctl lib v{sysctl.LIBAPI}.{sysctl.LIBPATCH}
 #
 # This file represents the output of the sysctl lib, which can combine multiple
 # configurations into a single file like.
