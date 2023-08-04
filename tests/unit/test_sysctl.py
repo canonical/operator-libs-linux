@@ -135,13 +135,13 @@ class TestSysctlConfig(unittest.TestCase):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config("test")
         with open(self.tmp_dir / "90-juju-othercharm", "w") as f:
-            f.write == TEST_OTHER_CHARM_FILE
+            f.write(TEST_OTHER_CHARM_FILE)
 
         config._merge()
 
         assert (self.tmp_dir / "95-juju-sysctl.conf").exists
         with open(self.tmp_dir / "95-juju-sysctl.conf", "r") as f:
-            f.read == TEST_OTHER_CHARM_MERGED
+            assert f.read() == TEST_OTHER_CHARM_MERGED
 
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
     def test_merge_without_own_file(self, mock_load):
@@ -149,15 +149,15 @@ class TestSysctlConfig(unittest.TestCase):
         config = sysctl.Config("test")
 
         with open(self.tmp_dir / "90-juju-test", "w") as f:
-            f.write == "# test\nvalue=1\n"
+            f.write("# test\nvalue=1\n")
         with open(self.tmp_dir / "90-juju-othercharm", "w") as f:
-            f.write == TEST_OTHER_CHARM_FILE
+            f.write(TEST_OTHER_CHARM_FILE)
 
         config._merge(add_own_charm=False)
 
         assert (self.tmp_dir / "95-juju-sysctl.conf").exists
         with open(self.tmp_dir / "95-juju-sysctl.conf", "r") as f:
-            f.read == TEST_OTHER_CHARM_MERGED
+            assert f.read() == TEST_OTHER_CHARM_MERGED
 
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
     def test_validate_different_keys(self, mock_load):

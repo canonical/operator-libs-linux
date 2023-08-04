@@ -220,7 +220,7 @@ class Config(Dict):
         data = [SYSCTL_HEADER]
         paths = set(SYSCTL_DIRECTORY.glob(f"{CHARM_FILENAME_PREFIX}*"))
         if not add_own_charm:
-            paths.discard(self.charm_filepath.as_posix())
+            paths.discard(self.charm_filepath)
 
         for path in paths:
             with open(path, "r") as f:
