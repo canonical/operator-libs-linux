@@ -70,7 +70,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 GRUB_DIRECTORY = Path("/etc/default/grub.d/")
 CHARM_CONFIG_PREFIX = "90-juju"
@@ -161,11 +161,22 @@ def _save_config(path: Path, config: Dict[str, str], header: str = CONFIG_HEADER
     if path.exists():
         logger.debug("GRUB config %s already exist and it will overwritten", path)
 
-    context = [f"{key}={shlex.quote(value)}" for key, value in config.items()]
     with open(path, "w", encoding="UTF-8") as file:
-        file.writelines([header, *context])
+        file.write(f"{header}{os.linesep}")
+        for key, value in config.items():
+            file.write(f"{key}={shlex.quote(value)}{os.linesep}")
 
     logger.info("GRUB config file %s was saved", path)
+
+
+def _update_config(path: Path, config: Dict[str, str], header: str = CONFIG_HEADER) -> None:
+    """Update existing GRUB config file."""
+    if path.exists():
+        original_config = _load_config(path)
+        original_config.update(config)
+        config = original_config.copy()
+
+    _save_config(path, config, header)
 
 
 def check_update_grub() -> bool:
@@ -178,7 +189,7 @@ def check_update_grub() -> bool:
         )
     except subprocess.CalledProcessError as error:
         logger.exception(error)
-        raise
+        raise ApplyError from error
 
     return not filecmp.cmp(main_grub_cfg, tmp_path)
 
@@ -378,5 +389,5 @@ class Config(Mapping[str, str]):
             raise
 
         logger.debug("[%s] saving copy of charm config to %s", self.charm_name, GRUB_DIRECTORY)
-        _save_config(self.path, config)
+        _update_config(self.path, config)
         return changed_keys
