@@ -84,7 +84,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 4
 
 CHARM_FILENAME_PREFIX = "90-juju-"
 SYSCTL_DIRECTORY = Path("/etc/sysctl.d")
@@ -220,7 +220,7 @@ class Config(Dict):
         data = [SYSCTL_HEADER]
         paths = set(SYSCTL_DIRECTORY.glob(f"{CHARM_FILENAME_PREFIX}*"))
         if not add_own_charm:
-            paths.discard(self.charm_filepath.as_posix())
+            paths.discard(self.charm_filepath)
 
         for path in paths:
             with open(path, "r") as f:
