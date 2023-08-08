@@ -1,7 +1,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import io
-import os
 import subprocess
 import tempfile
 import unittest
@@ -158,8 +157,8 @@ class TestUtils(BaseTest):
         mock_open.assert_called_once_with(path, "w", encoding="UTF-8")
         mock_open.return_value.write.assert_has_calls(
             [
-                mock.call(f"{grub.CONFIG_HEADER}{os.linesep}"),
-                mock.call(f"test='\"1234\"'{os.linesep}"),
+                mock.call(grub.CONFIG_HEADER),
+                mock.call("test='\"1234\"'\n"),
             ]
         )
 

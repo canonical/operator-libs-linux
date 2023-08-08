@@ -54,7 +54,6 @@ class UbuntuCharm(CharmBase):
 import filecmp
 import io
 import logging
-import os
 import shlex
 import subprocess
 from pathlib import Path
@@ -162,9 +161,9 @@ def _save_config(path: Path, config: Dict[str, str], header: str = CONFIG_HEADER
         logger.debug("GRUB config %s already exist and it will overwritten", path)
 
     with open(path, "w", encoding="UTF-8") as file:
-        file.write(f"{header}{os.linesep}")
+        file.write(header)
         for key, value in config.items():
-            file.write(f"{key}={shlex.quote(value)}{os.linesep}")
+            file.write(f"{key}={shlex.quote(value)}\n")
 
     logger.info("GRUB config file %s was saved", path)
 
@@ -251,7 +250,7 @@ class Config(Mapping[str, str]):
         """Save current GRUB configuration."""
         logger.info("saving new GRUB config to %s", GRUB_CONFIG)
         applied_configs = {self.path, *self.applied_configs}  # using set to drop duplicity
-        registered_configs = os.linesep.join(
+        registered_configs = "\n".join(
             FILE_LINE_IN_DESCRIPTION.format(path=path) for path in applied_configs
         )
         header = CONFIG_HEADER + CONFIG_DESCRIPTION.format(configs=registered_configs)
