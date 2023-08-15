@@ -32,15 +32,12 @@ jobs:
       - name: Run tests
         run: tox -e unit
   integration-test:
-    name: Integration tests
+    name: Ubuntu integration tests
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - uses: canonical/setup-lxd@v0.1.1
-        with:
-          channel: 5.0/stable
       - name: Install dependencies
-        run: python -m pip install tox
-      - name: Run integration tests
-        run: tox -e integration
+        run: sudo python -m pip install tox
+      - name: Run integration tests for Ubuntu
+        run: sudo tox -e integration-ubuntu
