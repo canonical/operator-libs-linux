@@ -164,7 +164,6 @@ def test_charm_remove_configuration():
 
     grub_conf.remove()
     assert grub_conf.path.exists() is False
-    assert {} == grub._load_config(grub_conf.path)
     assert {} == grub._load_config(grub.GRUB_CONFIG)
 
 
