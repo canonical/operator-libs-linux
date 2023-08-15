@@ -58,9 +58,9 @@ def user_exists(user: Union[str, int]) -> Optional[pwd.struct_passwd]:
         TypeError: where neither a string or int is passed as the first argument
     """
     try:
-        if type(user) is int:
+        if isinstance(user, int) and not isinstance(user, bool):
             return pwd.getpwuid(user)
-        elif type(user) is str:
+        elif isinstance(user, str):
             return pwd.getpwnam(user)
         else:
             raise TypeError("specified argument '%r' should be a string or int", user)
@@ -79,9 +79,9 @@ def group_exists(group: Union[str, int]) -> Optional[grp.struct_group]:
         TypeError: where neither a string or int is passed as the first argument
     """
     try:
-        if type(group) is int:
+        if isinstance(group, int) and not isinstance(group, bool):
             return grp.getgrgid(group)
-        elif type(group) is str:
+        elif isinstance(group, str):
             return grp.getgrnam(group)
         else:
             raise TypeError("specified argument '%r' should be a string or int", group)
