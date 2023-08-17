@@ -1,6 +1,7 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import subprocess
 import unittest
 from typing import List
 from unittest.mock import MagicMock, call, patch
@@ -9,16 +10,14 @@ from charms.operator_libs_linux.v1 import systemd
 
 
 def with_mock_subp(func):
-    """Set up a Popen mock.
+    """Set up a `subprocess.run(...)` mock.
 
     Any function that uses this decorator should take a function as an argument. When
-    called with a series of return codes, that function will mock out subprocess.Popen,
+    called with a series of return codes, that function will mock out `subprocess.run(...)`,
     and set it to return those error codes, in order.
 
-    The function returns the mock Popen object, so that routines such as
-    assert_called_with can be called upon it, along with the return from
-    systemd._popen_kwargs, for convenience when composing call objects.
-
+    The function returns the mock `subprocess.run(...)` object, so that routines such as
+    assert_called_with can be called upon it.
     """
 
     @patch("charms.operator_libs_linux.v1.systemd.subprocess")
@@ -26,21 +25,26 @@ def with_mock_subp(func):
         def make_mock_popen(returncodes: List[int], lines: List[str] = None, stdout: str = None):
             lines = lines if lines is not None else ("", "")
 
-            mock_subp.PIPE = mock_subp.STDOUT = stdout or ""
+            mock_subp.PIPE = mock_subp.STDOUT = stdout or subprocess.PIPE
 
             side_effects = []
 
             for code in returncodes:
                 mock_proc = MagicMock()
-                mock_proc.wait.return_value = None
-                mock_proc.stdout.readline.side_effect = lines
                 mock_proc.returncode = code
+                mock_proc.stdout = lines
                 side_effects.append(mock_proc)
 
-            mock_popen = mock_subp.Popen
-            mock_popen.side_effect = tuple(side_effects)
+            mock_run = mock_subp.run
+            mock_run.side_effect = tuple(side_effects)
 
-            return mock_popen, systemd._popen_kwargs()
+            return mock_run, {
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.PIPE,
+                "text": True,
+                "bufsize": 1,
+                "encoding": "utf-8",
+            }
 
         func(cls, make_mock_popen)
 
@@ -64,11 +68,11 @@ class TestSystemD(unittest.TestCase):
         mockp, kw = make_mock([0, 3])
 
         is_running = systemd.service_running("mysql")
-        mockp.assert_called_with(["systemctl", "is-active", "mysql", "--quiet"], **kw)
+        mockp.assert_called_with(["systemctl", "--quiet", "is-active", "mysql"], **kw)
         self.assertTrue(is_running)
 
         is_running = systemd.service_running("mysql")
-        mockp.assert_called_with(["systemctl", "is-active", "mysql", "--quiet"], **kw)
+        mockp.assert_called_with(["systemctl", "--quiet", "is-active", "mysql"], **kw)
         self.assertFalse(is_running)
 
     @with_mock_subp
@@ -76,11 +80,11 @@ class TestSystemD(unittest.TestCase):
         mockp, kw = make_mock([0, 1])
 
         is_failed = systemd.service_failed("mysql")
-        mockp.assert_called_with(["systemctl", "is-failed", "mysql", "--quiet"], **kw)
+        mockp.assert_called_with(["systemctl", "--quiet", "is-failed", "mysql"], **kw)
         self.assertTrue(is_failed)
 
         is_failed = systemd.service_failed("mysql")
-        mockp.assert_called_with(["systemctl", "is-failed", "mysql", "--quiet"], **kw)
+        mockp.assert_called_with(["systemctl", "--quiet", "is-failed", "mysql", ], **kw)
         self.assertFalse(is_failed)
 
     @with_mock_subp
@@ -160,9 +164,9 @@ class TestSystemD(unittest.TestCase):
         paused = systemd.service_pause("mysql")
         mockp.assert_has_calls(
             [
-                call(["systemctl", "disable", "mysql", "--now"], **kw),
+                call(["systemctl", "disable", "--now", "mysql"], **kw),
                 call(["systemctl", "mask", "mysql"], **kw),
-                call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
+                call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
             ]
         )
         self.assertTrue(paused)
@@ -172,9 +176,9 @@ class TestSystemD(unittest.TestCase):
         self.assertRaises(systemd.SystemdError, systemd.service_pause, "mysql")
         mockp.assert_has_calls(
             [
-                call(["systemctl", "disable", "mysql", "--now"], **kw),
+                call(["systemctl", "disable", "--now", "mysql"], **kw),
                 call(["systemctl", "mask", "mysql"], **kw),
-                call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
+                call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
             ]
         )
 
@@ -186,8 +190,8 @@ class TestSystemD(unittest.TestCase):
         mockp.assert_has_calls(
             [
                 call(["systemctl", "unmask", "mysql"], **kw),
-                call(["systemctl", "enable", "mysql", "--now"], **kw),
-                call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
+                call(["systemctl", "enable", "--now", "mysql"], **kw),
+                call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
             ]
         )
         self.assertTrue(resumed)
@@ -198,8 +202,8 @@ class TestSystemD(unittest.TestCase):
         mockp.assert_has_calls(
             [
                 call(["systemctl", "unmask", "mysql"], **kw),
-                call(["systemctl", "enable", "mysql", "--now"], **kw),
-                call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
+                call(["systemctl", "enable", "--now", "mysql"], **kw),
+                call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
             ]
         )
         self.assertTrue(resumed)
@@ -210,8 +214,8 @@ class TestSystemD(unittest.TestCase):
         mockp.assert_has_calls(
             [
                 call(["systemctl", "unmask", "mysql"], **kw),
-                call(["systemctl", "enable", "mysql", "--now"], **kw),
-                call(["systemctl", "is-active", "mysql", "--quiet"], **kw),
+                call(["systemctl", "enable", "--now", "mysql"], **kw),
+                call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
             ]
         )
 
