@@ -37,6 +37,7 @@ success = service_reload("nginx", restart_on_failure=True)
 """
 
 __all__ = [  # Don't export `_systemctl`. (It's not the intended way of using this lib.)
+    "SystemdError",
     "daemon_reload",
     "service_disable",
     "service_enable",
