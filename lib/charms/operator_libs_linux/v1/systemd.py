@@ -23,6 +23,7 @@ systemd commands, with a few shortcuts baked in. For example, service_pause and
 service_resume with run the mask/unmask and enable/disable invocations.
 
 Example usage:
+
 ```python
 from charms.operator_libs_linux.v0.systemd import service_running, service_reload
 
@@ -33,12 +34,7 @@ if not service_running("mysql"):
 # Attempt to reload a service, restarting if necessary
 success = service_reload("nginx", restart_on_failure=True)
 ```
-
 """
-
-import functools
-import logging
-import subprocess
 
 __all__ = [  # Don't export `_systemctl`. (It's not the intended way of using this lib.)
     "daemon_reload",
@@ -53,6 +49,10 @@ __all__ = [  # Don't export `_systemctl`. (It's not the intended way of using th
     "service_start",
     "service_stop",
 ]
+
+import logging
+import subprocess
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -71,69 +71,130 @@ class SystemdError(Exception):
     """Custom exception for SystemD related errors."""
 
 
-def _systemctl(*args) -> bool:
+def _systemctl(*args: str, check: bool = False) -> Optional[int]:
     """Control a system service using systemctl.
 
     Args:
         *args: Arguments to pass to systemctl.
+        check:
+            Check the output of the systemctl command. Default: False.
+
+    Raises:
+        SystemdError:
+            Raised if returncode != 0 and check is True.
+            None will be returned instead of a returncode.
     """
     cmd = ["systemctl", *args]
     logger.debug(f"Executing command: {cmd}")
-    proc = subprocess.run(
-        [*cmd],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-        encoding="utf-8"
-    )
-    logger.debug(proc.stdout)
-    if proc.returncode == 1 and "is-failed" in cmd:
-        return False
-    elif proc.returncode == 3 and "is-active" in cmd:
-        return False
-    elif proc.returncode == 0:
+    try:
+        proc = subprocess.run(
+            [*cmd],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            encoding="utf-8",
+            check=check,
+        )
+        logger.debug(
+            f"Command {cmd} exit code: {proc.returncode}. systemctl output:\n{proc.stdout}"
+        )
+        return proc.returncode
+    except subprocess.CalledProcessError as e:
+        raise SystemdError(
+            f"Command {cmd} failed with returncode {e.returncode}. systemctl output:\n{e.stdout}"
+        )
+
+
+def service_running(service_name: str) -> bool:
+    """Report whether a system service is running.
+
+    Args:
+        service_name: the name of the service to check
+    """
+    # If returncode is 0, this means that is service is active.
+    if _systemctl("--quiet", "is-active", service_name) == 0:
         return True
     else:
-        raise SystemdError(f"Command {cmd} failed. systemctl output:\n{proc.stdout}")
+        return False
 
 
-service_running = functools.partial(_systemctl, "--quiet", "is-active")
-service_running.__doc__ = "Determine whether a system service is running."
-service_failed = functools.partial(_systemctl, "--quiet", "is-failed")
-service_failed.__doc__ = "Determine whether a system service has failed."
-service_start = functools.partial(_systemctl, "start")
-service_start.__doc__ = "Start a system service."
-service_stop = functools.partial(_systemctl, "stop")
-service_stop.__doc__ = "Stop a system service."
-service_restart = functools.partial(_systemctl, "restart")
-service_restart.__doc__ = "Restart a system service."
-service_enable = functools.partial(_systemctl, "enable")
-service_enable.__doc__ = "Enable a system service."
-service_disable = functools.partial(_systemctl, "disable")
-service_disable.__doc__ = "Disable a system service."
-daemon_reload = functools.partial(_systemctl, "daemon-reload")
-daemon_reload.__doc__ = "Reload systemd manager configuration."
+def service_failed(service_name: str) -> bool:
+    """Report whether a system service has failed.
+
+    Args:
+        service_name: the name of the service to check
+    """
+    # If returncode is 0, this means that the service has failed.
+    if _systemctl("--quiet", "is-failed", service_name) == 0:
+        return True
+    else:
+        return False
 
 
-def service_reload(service_name: str, restart_on_failure: bool = False) -> bool:
+def service_start(*args: str) -> None:
+    """Start a system service.
+
+    Args:
+        *args: Arguments to pass to `systemctl start`.
+    """
+    _systemctl("start", *args, check=True)
+
+
+def service_stop(*args: str) -> None:
+    """Stop a system service.
+
+    Args:
+        *args: Arguments to pass to `systemctl stop`.
+    """
+    _systemctl("stop", *args, check=True)
+
+
+def service_restart(*args: str) -> None:
+    """Restart a system service.
+
+    Args:
+        *args: Arguments to pass to `systemctl restart`.
+    """
+    _systemctl("restart", *args, check=True)
+
+
+def service_enable(*args: str) -> None:
+    """Enable a system service.
+
+    Args:
+        *args: Arguments to pass to `systemctl enable`.
+    """
+    _systemctl("enable", *args, check=True)
+
+
+def service_disable(*args: str) -> None:
+    """Disable a system service.
+
+    Args:
+        *args: Arguments to pass to `systemctl disable`.
+    """
+    _systemctl("disable", *args, check=True)
+
+
+def service_reload(service_name: str, restart_on_failure: bool = False) -> None:
     """Reload a system service, optionally falling back to restart if reload fails.
 
     Args:
-        service_name: the name of the service to reload
-        restart_on_failure: boolean indicating whether to fall back to a restart if the
-          reload fails.
+        service_name: The name of the service to reload.
+        restart_on_failure:
+            Boolean indicating whether to fall back to a restart if the reload fails.
     """
     try:
-        return _systemctl("reload", service_name)
+        _systemctl("reload", service_name, check=True)
     except SystemdError:
         if restart_on_failure:
-            return service_restart(service_name)
+            service_restart(service_name)
         else:
             raise
 
 
-def service_pause(service_name: str) -> bool:
+def service_pause(service_name: str) -> None:
     """Pause a system service.
 
     Stop it, and prevent it from starting again at boot.
@@ -141,16 +202,14 @@ def service_pause(service_name: str) -> bool:
     Args:
         service_name: the name of the service to pause
     """
-    service_disable("--now", service_name)
+    _systemctl("disable", "--now", service_name)
     _systemctl("mask", service_name)
 
-    if not service_running(service_name):
-        return True
-
-    raise SystemdError(f"Attempted to pause '{service_name}', but it is still running.")
+    if service_running(service_name):
+        raise SystemdError(f"Attempted to pause {service_name!r}, but it is still running.")
 
 
-def service_resume(service_name: str) -> bool:
+def service_resume(service_name: str) -> None:
     """Resume a system service.
 
     Re-enable starting again at boot. Start the service.
@@ -159,9 +218,12 @@ def service_resume(service_name: str) -> bool:
         service_name: the name of the service to resume
     """
     _systemctl("unmask", service_name)
-    service_enable("--now", service_name)
+    _systemctl("enable", "--now", service_name)
 
-    if service_running(service_name):
-        return True
+    if not service_running(service_name):
+        raise SystemdError(f"Attempted to resume {service_name!r}, but it is not running.")
 
-    raise SystemdError(f"Attempted to resume '{service_name}', but it is not running.")
+
+def daemon_reload() -> None:
+    """Reload systemd manager configuration."""
+    _systemctl("daemon-reload", check=True)
