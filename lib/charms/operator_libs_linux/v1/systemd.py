@@ -53,7 +53,6 @@ __all__ = [  # Don't export `_systemctl`. (It's not the intended way of using th
 
 import logging
 import subprocess
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
