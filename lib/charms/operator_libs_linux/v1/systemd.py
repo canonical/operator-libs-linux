@@ -72,24 +72,24 @@ class SystemdError(Exception):
     """Custom exception for SystemD related errors."""
 
 
-def _systemctl(*args: str, check: bool = False) -> Optional[int]:
+def _systemctl(*args: str, check: bool = False) -> int:
     """Control a system service using systemctl.
 
     Args:
         *args: Arguments to pass to systemctl.
-        check:
-            Check the output of the systemctl command. Default: False.
+        check: Check the output of the systemctl command. Default: False.
+
+    Returns:
+        Returncode of systemctl command execution.
 
     Raises:
-        SystemdError:
-            Raised if returncode != 0 and check is True.
-            None will be returned instead of a returncode.
+        SystemdError: Raised if calling systemctl returns a non-zero returncode and check is True.
     """
     cmd = ["systemctl", *args]
     logger.debug(f"Executing command: {cmd}")
     try:
         proc = subprocess.run(
-            [*cmd],
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -111,97 +111,139 @@ def service_running(service_name: str) -> bool:
     """Report whether a system service is running.
 
     Args:
-        service_name: the name of the service to check
+        service_name: The name of the service to check.
+
+    Return:
+        True if service is running/active; False if not.
     """
     # If returncode is 0, this means that is service is active.
-    if _systemctl("--quiet", "is-active", service_name) == 0:
-        return True
-    else:
-        return False
+    return _systemctl("--quiet", "is-active", service_name) == 0
 
 
 def service_failed(service_name: str) -> bool:
     """Report whether a system service has failed.
 
     Args:
-        service_name: the name of the service to check
+        service_name: The name of the service to check.
+
+    Returns:
+        True if service is marked as failed; False if not.
     """
     # If returncode is 0, this means that the service has failed.
-    if _systemctl("--quiet", "is-failed", service_name) == 0:
-        return True
-    else:
-        return False
+    return _systemctl("--quiet", "is-failed", service_name) == 0
 
 
-def service_start(*args: str) -> None:
+def service_start(*args: str) -> bool:
     """Start a system service.
 
     Args:
         *args: Arguments to pass to `systemctl start`.
+
+    Returns:
+        On success, this function returns True for historical reasons.
+
+    Raises:
+        SystemdError: Raised if `systemctl start ...` returns a non-zero returncode.
     """
-    _systemctl("start", *args, check=True)
+    return _systemctl("start", *args, check=True) == 0
 
 
-def service_stop(*args: str) -> None:
+def service_stop(*args: str) -> bool:
     """Stop a system service.
 
     Args:
         *args: Arguments to pass to `systemctl stop`.
+
+    Returns:
+        On success, this function returns True for historical reasons.
+
+    Raises:
+        SystemdError: Raised if `systemctl stop ...` returns a non-zero returncode.
     """
-    _systemctl("stop", *args, check=True)
+    return _systemctl("stop", *args, check=True) == 0
 
 
-def service_restart(*args: str) -> None:
+def service_restart(*args: str) -> bool:
     """Restart a system service.
 
     Args:
         *args: Arguments to pass to `systemctl restart`.
+
+    Returns:
+        On success, this function returns True for historical reasons.
+
+    Raises:
+        SystemdError: Raised if `systemctl restart ...` returns a non-zero returncode.
     """
-    _systemctl("restart", *args, check=True)
+    return _systemctl("restart", *args, check=True) == 0
 
 
-def service_enable(*args: str) -> None:
+def service_enable(*args: str) -> bool:
     """Enable a system service.
 
     Args:
         *args: Arguments to pass to `systemctl enable`.
+
+    Returns:
+        On success, this function returns True for historical reasons.
+
+    Raises:
+        SystemdError: Raised if `systemctl enable ...` returns a non-zero returncode.
     """
-    _systemctl("enable", *args, check=True)
+    return _systemctl("enable", *args, check=True) == 0
 
 
-def service_disable(*args: str) -> None:
+def service_disable(*args: str) -> bool:
     """Disable a system service.
 
     Args:
         *args: Arguments to pass to `systemctl disable`.
+
+    Returns:
+        On success, this function returns True for historical reasons.
+
+    Raises:
+        SystemdError: Raised if `systemctl disable ...` returns a non-zero returncode.
     """
-    _systemctl("disable", *args, check=True)
+    return _systemctl("disable", *args, check=True) == 0
 
 
-def service_reload(service_name: str, restart_on_failure: bool = False) -> None:
+def service_reload(service_name: str, restart_on_failure: bool = False) -> bool:
     """Reload a system service, optionally falling back to restart if reload fails.
 
     Args:
         service_name: The name of the service to reload.
         restart_on_failure:
             Boolean indicating whether to fall back to a restart if the reload fails.
+
+    Returns:
+        On success, this function returns True for historical reasons.
+
+    Raises:
+        SystemdError: Raised if `systemctl reload|restart ...` returns a non-zero returncode.
     """
     try:
-        _systemctl("reload", service_name, check=True)
+        return _systemctl("reload", service_name, check=True) == 0
     except SystemdError:
         if restart_on_failure:
-            service_restart(service_name)
+            return service_restart(service_name)
         else:
             raise
 
 
-def service_pause(service_name: str) -> None:
+def service_pause(service_name: str) -> bool:
     """Pause a system service.
 
-    Stop it, and prevent it from starting again at boot.
+    Stops the service and prevents the service from starting again at boot.
 
     Args:
-        service_name: the name of the service to pause
+        service_name: The name of the service to pause.
+
+    Returns:
+        On success, this function returns True for historical reasons.
+
+    Raises:
+        SystemdError: Raised if service is still running after being paused by systemctl.
     """
     _systemctl("disable", "--now", service_name)
     _systemctl("mask", service_name)
@@ -209,14 +251,22 @@ def service_pause(service_name: str) -> None:
     if service_running(service_name):
         raise SystemdError(f"Attempted to pause {service_name!r}, but it is still running.")
 
+    return True
 
-def service_resume(service_name: str) -> None:
+
+def service_resume(service_name: str) -> bool:
     """Resume a system service.
 
-    Re-enable starting again at boot. Start the service.
+    Re-enable starting the service again at boot. Start the service.
 
     Args:
-        service_name: the name of the service to resume
+        service_name: The name of the service to resume.
+
+    Returns:
+        On success, this function returns True for historical reasons.
+
+    Raises:
+        SystemdError: Raised if service is not running after being resumed by systemctl.
     """
     _systemctl("unmask", service_name)
     _systemctl("enable", "--now", service_name)
@@ -224,7 +274,16 @@ def service_resume(service_name: str) -> None:
     if not service_running(service_name):
         raise SystemdError(f"Attempted to resume {service_name!r}, but it is not running.")
 
+    return True
 
-def daemon_reload() -> None:
-    """Reload systemd manager configuration."""
-    _systemctl("daemon-reload", check=True)
+
+def daemon_reload() -> bool:
+    """Reload systemd manager configuration.
+
+    Returns:
+        On success, this function returns True for historical reasons.
+
+    Raises:
+        SystemdError: Raised if `systemctl daemon-reload` returns a non-zero returncode.
+    """
+    return _systemctl("daemon-reload", check=True) == 0
