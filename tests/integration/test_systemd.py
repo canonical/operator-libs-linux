@@ -59,23 +59,22 @@ def test_service():
 
 def test_pause_and_resume():
     # Verify that we can disable and re-enable a service.
-    service_pause("cron")
+    assert service_pause("cron")
     assert not service_running("cron")
-    service_resume("cron")
+    assert service_resume("cron")
     assert service_running("cron")
 
 
 def test_restart():
     # Verify that we seem to be able to restart a service.
-    service_restart("cron")
-    assert service_running("cron")
+    assert service_restart("cron")
 
 
 def test_stop_and_start():
     # Verify that we can stop and start a service.
-    service_stop("cron")
+    assert service_stop("cron")
     assert not service_running("cron")
-    service_start("cron")
+    assert service_start("cron")
     assert service_running("cron")
 
 
@@ -87,11 +86,10 @@ def test_reload():
         pass
     else:
         raise AssertionError("cron does not support reload, but we didn't raise and error.")
-
-    service_reload("apparmor")
+    assert service_reload("apparmor")
 
     # The following is observed behavior. Not sure how happy I am about it.
-    service_reload("cron", restart_on_failure=True)
+    assert service_reload("cron", restart_on_failure=True)
 
 
 def test_daemon_reload():
@@ -109,5 +107,5 @@ def test_daemon_reload():
         f.write(content)
 
     assert needs_reload("cron")
-    daemon_reload()
+    assert daemon_reload()
     assert not needs_reload("cron")
