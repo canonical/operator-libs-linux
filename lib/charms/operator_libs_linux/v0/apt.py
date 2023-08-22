@@ -748,7 +748,7 @@ def add_package(
 
     packages = {"success": [], "retry": [], "failed": []}
 
-    package_names = [package_names] if type(package_names) is str else package_names
+    package_names = [package_names] if isinstance(package_names, str) else package_names
     if not package_names:
         raise TypeError("Expected at least one package name to add, received zero!")
 
@@ -818,7 +818,7 @@ def remove_package(
     """
     packages = []
 
-    package_names = [package_names] if type(package_names) is str else package_names
+    package_names = [package_names] if isinstance(package_names, str) else package_names
     if not package_names:
         raise TypeError("Expected at least one package name to add, received zero!")
 
