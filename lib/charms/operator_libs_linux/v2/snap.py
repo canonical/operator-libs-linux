@@ -898,11 +898,11 @@ def add(
     if not channel and not revision:
         channel = "latest"
 
-    snap_names = [snap_names] if type(snap_names) is str else snap_names
+    snap_names = [snap_names] if isinstance(snap_names, str) else snap_names
     if not snap_names:
         raise TypeError("Expected at least one snap to add, received zero!")
 
-    if type(state) is str:
+    if isinstance(state, str):
         state = SnapState(state)
 
     return _wrap_snap_operations(snap_names, state, channel, classic, cohort, revision)
@@ -918,7 +918,7 @@ def remove(snap_names: Union[str, List[str]]) -> Union[Snap, List[Snap]]:
     Raises:
         SnapError if some snaps failed to install.
     """
-    snap_names = [snap_names] if type(snap_names) is str else snap_names
+    snap_names = [snap_names] if isinstance(snap_names, str) else snap_names
     if not snap_names:
         raise TypeError("Expected at least one snap to add, received zero!")
 
