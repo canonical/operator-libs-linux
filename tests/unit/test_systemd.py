@@ -30,8 +30,8 @@ def with_mock_subp(func):
                 else:
                     mock_proc = MagicMock()
                     mock_proc.returncode = code
-                    mock_proc.stdout = subprocess.PIPE,
-                    mock_proc.stderr = subprocess.STDOUT,
+                    mock_proc.stdout = (subprocess.PIPE,)
+                    mock_proc.stderr = (subprocess.STDOUT,)
                     mock_proc.check = check
                     side_effects.append(mock_proc)
 
@@ -62,7 +62,9 @@ class TestSystemD(unittest.TestCase):
 
         mockp, kw = make_mock([1], check=True)
 
-        self.assertRaises(systemd.SystemdError, systemd._systemctl, "is-active", "mysql", check=True)
+        self.assertRaises(
+            systemd.SystemdError, systemd._systemctl, "is-active", "mysql", check=True
+        )
         mockp.assert_called_with(["systemctl", "is-active", "mysql"], **kw)
 
     @with_mock_subp
@@ -86,7 +88,15 @@ class TestSystemD(unittest.TestCase):
         self.assertTrue(is_failed)
 
         is_failed = systemd.service_failed("mysql")
-        mockp.assert_called_with(["systemctl", "--quiet", "is-failed", "mysql", ], **kw)
+        mockp.assert_called_with(
+            [
+                "systemctl",
+                "--quiet",
+                "is-failed",
+                "mysql",
+            ],
+            **kw,
+        )
         self.assertFalse(is_failed)
 
     @with_mock_subp
