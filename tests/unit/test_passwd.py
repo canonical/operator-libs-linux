@@ -21,7 +21,7 @@ class TestPasswd(TestCase):
 
     def test_user_exists_invalid_input(self):
         with self.assertRaises(TypeError):
-            print(passwd.user_exists(True))
+            passwd.user_exists(True)
 
     @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
     def test_user_exists_false(self, getpwnam):
