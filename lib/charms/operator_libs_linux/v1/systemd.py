@@ -136,7 +136,7 @@ def service_start(*args: str) -> bool:
     """Start a system service.
 
     Args:
-        *args: Arguments to pass to `systemctl start`.
+        *args: Arguments to pass to `systemctl start` (normally the service name).
 
     Returns:
         On success, this function returns True for historical reasons.
@@ -151,7 +151,7 @@ def service_stop(*args: str) -> bool:
     """Stop a system service.
 
     Args:
-        *args: Arguments to pass to `systemctl stop`.
+        *args: Arguments to pass to `systemctl stop` (normally the service name).
 
     Returns:
         On success, this function returns True for historical reasons.
@@ -166,7 +166,7 @@ def service_restart(*args: str) -> bool:
     """Restart a system service.
 
     Args:
-        *args: Arguments to pass to `systemctl restart`.
+        *args: Arguments to pass to `systemctl restart` (normally the service name).
 
     Returns:
         On success, this function returns True for historical reasons.
@@ -181,7 +181,7 @@ def service_enable(*args: str) -> bool:
     """Enable a system service.
 
     Args:
-        *args: Arguments to pass to `systemctl enable`.
+        *args: Arguments to pass to `systemctl enable` (normally the service name).
 
     Returns:
         On success, this function returns True for historical reasons.
@@ -196,7 +196,7 @@ def service_disable(*args: str) -> bool:
     """Disable a system service.
 
     Args:
-        *args: Arguments to pass to `systemctl disable`.
+        *args: Arguments to pass to `systemctl disable` (normally the service name).
 
     Returns:
         On success, this function returns True for historical reasons.
