@@ -1,0 +1,5 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+stop-service:
+  description: Stop internal test service inside charm
