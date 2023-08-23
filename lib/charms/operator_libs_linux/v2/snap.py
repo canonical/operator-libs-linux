@@ -310,23 +310,32 @@ class Snap(object):
         except CalledProcessError as e:
             raise SnapError("Could not {} for snap [{}]: {}".format(args, self._name, e.stderr))
 
-    def get(self, key) -> str:
+    def get(self, key: str, use_json: bool = False) -> Any:
         """Fetch a snap configuration value.
 
         Args:
             key: the key to retrieve
+            use_json: (optional) retrieve values in JSON format. Default `False`
         """
-        return self._snap("get", [key]).strip()
+        if not use_json:
+            return self._snap("get", [key]).strip()
 
-    def set(self, config: Dict) -> str:
+        configs = json.loads(self._snap("get", ["-d", key]))
+        return configs.get(key)
+
+    def set(self, configs: Dict[str, Any], use_json: bool = False) -> str:
         """Set a snap configuration value.
 
         Args:
-           config: a dictionary containing keys and values specifying the config to set.
+           configs: a dictionary containing keys and values specifying the config to set.
+           use_json: (optional) convert all values in the configs into JSON formatted string. Default `False`
         """
-        args = ['{}="{}"'.format(key, val) for key, val in config.items()]
+        args = []
+        for key, val in configs.items():
+            value = json.dumps(val) if use_json else "'{}'".format(val)
+            args.append("{}={}".format(key, value))
 
-        return self._snap("set", [*args])
+        return self._snap("set", args)
 
     def unset(self, key) -> str:
         """Unset a snap configuration value.
