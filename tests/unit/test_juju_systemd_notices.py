@@ -173,14 +173,14 @@ class TestJujuSystemdNoticesDaemon(unittest.IsolatedAsyncioTestCase):
     @patch("charms.operator_libs_linux.v0.juju_systemd_notices._juju_unit", "foobar/0")
     @patch("asyncio.create_subprocess_exec")
     async def test_send_juju_notification(self, mock_subp, *_) -> None:
-        # Branch 1 - .service in service name and notification succeeds.
+        # Scenario 1 - .service in service name and notification succeeds.
         mock_p = AsyncMock()
         mock_p.wait.return_value = None
         mock_p.returncode = 0
         mock_subp.return_value = mock_p
         await _send_juju_notification("foobar.service", "active")
 
-        # Branch 2 - No .service in name and state is stopped but notification fails.
+        # Scenario 2 - No .service in name and state is stopped but notification fails.
         mock_p = AsyncMock()
         mock_p.wait.return_value = None
         mock_p.returncode = 1
@@ -205,31 +205,27 @@ class TestJujuSystemdNoticesDaemon(unittest.IsolatedAsyncioTestCase):
         state = await _get_state(mock_sysbus, "foobar")
         self.assertEqual(state, "unknown")
 
-    async def test_async_load_services(self) -> None:
-        # Branch 1 - Hooks dir does not exist.
-        with patch("pathlib.Path.exists", return_value=False):
-            self.assertIsNone(await _async_load_services())
+    @patch("charms.operator_libs_linux.v0.juju_systemd_notices._get_state")
+    @patch("pathlib.Path.iterdir")
+    @patch("pathlib.Path.exists")
+    async def test_async_load_services(self, mock_exists, mock_iterdir, mock_state) -> None:
+        # Scenario 1 - Hooks dir does not exist.
+        mock_exists.return_value = False
+        self.assertIsNone(await _async_load_services())
 
-        # Branch 2 - There are no services to watch.
-        with (
-            patch("pathlib.Path.exists", return_value=True),
-            patch("pathlib.Path.iterdir", return_value=[]),
-        ):
-            self.assertIsNone(await _async_load_services())
+        # Scenario 2 - There are no services to watch.
+        mock_exists.return_value = True
+        mock_iterdir.return_value = []
+        self.assertIsNone(await _async_load_services())
 
-        # Branch 3 - Desired outcome (services are subscribed to for watching).
-        with (
-            patch("pathlib.Path.exists", return_value=True),
-            patch(
-                "pathlib.Path.iterdir",
-                return_value=[Path("service-foobar-started"), Path("service-foobar-stopped")],
-            ),
-            patch(
-                "charms.operator_libs_linux.v0.juju_systemd_notices._get_state",
-                return_value="active",
-            ),
-        ):
-            self.assertIsNone(await _async_load_services())
+        # Scenario 3 - Desired outcome (services are subscribed to for watching).
+        mock_exists.return_value = True
+        mock_iterdir.return_value = [
+            Path("service-foobar-started"),
+            Path("service-foobar-stopped"),
+        ]
+        mock_state.return_value = "active"
+        self.assertIsNone(await _async_load_services())
 
     @patch("pathlib.Path.exists", return_value=False)
     @patch("asyncio.Event.wait")
