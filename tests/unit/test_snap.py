@@ -551,26 +551,36 @@ class TestSnapBareMethods(unittest.TestCase):
     def test_snap_set(self, mock_subprocess):
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
 
-        foo.set({"bar": "baz"})
+        configs = {
+            "true": True,
+            "false": False,
+            "null": None,
+            "integer": 1,
+            "float": 2.0,
+            "list": [1, 2.0, True, False],
+            "dict": {
+                "true": True,
+                "false": False,
+                "null": None,
+                "integer": 1,
+                "float": 2.0,
+                "list": [1, 2.0, True, False],
+            },
+        }
+
+        foo.set(configs, use_json=True)
+        args = ["{}={}".format(key, json.dumps(val)) for key, val in configs.items()]
         mock_subprocess.assert_called_with(
-            ["snap", "set", "foo", 'bar="baz"'],
+            ["snap", "set", "foo", *args],
             universal_newlines=True,
         )
 
-        foo.set({"bar": "baz", "qux": "quux"})
-        try:
-            mock_subprocess.assert_called_with(
-                ["snap", "set", "foo", 'bar="baz"', 'qux="quux"'],
-                universal_newlines=True,
-            )
-        except AssertionError:
-            # The ordering of this call can be unpredictable across Python versions.
-            # Unfortunately, the methods available to introspect the call list have also
-            # changed, so we do this, which is a little clunky.
-            mock_subprocess.assert_called_with(
-                ["snap", "set", "foo", 'qux="quux"', 'bar="baz"'],
-                universal_newlines=True,
-            )
+        foo.set(configs, use_json=False)
+        args = ['{}="{}"'.format(key, val) for key, val in configs.items()]
+        mock_subprocess.assert_called_with(
+            ["snap", "set", "foo", *args],
+            universal_newlines=True,
+        )
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_call")
     def test_system_set(self, mock_subprocess):

@@ -332,7 +332,7 @@ class Snap(object):
         """
         args = []
         for key, val in configs.items():
-            value = json.dumps(val) if use_json else "'{}'".format(val)
+            value = json.dumps(val) if use_json else '"{}"'.format(val)
             args.append("{}={}".format(key, value))
 
         return self._snap("set", args)
