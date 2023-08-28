@@ -18,6 +18,8 @@ after which they may be imported and used as normal charms.
 - [snap] - a library for installing and working with [snap packages].
 - [systemd] - a library for manipulating services managed by the `systemd` init system.
 - [passwd] - a library for manipulating Linux users and groups.
+- [grub] - a library for managing Linux kernel configuration via GRUB.
+- [sysctl] - a library for managing kernel parameters at runtime via `sysctl`.
 
 ## Contributing
 
@@ -30,3 +32,5 @@ charm following best practice guidelines, and `CONTRIBUTING.md` for developer gu
 [snap]: https://charmhub.io/operator-libs-linux/libraries/snap
 [systemd]: https://charmhub.io/operator-libs-linux/libraries/systemd
 [passwd]: https://charmhub.io/operator-libs-linux/libraries/passwd
+[grub]: https://charmhub.io/operator-libs-linux/libraries/grub
+[sysctl]: https://charmhub.io/operator-libs-linux/libraries/sysctl
