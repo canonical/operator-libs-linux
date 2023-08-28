@@ -223,6 +223,7 @@ class TestJujuSystemdNoticesDaemon(unittest.IsolatedAsyncioTestCase):
         mock_iterdir.return_value = [
             Path("service-foobar-started"),
             Path("service-foobar-stopped"),
+            Path("dispatch"),  # Ensure that unmatched hooks are ignored/not registered.
         ]
         mock_state.return_value = "active"
         self.assertIsNone(await _async_load_services())
@@ -236,13 +237,19 @@ class TestJujuSystemdNoticesDaemon(unittest.IsolatedAsyncioTestCase):
     @patch("charms.operator_libs_linux.v0.juju_systemd_notices._juju_systemd_notices_daemon")
     @patch("argparse.ArgumentParser.parse_args")
     def test_main(self, mocked_args, *_) -> None:
-        # Scenario 1 - Debug flag is passed to script but no unit name.
-        mocked_args.return_value = argparse.Namespace(debug=True, unit=None)
+        # Scenario 1 - Desired outcome (juju-systemd-notices daemon starts successfully)
+        #   and debug is set to True.
+        mocked_args.return_value = argparse.Namespace(debug=True, unit="foobar/0")
+        _main()
+
+        # Scenario 2 - Desired outcome (juju-systemd-notices daemon starts successfully)
+        #   and debug is set to False
+        mocked_args.return_value = argparse.Namespace(debug=False, unit="foobar/0")
+        _main()
+
+        # Scenario 3 - Debug flag is passed to script but no unit name.
+        mocked_args.side_effect = argparse.ArgumentError(argument=None, message="Unit missing")
         with self.assertRaises(SystemExit) as e:
             _main()
 
         self.assertEqual(e.exception.code, 2)
-
-        # Scenario 2 - Desired outcome (juju-systemd-notices daemon starts successfully).
-        mocked_args.return_value = argparse.Namespace(debug=False, unit="foobar/0")
-        _main()
