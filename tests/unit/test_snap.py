@@ -548,29 +548,28 @@ class TestSnapBareMethods(unittest.TestCase):
         self.assertIn("Failed to install or refresh snap(s): nothere", ctx.exception.message)
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_snap_set(self, mock_subprocess):
+    def test_snap_set_typed(self, mock_subprocess):
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
 
-        foo.set({"bar": "baz"})
+        config = {"n": 42, "s": "string", "d": {"nested": True}}
+
+        foo.set(config, typed=True)
         mock_subprocess.assert_called_with(
-            ["snap", "set", "foo", 'bar="baz"'],
+            ["snap", "set", "foo", "-t", "n=42", 's="string"', 'd={"nested": true}'],
             universal_newlines=True,
         )
 
-        foo.set({"bar": "baz", "qux": "quux"})
-        try:
-            mock_subprocess.assert_called_with(
-                ["snap", "set", "foo", 'bar="baz"', 'qux="quux"'],
-                universal_newlines=True,
-            )
-        except AssertionError:
-            # The ordering of this call can be unpredictable across Python versions.
-            # Unfortunately, the methods available to introspect the call list have also
-            # changed, so we do this, which is a little clunky.
-            mock_subprocess.assert_called_with(
-                ["snap", "set", "foo", 'qux="quux"', 'bar="baz"'],
-                universal_newlines=True,
-            )
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
+    def test_snap_set_untyped(self, mock_subprocess):
+        foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
+
+        config = {"n": 42, "s": "string", "d": {"nested": True}}
+
+        foo.set(config, typed=False)
+        mock_subprocess.assert_called_with(
+            ["snap", "set", "foo", "n=42", "s=string", "d={'nested': True}"],
+            universal_newlines=True,
+        )
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_call")
     def test_system_set(self, mock_subprocess):
