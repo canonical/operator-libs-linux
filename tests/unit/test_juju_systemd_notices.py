@@ -16,7 +16,7 @@ from charms.operator_libs_linux.v0.juju_systemd_notices import (
     SystemdNotices,
     _async_load_services,
     _dbus_path_to_name,
-    _get_state,
+    _get_service_state,
     _juju_systemd_notices_daemon,
     _main,
     _name_to_dbus_path,
@@ -194,7 +194,7 @@ class TestJujuSystemdNoticesDaemon(unittest.IsolatedAsyncioTestCase):
         with patch("dbus_fast.signature.Variant") as mock_variant:
             mock_variant.value = "active"
             sysbus = await MessageBus(bus_type=BusType.SYSTEM).connect()
-            state = await _get_state(sysbus, "cron.service")
+            state = await _get_service_state(sysbus, "cron.service")
             self.assertEqual(state, "active")
 
         # Scenario 2 - DBusError is encountered when getting the state of a service.
@@ -202,7 +202,7 @@ class TestJujuSystemdNoticesDaemon(unittest.IsolatedAsyncioTestCase):
         mock_sysbus.introspect = AsyncMock(
             side_effect=DBusError(ErrorType.TIMEOUT, "Timeout waiting DBus")
         )
-        state = await _get_state(mock_sysbus, "foobar")
+        state = await _get_service_state(mock_sysbus, "foobar")
         self.assertEqual(state, "unknown")
 
     @patch("charms.operator_libs_linux.v0.juju_systemd_notices._get_state")
@@ -249,7 +249,5 @@ class TestJujuSystemdNoticesDaemon(unittest.IsolatedAsyncioTestCase):
 
         # Scenario 3 - Debug flag is passed to script but no unit name.
         mocked_args.side_effect = argparse.ArgumentError(argument=None, message="Unit missing")
-        with self.assertRaises(SystemExit) as e:
+        with self.assertRaises(argparse.ArgumentError):
             _main()
-
-        self.assertEqual(e.exception.code, 2)

@@ -88,7 +88,6 @@ import logging
 import re
 import signal
 import subprocess
-import sys
 import textwrap
 from pathlib import Path
 from typing import List
@@ -100,9 +99,18 @@ from dbus_fast.message import Message
 from ops.charm import CharmBase
 from ops.framework import EventBase
 
-LIBID = "HPCTEAMUSEONLY"
+# The unique Charmhub library identifier, never change it.
+LIBID = "2bb6ecd037e64c899033113abab02e01"
+
+# Increment this major API version when introducing breaking changes.
 LIBAPI = 0
+
+# Increment this PATCH version before using `charmcraft publish-lib` or reset
+# to 0 if you are raising the major API version.
 LIBPATCH = 1
+
+# juju-systemd-notices charm library dependencies.
+# Charm library dependencies are installed when the consuming charm is packed.
 PYDEPS = ["dbus-fast>=1.90.2"]
 
 _logger = logging.getLogger(__name__)
@@ -125,11 +133,11 @@ def _systemctl(*args) -> None:
         subprocess.CalledProcessError: Raised if systemctl command fails.
     """
     cmd = ["systemctl", *args]
-    _logger.debug(f"systemd: Executing command {cmd}")
+    _logger.debug("systemd: Executing command %s", cmd)
     try:
         subprocess.check_output(cmd)
     except subprocess.CalledProcessError as e:
-        _logger.error(f"systemctl command failed: {e}")
+        _logger.error("systemctl command failed: %s", e)
         raise
 
 
@@ -158,27 +166,27 @@ class SystemdNotices:
         unit_name = self._charm.unit.name.replace("/", "-")
         self._service_file = Path(f"/etc/systemd/system/juju-{unit_name}-systemd-notices.service")
 
-        _logger.debug(f"Attaching systemd notice events to charm {self._charm.__class__.__name__}")
+        _logger.debug(
+            "Attaching systemd notice events to charm %s", self._charm.__class__.__name__
+        )
         for service in self._services:
             self._charm.on.define_event(f"service_{service}_started", ServiceStartedEvent)
             self._charm.on.define_event(f"service_{service}_stopped", ServiceStoppedEvent)
 
     def subscribe(self) -> None:
         """Subscribe charmed operator to observe status of systemd services."""
-        _logger.debug(f"Generating systemd notice hooks for {self._services}")
-        for hook in [
-            Path(f"hooks/service-{service}-{hook_type}")
-            for service in self._services
-            for hook_type in ("started", "stopped")
-        ]:
+        _logger.debug("Generating systemd notice hooks for %s", self._services)
+        start_hooks = [Path(f"hooks/service-{service}-started") for service in self._services]
+        stop_hooks = [Path(f"hooks/service-{service}-stopped") for service in self._services]
+        for hook in start_hooks + stop_hooks:
             if hook.exists():
-                _logger.debug(f"Hook {hook.name} already exists. Skipping...")
+                _logger.debug("Hook %s already exists. Skipping...", hook.name)
             else:
                 hook.symlink_to(self._charm.framework.charm_dir / "dispatch")
 
-        _logger.debug(f"Starting {self._service_file.name} daemon")
+        _logger.debug("Starting %s daemon", self._service_file.name)
         if self._service_file.exists():
-            _logger.debug(f"Overwriting existing service file {self._service_file.name}")
+            _logger.debug("Overwriting existing service file %s", self._service_file.name)
         self._service_file.write_text(
             textwrap.dedent(
                 f"""
@@ -198,13 +206,13 @@ class SystemdNotices:
                 """
             ).strip()
         )
-        _logger.debug(f"Service file {self._service_file.name} written. Reloading systemd")
+        _logger.debug("Service file %s written. Reloading systemd", self._service_file.name)
         _daemon_reload()
         # Notices daemon is enabled so that the service will start even after machine reboot.
         # This functionality is needed in the event that a charm is rebooted to apply updates.
         _enable_service(self._service_file.name)
         _start_service(self._service_file.name)
-        _logger.debug(f"Started {self._service_file.name} daemon")
+        _logger.debug("Started %s daemon", self._service_file.name)
 
     def stop(self) -> None:
         """Stop charmed operator from observing the status of subscribed services."""
@@ -262,7 +270,10 @@ def _systemd_unit_changed(msg: Message) -> bool:
         True if the event is processed. False if otherwise.
     """
     _logger.debug(
-        f"Received message: path: {msg.path}, interface: {msg.interface}, member: {msg.member}"
+        "Received message: path: %s, interface: %s, member: %s",
+        msg.path,
+        msg.interface,
+        msg.member,
     )
     service = _dbus_path_to_name(msg.path)
     properties = msg.body[1]
@@ -271,18 +282,18 @@ def _systemd_unit_changed(msg: Message) -> bool:
 
     global _service_states
     if service not in _service_states:
-        _logger.debug(f"Dropping event for unwatched service: {service}")
+        _logger.debug("Dropping event for unwatched service: %s", service)
         return False
 
     curr_state = properties["ActiveState"].value
     prev_state = _service_states[service]
     # Drop transitioning and duplicate events
     if curr_state.endswith("ing") or curr_state == prev_state:
-        _logger.debug(f"Dropping event - service: {service}, state: {curr_state}")
+        _logger.debug("Dropping event - service: %s, state: %s", service, curr_state)
         return False
 
     _service_states[service] = curr_state
-    _logger.debug(f"Service {service} changed state to {curr_state}")
+    _logger.debug("Service %s changed state to %s", service, curr_state)
     # Run the hook in a separate thread so the dbus notifications aren't
     # blocked from being received.
     asyncio.create_task(_send_juju_notification(service, curr_state))
@@ -303,18 +314,18 @@ async def _send_juju_notification(service: str, state: str) -> None:
     hook = f"service-{service}-{event_name}"
     cmd = ["/usr/bin/juju-exec", _juju_unit, f"hooks/{hook}"]
 
-    _logger.debug(f"Invoking hook {hook} with command: {' '.join(cmd)}")
-    process = await asyncio.create_subprocess_exec(*cmd,)  # fmt: skip
+    _logger.debug("Invoking hook %s with command: %s", hook, " ".join(cmd))
+    process = await asyncio.create_subprocess_exec(*cmd)
     await process.wait()
     if process.returncode:
         _logger.error(
-            f"Hook command '{' '.join(cmd)}' failed with returncode {process.returncode}"
+            "Hook command '%s' failed with returncode %s", " ".join(cmd), process.returncode
         )
     else:
-        _logger.info(f"Hook command '{' '.join(cmd)}' succeeded.")
+        _logger.info("Hook command '%s' succeeded.", " ".join(cmd))
 
 
-async def _get_state(bus: MessageBus, service: str) -> str:
+async def _get_service_state(bus: MessageBus, service: str) -> str:
     """Report the current state of a service.
 
     Args:
@@ -326,7 +337,7 @@ async def _get_state(bus: MessageBus, service: str) -> str:
     """
     obj_path = _name_to_dbus_path(service)
     try:
-        _logger.debug(f"Retrieving state for service {service} at object path: {obj_path}")
+        _logger.debug("Retrieving state for service %s at object path: %s", service, obj_path)
         introspection = await bus.introspect("org.freedesktop.systemd1", obj_path)
         proxy = bus.get_proxy_object("org.freedesktop.systemd1", obj_path, introspection)
         properties = proxy.get_interface("org.freedesktop.DBus.Properties")
@@ -354,10 +365,10 @@ async def _async_load_services() -> None:
     """
     global _juju_unit
     hooks_dir = Path.cwd() / "hooks"
-    _logger.info(f"Loading services from hooks in {hooks_dir}")
+    _logger.info("Loading services from hooks in %s", hooks_dir)
 
     if not hooks_dir.exists():
-        _logger.warning(f"Hooks dir {hooks_dir} does not exist.")
+        _logger.warning("Hooks dir %s does not exist.", hooks_dir)
         return
 
     watched_services = []
@@ -367,7 +378,7 @@ async def _async_load_services() -> None:
         if match:
             watched_services.append(match.group("service"))
 
-    _logger.info(f"Services from hooks are {watched_services}")
+    _logger.info("Services from hooks are %s", watched_services)
     if not watched_services:
         return
 
@@ -380,8 +391,8 @@ async def _async_load_services() -> None:
         # service unit when readying the watcher if absent from the service name.
         service = f"{service}.service"
         if service not in _service_states:
-            state = await _get_state(bus, service)
-            _logger.debug(f"Adding service '{service}' with initial state: {state}")
+            state = await _get_service_state(bus, service)
+            _logger.debug("Adding service '%s' with initial state: %s", service, state)
             _service_states[service] = state
 
 
@@ -443,33 +454,32 @@ async def _juju_systemd_notices_daemon() -> None:
 def _main():
     """Invoke the Juju systemd notices daemon.
 
-    Note:
-        This method is used to start the Juju systemd notices daemon when
-        juju_systemd_notices.py is executed as a script, not imported as a module.
+    This method is used to start the Juju systemd notices daemon when
+    juju_systemd_notices.py is executed as a script, not imported as a module.
+
+    Raises:
+        argparse.ArgumentError: Raised if unit argument is absent.
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--debug", action="store_true")
     parser.add_argument("unit", type=str)
-    try:
-        args = parser.parse_args()
-        # Intentionally set as global.
-        global _juju_unit
-        _juju_unit = args.unit
+    args = parser.parse_args()
 
-        console_handler = logging.StreamHandler()
-        if args.debug:
-            _logger.setLevel(logging.DEBUG)
-            console_handler.setLevel(logging.DEBUG)
-        else:
-            _logger.setLevel(logging.INFO)
-            console_handler.setLevel(logging.DEBUG)
+    # Intentionally set as global.
+    global _juju_unit
+    _juju_unit = args.unit
 
-        _logger.addHandler(console_handler)
-        _logger.info("Starting juju systemd notices service")
-        asyncio.run(_juju_systemd_notices_daemon())
-    except argparse.ArgumentError:
-        parser.print_usage()
-        sys.exit(2)
+    console_handler = logging.StreamHandler()
+    if args.debug:
+        _logger.setLevel(logging.DEBUG)
+        console_handler.setLevel(logging.DEBUG)
+    else:
+        _logger.setLevel(logging.INFO)
+        console_handler.setLevel(logging.DEBUG)
+
+    _logger.addHandler(console_handler)
+    _logger.info("Starting juju systemd notices service")
+    asyncio.run(_juju_systemd_notices_daemon())
 
 
 if __name__ == "__main__":  # pragma: nocover
