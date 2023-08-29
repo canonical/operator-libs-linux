@@ -18,6 +18,7 @@ after which they may be imported and used as normal charms.
 - [snap] - a library for installing and working with [snap packages].
 - [systemd] - a library for manipulating services managed by the `systemd` init system.
 - [passwd] - a library for manipulating Linux users and groups.
+- [juju-systemd-notices] - a library for utilizing systemd to observe and emit notices when services change state.
 
 ## Contributing
 
@@ -30,3 +31,4 @@ charm following best practice guidelines, and `CONTRIBUTING.md` for developer gu
 [snap]: https://charmhub.io/operator-libs-linux/libraries/snap
 [systemd]: https://charmhub.io/operator-libs-linux/libraries/systemd
 [passwd]: https://charmhub.io/operator-libs-linux/libraries/passwd
+[juju-systemd-notices]: https://charmhub.io/operator-libs-linux/libraries/juju-systemd-notices
