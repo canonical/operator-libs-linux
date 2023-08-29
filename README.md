@@ -35,4 +35,4 @@ charm following best practice guidelines, and `CONTRIBUTING.md` for developer gu
 [passwd]: https://charmhub.io/operator-libs-linux/libraries/passwd
 [grub]: https://charmhub.io/operator-libs-linux/libraries/grub
 [sysctl]: https://charmhub.io/operator-libs-linux/libraries/sysctl
-[juju-systemd-notices]: https://charmhub.io/operator-libs-linux/libraries/juju-systemd-notices
+[juju-systemd-notices]: https://charmhub.io/operator-libs-linux/libraries/juju_systemd_notices
