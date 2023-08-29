@@ -52,7 +52,7 @@ def test_snap_refresh():
     lxd.ensure(snap.SnapState.Latest, classic=False, channel="latest/candidate", cohort="+")
 
 
-def test_snap_set_and_get_with_json():
+def test_snap_set_and_get_with_typed():
     cache = snap.SnapCache()
     lxd = cache["lxd"]
     lxd.ensure(snap.SnapState.Latest, channel="latest")
@@ -75,20 +75,20 @@ def test_snap_set_and_get_with_json():
         "ceph.external": "false",
     }
 
-    lxd.set(configs, use_json=True)
+    lxd.set(configs, typed=True)
 
-    assert lxd.get("true", use_json=True)
-    assert not lxd.get("false", use_json=True)
+    assert lxd.get("true", typed=True)
+    assert not lxd.get("false", typed=True)
     with pytest.raises(snap.SnapError):
-        lxd.get("null", use_json=True)
-    assert lxd.get("integer", use_json=True) == 1
-    assert lxd.get("float", use_json=True) == 2.0
-    assert lxd.get("list", use_json=True) == [1, 2.0, True, False, None]
+        lxd.get("null", typed=True)
+    assert lxd.get("integer", typed=True) == 1
+    assert lxd.get("float", typed=True) == 2.0
+    assert lxd.get("list", typed=True) == [1, 2.0, True, False, None]
 
     # Note that `"null": None` will be missing here because `key=null` will not
     # be set (because it means unset in snap). However, `key=[null]` will be
     # okay, and that's why `None` exists in "list".
-    assert lxd.get("dict", use_json=True) == {
+    assert lxd.get("dict", typed=True) == {
         "true": True,
         "false": False,
         "integer": 1,
@@ -96,26 +96,26 @@ def test_snap_set_and_get_with_json():
         "list": [1, 2.0, True, False, None],
     }
 
-    assert lxd.get("dict.true", use_json=True)
-    assert not lxd.get("dict.false", use_json=True)
+    assert lxd.get("dict.true", typed=True)
+    assert not lxd.get("dict.false", typed=True)
     with pytest.raises(snap.SnapError):
-        lxd.get("dict.null", use_json=True)
-    assert lxd.get("dict.integer", use_json=True) == 1
-    assert lxd.get("dict.float", use_json=True) == 2.0
-    assert lxd.get("dict.list", use_json=True) == [1, 2.0, True, False, None]
+        lxd.get("dict.null", typed=True)
+    assert lxd.get("dict.integer", typed=True) == 1
+    assert lxd.get("dict.float", typed=True) == 2.0
+    assert lxd.get("dict.list", typed=True) == [1, 2.0, True, False, None]
 
-    assert lxd.get("criu.enable", use_json=True) == "true"
-    assert lxd.get("ceph.external", use_json=True) == "false"
+    assert lxd.get("criu.enable", typed=True) == "true"
+    assert lxd.get("ceph.external", typed=True) == "false"
 
 
-def test_snap_set_and_get_without_json():
+def test_snap_set_and_get_untyped():
     cache = snap.SnapCache()
     lxd = cache["lxd"]
     lxd.ensure(snap.SnapState.Latest, channel="latest")
 
-    lxd.set({"foo": "true", "bar": True}, use_json=False)
-    assert lxd.get("foo", use_json=False) == "true"
-    assert lxd.get("bar", use_json=False) == "True"
+    lxd.set({"foo": "true", "bar": True}, typed=False)
+    assert lxd.get("foo", typed=False) == "true"
+    assert lxd.get("bar", typed=False) == "True"
 
 
 def test_unset_key_raises_snap_error():

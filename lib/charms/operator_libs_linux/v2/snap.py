@@ -310,32 +310,35 @@ class Snap(object):
         except CalledProcessError as e:
             raise SnapError("Could not {} for snap [{}]: {}".format(args, self._name, e.stderr))
 
-    def get(self, key: str, use_json: bool = False) -> Any:
-        """Fetch a snap configuration value.
+    def get(self, key: str = "", *, typed: bool = False) -> Any:
+        """Fetch snap configuration values.
 
         Args:
-            key: the key to retrieve
-            use_json: (optional) retrieve values in JSON format. Default `False`
+            key: the key to retrieve. Default to retrieve all values.
+            typed: set to True to retrieve typed values (set with typed=True).
+                Default is to return a string.
         """
-        if not use_json:
-            return self._snap("get", [key]).strip()
+        if typed:
+            config = json.loads(self._snap("get", ["-d", key]))
+            if key:
+                return config.get(key)
+            return config
 
-        configs = json.loads(self._snap("get", ["-d", key]))
-        return configs.get(key)
+        return self._snap("get", [key]).strip()
 
-    def set(self, configs: Dict[str, Any], use_json: bool = False) -> str:
+    def set(self, config: Dict[str, Any], *, typed: bool = False) -> str:
         """Set a snap configuration value.
 
         Args:
-           configs: a dictionary containing keys and values specifying the config to set.
-           use_json: (optional) convert all values in the configs into JSON formatted string. Default `False`
+           config: a dictionary containing keys and values specifying the config to set.
+           typed: set to True to convert all values in the config into typed values while
+                configuring the snap (set with typed=True). Default is not to convert.
         """
-        args = []
-        for key, val in configs.items():
-            value = json.dumps(val) if use_json else '"{}"'.format(val)
-            args.append("{}={}".format(key, value))
+        if typed:
+            kv = [f"{key}={json.dumps(val)}" for key, val in config.items()]
+            return self._snap("set", ["-t"] + kv)
 
-        return self._snap("set", args)
+        return self._snap("set", [f"{key}={val}" for key, val in config.items()])
 
     def unset(self, key) -> str:
         """Unset a snap configuration value.

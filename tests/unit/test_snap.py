@@ -548,37 +548,26 @@ class TestSnapBareMethods(unittest.TestCase):
         self.assertIn("Failed to install or refresh snap(s): nothere", ctx.exception.message)
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_snap_set(self, mock_subprocess):
+    def test_snap_set_typed(self, mock_subprocess):
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
 
-        configs = {
-            "true": True,
-            "false": False,
-            "null": None,
-            "integer": 1,
-            "float": 2.0,
-            "list": [1, 2.0, True, False],
-            "dict": {
-                "true": True,
-                "false": False,
-                "null": None,
-                "integer": 1,
-                "float": 2.0,
-                "list": [1, 2.0, True, False],
-            },
-        }
+        config = {"n": 42, "s": "string", "d": {"nested": True}}
 
-        foo.set(configs, use_json=True)
-        args = ["{}={}".format(key, json.dumps(val)) for key, val in configs.items()]
+        foo.set(config, typed=True)
         mock_subprocess.assert_called_with(
-            ["snap", "set", "foo", *args],
+            ["snap", "set", "foo", "-t", "n=42", 's="string"', 'd={"nested": true}'],
             universal_newlines=True,
         )
 
-        foo.set(configs, use_json=False)
-        args = ['{}="{}"'.format(key, val) for key, val in configs.items()]
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
+    def test_snap_set_untyped(self, mock_subprocess):
+        foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
+
+        config = {"n": 42, "s": "string", "d": {"nested": True}}
+
+        foo.set(config, typed=False)
         mock_subprocess.assert_called_with(
-            ["snap", "set", "foo", *args],
+            ["snap", "set", "foo", "n=42", "s=string", "d={'nested': True}"],
             universal_newlines=True,
         )
 
