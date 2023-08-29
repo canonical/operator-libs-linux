@@ -310,11 +310,11 @@ class Snap(object):
         except CalledProcessError as e:
             raise SnapError("Could not {} for snap [{}]: {}".format(args, self._name, e.stderr))
 
-    def get(self, key: str = "", *, typed: bool = False) -> Any:
+    def get(self, key: Optional[str], *, typed: bool = False) -> Any:
         """Fetch snap configuration values.
 
         Args:
-            key: the key to retrieve. Default to retrieve all values.
+            key: the key to retrieve. Default to retrieve all values for typed=True.
             typed: set to True to retrieve typed values (set with typed=True).
                 Default is to return a string.
         """
@@ -323,6 +323,9 @@ class Snap(object):
             if key:
                 return config.get(key)
             return config
+
+        if not key:
+            raise TypeError("Key must be provided when typed=False")
 
         return self._snap("get", [key]).strip()
 
