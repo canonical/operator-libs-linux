@@ -20,6 +20,7 @@ after which they may be imported and used as normal charms.
 - [passwd] - a library for manipulating Linux users and groups.
 - [grub] - a library for managing Linux kernel configuration via GRUB.
 - [sysctl] - a library for managing kernel parameters at runtime via `sysctl`.
+- [juju-systemd-notices] - a library for utilizing systemd to observe and emit notices when services change state.
 
 ## Contributing
 
@@ -34,3 +35,4 @@ charm following best practice guidelines, and `CONTRIBUTING.md` for developer gu
 [passwd]: https://charmhub.io/operator-libs-linux/libraries/passwd
 [grub]: https://charmhub.io/operator-libs-linux/libraries/grub
 [sysctl]: https://charmhub.io/operator-libs-linux/libraries/sysctl
+[juju-systemd-notices]: https://charmhub.io/operator-libs-linux/libraries/juju-systemd-notices

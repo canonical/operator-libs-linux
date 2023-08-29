@@ -21,7 +21,7 @@ def test_snap_install():
         cache = snap.SnapCache()
         juju = cache["juju"]
         if not juju.present:
-            juju.ensure(snap.SnapState.Latest, classic="True", channel="stable")
+            juju.ensure(snap.SnapState.Latest, channel="stable")
     except snap.SnapError as e:
         logger.error("An exception occurred when installing Juju. Reason: {}".format(e.message))
 
@@ -48,8 +48,18 @@ def test_snap_remove():
 
 def test_snap_refresh():
     cache = snap.SnapCache()
-    lxd = cache["lxd"]
-    lxd.ensure(snap.SnapState.Latest, classic=False, channel="latest/candidate", cohort="+")
+    hello_world = cache["hello-world"]
+    if not hello_world.present:
+        hello_world.ensure(snap.SnapState.Latest, channel="latest/stable")
+
+    cache = snap.SnapCache()
+    hello_world = cache["hello-world"]
+    assert hello_world.channel == "latest/stable"
+    hello_world.ensure(snap.SnapState.Latest, channel="latest/candidate")
+    # Refresh cache
+    cache = snap.SnapCache()
+    hello_world = cache["hello-world"]
+    assert hello_world.channel == "latest/candidate"
 
 
 def test_snap_set():
