@@ -187,7 +187,7 @@ class TestJujuSystemdNoticesDaemon(unittest.IsolatedAsyncioTestCase):
         mock_subp.return_value = mock_p
         await _send_juju_notification("foobar", "inactive")
 
-    async def test_get_state(self) -> None:
+    async def test_get_service_state(self) -> None:
         # Scenario 1 - Succeed getting the state of the current service.
         #   Note: Requires dbus to be installed on your test host
         #   and the test host to have a running cron service through systemd.
@@ -205,7 +205,7 @@ class TestJujuSystemdNoticesDaemon(unittest.IsolatedAsyncioTestCase):
         state = await _get_service_state(mock_sysbus, "foobar")
         self.assertEqual(state, "unknown")
 
-    @patch("charms.operator_libs_linux.v0.juju_systemd_notices._get_state")
+    @patch("charms.operator_libs_linux.v0.juju_systemd_notices._get_service_state")
     @patch("pathlib.Path.iterdir")
     @patch("pathlib.Path.exists")
     async def test_async_load_services(self, mock_exists, mock_iterdir, mock_state) -> None:
