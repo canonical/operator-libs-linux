@@ -21,7 +21,7 @@ def test_snap_install():
         cache = snap.SnapCache()
         juju = cache["juju"]
         if not juju.present:
-            juju.ensure(snap.SnapState.Latest, classic="True", channel="stable")
+            juju.ensure(snap.SnapState.Latest, channel="stable")
     except snap.SnapError as e:
         logger.error("An exception occurred when installing Juju. Reason: {}".format(e.message))
 
@@ -48,24 +48,84 @@ def test_snap_remove():
 
 def test_snap_refresh():
     cache = snap.SnapCache()
+    hello_world = cache["hello-world"]
+    if not hello_world.present:
+        hello_world.ensure(snap.SnapState.Latest, channel="latest/stable")
+
+    cache = snap.SnapCache()
+    hello_world = cache["hello-world"]
+    assert hello_world.channel == "latest/stable"
+    hello_world.ensure(snap.SnapState.Latest, channel="latest/candidate")
+    # Refresh cache
+    cache = snap.SnapCache()
+    hello_world = cache["hello-world"]
+    assert hello_world.channel == "latest/candidate"
+
+
+def test_snap_set_and_get_with_typed():
+    cache = snap.SnapCache()
     lxd = cache["lxd"]
-    lxd.ensure(snap.SnapState.Latest, classic=False, channel="latest/candidate", cohort="+")
+    lxd.ensure(snap.SnapState.Latest, channel="latest")
+    configs = {
+        "true": True,
+        "false": False,
+        "null": None,
+        "integer": 1,
+        "float": 2.0,
+        "list": [1, 2.0, True, False, None],
+        "dict": {
+            "true": True,
+            "false": False,
+            "null": None,
+            "integer": 1,
+            "float": 2.0,
+            "list": [1, 2.0, True, False, None],
+        },
+        "criu.enable": "true",
+        "ceph.external": "false",
+    }
+
+    lxd.set(configs, typed=True)
+
+    assert lxd.get("true", typed=True)
+    assert not lxd.get("false", typed=True)
+    with pytest.raises(snap.SnapError):
+        lxd.get("null", typed=True)
+    assert lxd.get("integer", typed=True) == 1
+    assert lxd.get("float", typed=True) == 2.0
+    assert lxd.get("list", typed=True) == [1, 2.0, True, False, None]
+
+    # Note that `"null": None` will be missing here because `key=null` will not
+    # be set (because it means unset in snap). However, `key=[null]` will be
+    # okay, and that's why `None` exists in "list".
+    assert lxd.get("dict", typed=True) == {
+        "true": True,
+        "false": False,
+        "integer": 1,
+        "float": 2.0,
+        "list": [1, 2.0, True, False, None],
+    }
+
+    assert lxd.get("dict.true", typed=True)
+    assert not lxd.get("dict.false", typed=True)
+    with pytest.raises(snap.SnapError):
+        lxd.get("dict.null", typed=True)
+    assert lxd.get("dict.integer", typed=True) == 1
+    assert lxd.get("dict.float", typed=True) == 2.0
+    assert lxd.get("dict.list", typed=True) == [1, 2.0, True, False, None]
+
+    assert lxd.get("criu.enable", typed=True) == "true"
+    assert lxd.get("ceph.external", typed=True) == "false"
 
 
-def test_snap_set():
+def test_snap_set_and_get_untyped():
     cache = snap.SnapCache()
     lxd = cache["lxd"]
     lxd.ensure(snap.SnapState.Latest, channel="latest")
 
-    lxd.set({"ceph.external": "false", "criu.enable": "false"})
-
-    assert lxd.get("ceph.external") == "false"
-    assert lxd.get("criu.enable") == "false"
-
-    lxd.set({"ceph.external": "true", "criu.enable": "true"})
-
-    assert lxd.get("ceph.external") == "true"
-    assert lxd.get("criu.enable") == "true"
+    lxd.set({"foo": "true", "bar": True}, typed=False)
+    assert lxd.get("foo", typed=False) == "true"
+    assert lxd.get("bar", typed=False) == "True"
 
 
 def test_unset_key_raises_snap_error():

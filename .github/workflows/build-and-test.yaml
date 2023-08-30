@@ -40,4 +40,13 @@ jobs:
       - name: Install dependencies
         run: sudo python -m pip install tox
       - name: Run integration tests for Ubuntu
+        # tests must be run as root because they configure the system
         run: sudo tox -e integration-ubuntu
+      - name: Setup operator environment
+        uses: charmed-kubernetes/actions-operator@main
+        with:
+          provider: lxd
+          juju-channel: 3.1/stable
+      - name: Run integration tests (juju-systemd-notices)
+        run: tox run -e integration-juju-systemd-notices
+
