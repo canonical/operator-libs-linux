@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 @pytest.fixture(autouse=True)
 def clean_configs():
     """Clean main and charms configs after each test."""
+    yield  # run test
     grub.GRUB_CONFIG.unlink(missing_ok=True)
     for charm_config in grub.GRUB_DIRECTORY.glob(f"{grub.CHARM_CONFIG_PREFIX}-*"):
         charm_config.unlink(missing_ok=True)
@@ -51,7 +52,7 @@ def test_single_charm_update_apply_failure(config):
         grub_conf.update(config)
 
     # check that charm file was not configured
-    assert grub_conf.path.exists() is False
+    assert not grub_conf.path.exists()
     # check the main config
     main_config = grub._load_config(grub.GRUB_CONFIG)
     for key in config:
@@ -146,8 +147,7 @@ def test_two_charms_with_conflict(config_1, config_2):
     with pytest.raises(grub.ValidationError):
         grub_conf_2.update(config_2)
 
-    assert grub_conf_2.path.exists() is False
-
+    assert not grub_conf_2.path.exists()
     # check the main config
     assert config_1 == grub._load_config(grub.GRUB_CONFIG)
 
@@ -163,7 +163,7 @@ def test_charm_remove_configuration():
     assert config == grub._load_config(grub.GRUB_CONFIG)
 
     grub_conf.remove()
-    assert grub_conf.path.exists() is False
+    assert not grub_conf.path.exists()
     assert {} == grub._load_config(grub.GRUB_CONFIG)
 
 
@@ -197,5 +197,5 @@ def test_charm_remove_configuration_without_changing_others(config_1, config_2):
     assert grub_conf_2.path.exists()
 
     grub_conf_1.remove()
-    assert grub_conf_1.path.exists() is False
+    assert not grub_conf_1.path.exists()
     assert config_2 == grub._load_config(grub.GRUB_CONFIG)
