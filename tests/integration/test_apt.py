@@ -55,7 +55,7 @@ def test_install_package_external_repository():
     apt.update()
     apt.add_package("terraform")
 
-    assert get_command_path("terraform") == "/usr/bin/terraform"
+    assert get_command_path("terraform") == "/usr/local/bin/terraform"
 
 
 def test_list_file_generation_external_repository():
