@@ -1,5 +1,8 @@
 # Linux Libraries for Operator Framework Charms
 
+![Release Libraries](https://github.com/canonical/operator-libs-linux/actions/workflows/release-libs.yaml/badge.svg)
+![Release to Charmhub](https://github.com/canonical/operator-libs-linux/actions/workflows/release.yaml/badge.svg)
+
 ## Description
 
 The `operator-libs-linux` charm provides a set of [charm libraries] which can be used for managing and manipulating Debian packages, [snap packages], system repositories, users and groups, and other operations
