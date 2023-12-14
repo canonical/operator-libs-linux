@@ -108,7 +108,7 @@ import re
 import subprocess
 from collections.abc import Mapping
 from enum import Enum
-from subprocess import PIPE, CalledProcessError, check_call, check_output
+from subprocess import PIPE, CalledProcessError, check_output
 from typing import Iterable, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
@@ -250,7 +250,7 @@ class DebianPackage:
         try:
             env = os.environ.copy()
             env["DEBIAN_FRONTEND"] = "noninteractive"
-            check_call(_cmd, env=env, stderr=PIPE, stdout=PIPE)
+            subprocess.run(_cmd, capture_output=True, check=True, env=env)
         except CalledProcessError as e:
             raise PackageError(
                 "Could not {} package(s) [{}]: {}".format(command, [*package_names], e.output)
@@ -837,7 +837,7 @@ def remove_package(
 
 def update() -> None:
     """Update the apt cache via `apt-get update`."""
-    check_call(["apt-get", "update"], stderr=PIPE, stdout=PIPE)
+    subprocess.run(["apt-get", "update"], capture_output=True, check=True)
 
 
 def import_key(key: str) -> str:
