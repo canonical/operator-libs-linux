@@ -250,7 +250,7 @@ class DebianPackage:
         try:
             env = os.environ.copy()
             env["DEBIAN_FRONTEND"] = "noninteractive"
-            subprocess.run(_cmd, capture_output=True, check=True, env=env)
+            subprocess.run(_cmd, capture_output=True, check=True, text=True, env=env)
         except CalledProcessError as e:
             raise PackageError(
                 "Could not {} package(s) [{}]: {}".format(command, [*package_names], e.stderr)

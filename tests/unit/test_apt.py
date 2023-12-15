@@ -324,6 +324,7 @@ class TestApt(unittest.TestCase):
             ],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive", "PING": "PONG"},
         )
         self.assertEqual(pkg.state, apt.PackageState.Latest)
@@ -333,6 +334,7 @@ class TestApt(unittest.TestCase):
             ["apt-get", "-y", "remove", "mocktester=1:1.2.3-4"],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive", "PING": "PONG"},
         )
 
@@ -409,6 +411,7 @@ class TestAptBareMethods(unittest.TestCase):
             ],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive"},
         )
         self.assertEqual(foo.present, True)
@@ -420,6 +423,7 @@ class TestAptBareMethods(unittest.TestCase):
             ["apt-get", "-y", "remove", "zsh=5.8-3ubuntu1"],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive"},
         )
         self.assertEqual(bar.present, False)
@@ -454,6 +458,7 @@ class TestAptBareMethods(unittest.TestCase):
             ],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive"},
         )
         mock_subprocess.assert_any_call(
@@ -466,6 +471,7 @@ class TestAptBareMethods(unittest.TestCase):
             ],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive"},
         )
         self.assertEqual(foo[0].present, True)
@@ -477,12 +483,14 @@ class TestAptBareMethods(unittest.TestCase):
             ["apt-get", "-y", "remove", "vim=2:8.1.2269-1ubuntu5"],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive"},
         )
         mock_subprocess.assert_any_call(
             ["apt-get", "-y", "remove", "zsh=5.8-3ubuntu1"],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive"},
         )
         self.assertEqual(bar[0].present, False)
