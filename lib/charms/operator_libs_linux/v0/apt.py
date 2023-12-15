@@ -253,7 +253,7 @@ class DebianPackage:
             subprocess.run(_cmd, capture_output=True, check=True, env=env)
         except CalledProcessError as e:
             raise PackageError(
-                "Could not {} package(s) [{}]: {}".format(command, [*package_names], e.output)
+                "Could not {} package(s) [{}]: {}".format(command, [*package_names], e.stderr)
             ) from None
 
     def _add(self) -> None:
@@ -476,7 +476,7 @@ class DebianPackage:
             )
         except CalledProcessError as e:
             raise PackageError(
-                "Could not list packages in apt-cache: {}".format(e.output)
+                "Could not list packages in apt-cache: {}".format(e.stderr)
             ) from None
 
         pkg_groups = output.strip().split("\n\n")
