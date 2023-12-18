@@ -172,6 +172,113 @@ Task: ubuntu-desktop, ubuntukylin-desktop, ubuntu-budgie-desktop
 Description-md5: e7f99df3aa92cf870d335784e155ec33
 """
 
+apt_cache_freeipmi_tools = """
+Package: freeipmi-tools
+Architecture: amd64
+Version: 1.6.9-2~bpo20.04.1
+Priority: extra
+Section: admin
+Source: freeipmi
+Origin: Ubuntu
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Original-Maintainer: Fabio Fantoni <fantonifabio@tiscali.it>
+Bugs: https://bugs.launchpad.net/ubuntu/+filebug
+Installed-Size: 3102
+Depends: freeipmi-common (= 1.6.9-2~bpo20.04.1), libc6 (>= 2.15), libfreeipmi17 (>= 1.6.2), libipmiconsole2 (>= 1.4.4), libipmidetect0 (>= 1.1.5)
+Suggests: freeipmi-bmc-watchdog, freeipmi-ipmidetect
+Filename: pool/main/f/freeipmi/freeipmi-tools_1.6.9-2~bpo20.04.1_amd64.deb
+Size: 637216
+MD5sum: fa4105fb6b0fb48969d56f005c7d32e8
+SHA1: 4625f8601a3af2e787389a30b7c5b8027c908cad
+SHA256: 247667a2835c5e775a9f68ec12e27f4a01c30dfd6a6306c29f10a3b52a255947
+SHA512: b553c00327ec3304a0249ba238bbbe226fd293af6f3fc5aeb52b7ee3f90a8216d316e34ea4e8c69b9781beb9a746fc210fee34186d96202251439c33302b24db
+Homepage: https://www.gnu.org/software/freeipmi/
+Description-en: GNU implementation of the IPMI protocol - tools
+ FreeIPMI is a collection of Intelligent Platform Management IPMI
+ system software. It provides in-band and out-of-band software and a
+ development library conforming to the Intelligent Platform Management
+ Interface (IPMI v1.5 and v2.0) standards.
+ .
+ This package contains assorted IPMI-related tools:
+  * bmc-config - configure BMC values
+  * bmc-info - display BMC information
+  * ipmi-chassis - IPMI chassis management utility
+  * ipmi-fru - display FRU information
+  * ipmi-locate - IPMI probing utility
+  * ipmi-oem - IPMI OEM utility
+  * ipmi-pet - decode Platform Event Traps
+  * ipmi-raw - IPMI raw communication utility
+  * ipmi-sel - display SEL entries
+  * ipmi-sensors - display IPMI sensor information
+  * ipmi-sensors-config - configure sensors
+  * ipmiconsole - IPMI console utility
+  * ipmiping - send IPMI Get Authentication Capability request
+  * ipmipower - IPMI power control utility
+  * pef-config - configure PEF values
+  * rmcpping - send RMCP Ping to network hosts
+Description-md5: 6752c6921b38f7d4192531a8ab33783c
+
+
+Package: freeipmi-tools
+Architecture: amd64
+Version: 1.6.4-3ubuntu1.1
+Priority: extra
+Section: admin
+Source: freeipmi
+Origin: Ubuntu
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Original-Maintainer: Bernd Zeimetz <bzed@debian.org>
+Bugs: https://bugs.launchpad.net/ubuntu/+filebug
+Installed-Size: 3099
+Depends: libc6 (>= 2.15), libfreeipmi17 (>= 1.6.2), libipmiconsole2 (>= 1.4.4), libipmidetect0 (>= 1.1.5), freeipmi-common (= 1.6.4-3ubuntu1.1)
+Suggests: freeipmi-ipmidetect, freeipmi-bmc-watchdog
+Filename: pool/main/f/freeipmi/freeipmi-tools_1.6.4-3ubuntu1.1_amd64.deb
+Size: 636384
+MD5sum: bc7c1ec3484d07d3627ba92bb0300693
+SHA1: b5851b2160d5139d141e3c1b29b946f6fd895871
+SHA256: 6d0a643fcb62404b17d7574baf854b9b39443a2f0067c2076f5f663437d39968
+SHA512: 8f89796c86a8a410c71996d8fb229293492c949a664476e0fa63fd3fe7b1523a3174997172fe82f6eed6fb59c0a4fde221273d6149b45d4e18da7e99faed02d6
+Homepage: http://www.gnu.org/software/freeipmi/
+Description-en: GNU implementation of the IPMI protocol - tools
+ FreeIPMI is a collection of Intelligent Platform Management IPMI
+ system software. It provides in-band and out-of-band software and a
+ development library conforming to the Intelligent Platform Management
+ Interface (IPMI v1.5 and v2.0) standards.
+ .
+ This package contains assorted IPMI-related tools:
+  * bmc-config - configure BMC values
+  * bmc-info - display BMC information
+  * ipmi-chassis - IPMI chassis management utility
+  * ipmi-fru - display FRU information
+  * ipmi-locate - IPMI probing utility
+  * ipmi-oem - IPMI OEM utility
+  * ipmi-pet - decode Platform Event Traps
+  * ipmi-raw - IPMI raw communication utility
+  * ipmi-sel - display SEL entries
+  * ipmi-sensors - display IPMI sensor information
+  * ipmi-sensors-config - configure sensors
+  * ipmiconsole - IPMI console utility
+  * ipmiping - send IPMI Get Authentication Capability request
+  * ipmipower - IPMI power control utility
+  * pef-config - configure PEF values
+  * rmcpping - send RMCP Ping to network hosts
+Description-md5: 6752c6921b38f7d4192531a8ab33783c
+"""
+
+
+apt_cache_policy_freeipmi_tools_focal = """
+freeipmi-tools:
+  Installed: (none)
+  Candidate: 1.6.4-3ubuntu1.1
+  Version table:
+     1.6.9-2~bpo20.04.1 100
+        100 http://archive.ubuntu.com/ubuntu focal-backports/main amd64 Packages
+     1.6.4-3ubuntu1.1 500
+        500 http://archive.ubuntu.com/ubuntu focal-updates/main amd64 Packages
+     1.6.4-3ubuntu1 500
+        500 http://archive.ubuntu.com/ubuntu focal/main amd64 Packages
+"""
+
 
 class TestApt(unittest.TestCase):
     @patch("charms.operator_libs_linux.v0.apt.check_output")
@@ -510,3 +617,69 @@ class TestAptBareMethods(unittest.TestCase):
         packages = apt.remove_package("ubuntu-advantage-tools")
         mock_subprocess.assert_not_called()
         self.assertEqual(packages, [])
+
+    @patch("charms.operator_libs_linux.v0.apt.check_output")
+    def test_get_candidate_version(self, mock_subprocess_output):
+        mock_subprocess_output.return_value = apt_cache_policy_freeipmi_tools_focal
+
+        version = apt.get_candidate_version("freeipmi_tools")
+        self.assertEqual(version, "1.6.4-3ubuntu1.1")
+
+    @patch("charms.operator_libs_linux.v0.apt.check_output")
+    def test_get_candidate_version_package_not_found_error(self, mock_subprocess_output):
+        mock_subprocess_output.side_effect = subprocess.CalledProcessError(
+            returncode=-1, cmd=["apt-cache", "policy", "fake_package_name"]
+        )
+
+        with self.assertRaises(apt.PackageError) as ctx:
+            apt.get_candidate_version("fake_package_name")
+
+        self.assertEqual("<charms.operator_libs_linux.v0.apt.PackageError>", ctx.exception.name)
+        self.assertIn("Could not list packages in apt-cache:", ctx.exception.message)
+
+    @patch("charms.operator_libs_linux.v0.apt.check_output")
+    def test_get_candidate_version_can_not_found_candidate(self, mock_subprocess_output):
+        output = apt_cache_policy_freeipmi_tools_focal.replace("Candidate", "candidate")
+        mock_subprocess_output.return_value = output
+        with self.assertRaises(apt.PackageNotFoundError) as ctx:
+            apt.get_candidate_version("freeipmi_tools")
+
+        self.assertEqual(
+            "<charms.operator_libs_linux.v0.apt.PackageNotFoundError>", ctx.exception.name
+        )
+        self.assertIn(
+            f"Could not find candidate version package in apt-cache: {output}",
+            ctx.exception.message,
+        )
+
+    @patch("charms.operator_libs_linux.v0.apt.check_output")
+    @patch("charms.operator_libs_linux.v0.apt.subprocess.run")
+    @patch("os.environ.copy")
+    def test_can_run_bare_changes_on_single_package_with_candidate_version(
+        self, mock_environ, mock_subprocess, mock_subprocess_output
+    ):
+        mock_subprocess.return_value = 0
+        mock_subprocess_output.side_effect = [
+            apt_cache_policy_freeipmi_tools_focal,
+            "amd64",
+            subprocess.CalledProcessError(returncode=100, cmd=["dpkg", "-l", "freeipmi-tools"]),
+            "amd64",
+            apt_cache_freeipmi_tools,
+        ]
+        mock_environ.return_value = {}
+
+        # foo = apt.add_package("freeipmi_tools", candidate_version=True)
+        foo = apt.add_package("freeipmi_tools", candidate_version=True)
+        mock_subprocess.assert_called_with(
+            [
+                "apt-get",
+                "-y",
+                "--option=Dpkg::Options::=--force-confold",
+                "install",
+                "freeipmi-tools=1.6.4-3ubuntu1.1",
+            ],
+            capture_output=True,
+            check=True,
+            env={"DEBIAN_FRONTEND": "noninteractive"},
+        )
+        self.assertEqual(foo.present, True)

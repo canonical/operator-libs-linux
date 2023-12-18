@@ -721,11 +721,39 @@ class Version:
         return not self.__eq__(other)
 
 
+def get_candidate_version(package: str) -> Optional[str]:
+    """Get candiate version of package from apt-cache.
+
+    Args:
+        package: package name
+    Returns:
+        A version string
+    Raises:
+        PackageError if fail to use apt-cache policy command
+        PackageNotFoundError if fail to get Candidate version
+    """
+    try:
+        output = check_output(
+            ["apt-cache", "policy", package], stderr=PIPE, universal_newlines=True
+        )
+    except CalledProcessError as e:
+        raise PackageError(f"Could not list packages in apt-cache: {e.output}") from None
+
+    lines = [line.strip() for line in output.strip().split("\n")]
+    for line in lines:
+        candidate_matcher = re.compile(r"^Candidate:\s(?P<version>(.*))")
+        matches = candidate_matcher.search(line)
+        if matches:
+            return matches.groupdict().get("version")
+    raise PackageNotFoundError(f"Could not find candidate version package in apt-cache: {output}")
+
+
 def add_package(
     package_names: Union[str, List[str]],
     version: Optional[str] = "",
     arch: Optional[str] = "",
     update_cache: Optional[bool] = False,
+    candidate_version: bool = False,
 ) -> Union[DebianPackage, List[DebianPackage]]:
     """Add a package or list of packages to the system.
 
@@ -735,6 +763,7 @@ def add_package(
         version: an (Optional) version as a string. Defaults to the latest known
         arch: an optional architecture for the package
         update_cache: whether or not to run `apt-get update` prior to operating
+        candidate_version: whether or not to use `apt-cache policy` to get and install candidate version
 
     Raises:
         TypeError if no package name is given, or explicit version is set for multiple packages
@@ -758,6 +787,8 @@ def add_package(
         )
 
     for p in package_names:
+        if candidate_version:
+            version = get_candidate_version(p)
         pkg, success = _add(p, version, arch)
         if success:
             packages["success"].append(pkg)
