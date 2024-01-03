@@ -276,6 +276,24 @@ class TestApt(unittest.TestCase):
         self.assertEqual(str(tester.version), "1:1.2.3-4")
 
     @patch("charms.operator_libs_linux.v0.apt.check_output")
+    def test_will_throw_apt_cache_errors(self, mock_subprocess):
+        mock_subprocess.side_effect = [
+            "amd64",
+            subprocess.CalledProcessError(
+                returncode=100,
+                cmd=["apt-cache", "show", "mocktester"],
+                stderr="N: Unable to locate package mocktester",
+            ),
+        ]
+
+        with self.assertRaises(apt.PackageError) as ctx:
+            apt.DebianPackage.from_apt_cache("mocktester", arch="i386")
+
+        self.assertEqual("<charms.operator_libs_linux.v0.apt.PackageError>", ctx.exception.name)
+        self.assertIn("Could not list packages in apt-cache", ctx.exception.message)
+        self.assertIn("Unable to locate package", ctx.exception.message)
+
+    @patch("charms.operator_libs_linux.v0.apt.check_output")
     @patch("charms.operator_libs_linux.v0.apt.subprocess.run")
     @patch("os.environ.copy")
     def test_can_run_apt_commands(
@@ -306,6 +324,7 @@ class TestApt(unittest.TestCase):
             ],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive", "PING": "PONG"},
         )
         self.assertEqual(pkg.state, apt.PackageState.Latest)
@@ -315,6 +334,7 @@ class TestApt(unittest.TestCase):
             ["apt-get", "-y", "remove", "mocktester=1:1.2.3-4"],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive", "PING": "PONG"},
         )
 
@@ -322,7 +342,9 @@ class TestApt(unittest.TestCase):
     @patch("charms.operator_libs_linux.v0.apt.subprocess.run")
     def test_will_throw_apt_errors(self, mock_subprocess_call, mock_subprocess_output):
         mock_subprocess_call.side_effect = subprocess.CalledProcessError(
-            returncode=1, cmd=["apt-get", "-y", "install"]
+            returncode=1,
+            cmd=["apt-get", "-y", "install"],
+            stderr="E: Unable to locate package mocktester",
         )
         mock_subprocess_output.side_effect = [
             "amd64",
@@ -339,6 +361,7 @@ class TestApt(unittest.TestCase):
 
         self.assertEqual("<charms.operator_libs_linux.v0.apt.PackageError>", ctx.exception.name)
         self.assertIn("Could not install package", ctx.exception.message)
+        self.assertIn("Unable to locate package", ctx.exception.message)
 
     def test_can_compare_versions(self):
         old_version = apt.Version("1.0.0", "")
@@ -388,6 +411,7 @@ class TestAptBareMethods(unittest.TestCase):
             ],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive"},
         )
         self.assertEqual(foo.present, True)
@@ -399,6 +423,7 @@ class TestAptBareMethods(unittest.TestCase):
             ["apt-get", "-y", "remove", "zsh=5.8-3ubuntu1"],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive"},
         )
         self.assertEqual(bar.present, False)
@@ -433,6 +458,7 @@ class TestAptBareMethods(unittest.TestCase):
             ],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive"},
         )
         mock_subprocess.assert_any_call(
@@ -445,6 +471,7 @@ class TestAptBareMethods(unittest.TestCase):
             ],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive"},
         )
         self.assertEqual(foo[0].present, True)
@@ -456,12 +483,14 @@ class TestAptBareMethods(unittest.TestCase):
             ["apt-get", "-y", "remove", "vim=2:8.1.2269-1ubuntu5"],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive"},
         )
         mock_subprocess.assert_any_call(
             ["apt-get", "-y", "remove", "zsh=5.8-3ubuntu1"],
             capture_output=True,
             check=True,
+            text=True,
             env={"DEBIAN_FRONTEND": "noninteractive"},
         )
         self.assertEqual(bar[0].present, False)

@@ -27,6 +27,20 @@ def test_install_package():
     assert get_command_path("jq") == "/usr/bin/jq"
 
 
+def test_install_package_error():
+    try:
+        package = apt.DebianPackage(
+            "ceci-n'est-pas-un-paquet",
+            "1.0",
+            "",
+            "amd64",
+            apt.PackageState.Available,
+        )
+        package.ensure(apt.PackageState.Present)
+    except apt.PackageError as e:
+        assert "Unable to locate package" in str(e)
+
+
 def test_remove_package():
     # First ensure the package is present
     cfssl = apt.DebianPackage.from_apt_cache("golang-cfssl")
@@ -77,3 +91,10 @@ def test_list_file_generation_external_repository():
     apt.add_package("mongodb-org")
 
     assert get_command_path("mongod") == "/usr/bin/mongod"
+
+
+def test_from_apt_cache_error():
+    try:
+        apt.DebianPackage.from_apt_cache("ceci-n'est-pas-un-paquet")
+    except apt.PackageError as e:
+        assert "No packages found" in str(e)

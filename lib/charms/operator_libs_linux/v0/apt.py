@@ -122,7 +122,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 12
+LIBPATCH = 13
 
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
@@ -250,10 +250,10 @@ class DebianPackage:
         try:
             env = os.environ.copy()
             env["DEBIAN_FRONTEND"] = "noninteractive"
-            subprocess.run(_cmd, capture_output=True, check=True, env=env)
+            subprocess.run(_cmd, capture_output=True, check=True, text=True, env=env)
         except CalledProcessError as e:
             raise PackageError(
-                "Could not {} package(s) [{}]: {}".format(command, [*package_names], e.output)
+                "Could not {} package(s) [{}]: {}".format(command, [*package_names], e.stderr)
             ) from None
 
     def _add(self) -> None:
@@ -476,7 +476,7 @@ class DebianPackage:
             )
         except CalledProcessError as e:
             raise PackageError(
-                "Could not list packages in apt-cache: {}".format(e.output)
+                "Could not list packages in apt-cache: {}".format(e.stderr)
             ) from None
 
         pkg_groups = output.strip().split("\n\n")
