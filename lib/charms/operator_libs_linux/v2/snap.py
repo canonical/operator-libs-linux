@@ -491,7 +491,7 @@ class Snap(object):
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
         revision: Optional[str] = None,
-        devmode: Optional[bool] = False,
+        devmode: bool = False,
         leave_cohort: Optional[bool] = False,
     ) -> None:
         """Refresh a snap.
@@ -537,7 +537,7 @@ class Snap(object):
         self,
         state: SnapState,
         classic: Optional[bool] = False,
-        devmode: Optional[bool] = False,
+        devmode: bool = False,
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
         revision: Optional[str] = None,
@@ -583,7 +583,7 @@ class Snap(object):
                 self._install(channel, cohort, revision)
             else:
                 # The snap is installed, but we are changing it (e.g., switching channels).
-                self._refresh(channel, cohort, revision, devmode)
+                self._refresh(channel=channel, cohort=cohort, revision=revision, devmode=devmode)
 
         self._update_snap_apps()
         self._state = state
@@ -909,7 +909,7 @@ def add(
     state: Union[str, SnapState] = SnapState.Latest,
     channel: Optional[str] = "",
     classic: Optional[bool] = False,
-    devmode: Optional[bool] = False,
+    devmode: bool = False,
     cohort: Optional[str] = "",
     revision: Optional[str] = None,
 ) -> Union[Snap, List[Snap]]:
@@ -956,8 +956,13 @@ def remove(snap_names: Union[str, List[str]]) -> Union[Snap, List[Snap]]:
     snap_names = [snap_names] if isinstance(snap_names, str) else snap_names
     if not snap_names:
         raise TypeError("Expected at least one snap to add, received zero!")
-
-    return _wrap_snap_operations(snap_names, SnapState.Absent, "", False, False)
+    return _wrap_snap_operations(
+        snap_names=snap_names,
+        state=SnapState.Absent,
+        channel="",
+        classic=False,
+        devmode=False,
+    )
 
 
 @_cache_init
@@ -966,7 +971,7 @@ def ensure(
     state: str,
     channel: Optional[str] = "",
     classic: Optional[bool] = False,
-    devmode: Optional[bool] = False,
+    devmode: bool = False,
     cohort: Optional[str] = "",
     revision: Optional[int] = None,
 ) -> Union[Snap, List[Snap]]:
@@ -993,7 +998,15 @@ def ensure(
         channel = "latest"
 
     if state in ("present", "latest") or revision:
-        return add(snap_names, SnapState(state), channel, classic, devmode, cohort, revision)
+        return add(
+            snap_names=snap_names,
+            state=SnapState(state),
+            channel=channel,
+            classic=classic,
+            devmode=devmode,
+            cohort=cohort,
+            revision=revision,
+        )
     else:
         return remove(snap_names)
 
