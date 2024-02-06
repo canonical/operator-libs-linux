@@ -291,17 +291,17 @@ class TestSnapCache(unittest.TestCase):
         )
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_can_run_snap_commands_devmode(self, mock_subprocess):
-        mock_subprocess.return_value = 0
+    def test_can_run_snap_commands_devmode(self, mock_check_output):
+        mock_check_output.return_value = 0
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "devmode")
         self.assertEqual(foo.present, True)
 
         foo.ensure(snap.SnapState.Absent)
-        mock_subprocess.assert_called_with(["snap", "remove", "foo"], universal_newlines=True)
+        mock_check_output.assert_called_with(["snap", "remove", "foo"], universal_newlines=True)
 
         foo.ensure(snap.SnapState.Latest, devmode=True, channel="latest/edge")
 
-        mock_subprocess.assert_called_with(
+        mock_check_output.assert_called_with(
             [
                 "snap",
                 "install",
@@ -314,10 +314,10 @@ class TestSnapCache(unittest.TestCase):
         self.assertEqual(foo.latest, True)
 
         foo.state = snap.SnapState.Absent
-        mock_subprocess.assert_called_with(["snap", "remove", "foo"], universal_newlines=True)
+        mock_check_output.assert_called_with(["snap", "remove", "foo"], universal_newlines=True)
 
         foo.ensure(snap.SnapState.Latest, revision=123)
-        mock_subprocess.assert_called_with(
+        mock_check_output.assert_called_with(
             ["snap", "install", "foo", "--devmode", '--revision="123"'], universal_newlines=True
         )
 
