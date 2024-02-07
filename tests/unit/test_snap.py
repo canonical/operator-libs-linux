@@ -290,6 +290,37 @@ class TestSnapCache(unittest.TestCase):
             ["snap", "install", "foo", "--classic", '--revision="123"'], universal_newlines=True
         )
 
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
+    def test_can_run_snap_commands_devmode(self, mock_check_output):
+        mock_check_output.return_value = 0
+        foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "devmode")
+        self.assertEqual(foo.present, True)
+
+        foo.ensure(snap.SnapState.Absent)
+        mock_check_output.assert_called_with(["snap", "remove", "foo"], universal_newlines=True)
+
+        foo.ensure(snap.SnapState.Latest, devmode=True, channel="latest/edge")
+
+        mock_check_output.assert_called_with(
+            [
+                "snap",
+                "install",
+                "foo",
+                "--devmode",
+                '--channel="latest/edge"',
+            ],
+            universal_newlines=True,
+        )
+        self.assertEqual(foo.latest, True)
+
+        foo.state = snap.SnapState.Absent
+        mock_check_output.assert_called_with(["snap", "remove", "foo"], universal_newlines=True)
+
+        foo.ensure(snap.SnapState.Latest, revision=123)
+        mock_check_output.assert_called_with(
+            ["snap", "install", "foo", "--devmode", '--revision="123"'], universal_newlines=True
+        )
+
     @patch("charms.operator_libs_linux.v2.snap.subprocess.run")
     def test_can_run_snap_daemon_commands(self, mock_subprocess):
         mock_subprocess.return_value = MagicMock()
