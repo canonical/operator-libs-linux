@@ -277,6 +277,7 @@ class Snap(object):
         try:
             return subprocess.check_output(args, universal_newlines=True)
         except CalledProcessError as e:
+            logger.error("Error when running %s command: %s", " ".join(args), e)
             raise SnapError(
                 "Snap: {!r}; command {!r} failed with output = {!r}".format(
                     self._name, args, e.output
@@ -581,12 +582,14 @@ class Snap(object):
             if self._state not in (SnapState.Present, SnapState.Latest):
                 # The snap is not installed, so we install it.
                 logger.info(
-                    f"Installing snap {self._name} revision {revision}, tracking {channel}"
+                    "Installing snap %s, revision %s, tracking %s", self._name, revision, channel
                 )
                 self._install(channel, cohort, revision)
             else:
                 # The snap is installed, but we are changing it (e.g., switching channels).
-                logger.info(f"Refreshing snap {self._name} to revision {revision} in {channel}")
+                logger.info(
+                    "Refreshing snap %s, revision %s, tracking %s", self._name, revision, channel
+                )
                 self._refresh(channel=channel, cohort=cohort, revision=revision, devmode=devmode)
             logger.info("The snap installation completed successfully")
 
