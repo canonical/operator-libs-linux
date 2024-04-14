@@ -580,7 +580,9 @@ class Snap(object):
             # We are installing or refreshing a snap.
             if self._state not in (SnapState.Present, SnapState.Latest):
                 # The snap is not installed, so we install it.
-                logger.info(f"Installing snap {self._name} revision {revision}, tracking {channel}")
+                logger.info(
+                    f"Installing snap {self._name} revision {revision}, tracking {channel}"
+                )
                 self._install(channel, cohort, revision)
             else:
                 # The snap is installed, but we are changing it (e.g., switching channels).
