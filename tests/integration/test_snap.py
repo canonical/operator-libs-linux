@@ -176,7 +176,6 @@ def test_snap_ensure_revision():
 
     edge_revision = None
     for line in snap_info_juju:
-        logger.info(line)
         match = re.search(r"latest/edge.*\((\d+)\)", line)
 
         if match:
