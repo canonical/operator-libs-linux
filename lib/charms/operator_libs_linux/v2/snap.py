@@ -584,13 +584,16 @@ class Snap(object):
                     "Installing snap %s, revision %s, tracking %s", self._name, revision, channel
                 )
                 self._install(channel, cohort, revision)
-            else:
+                logger.info("The snap installation completed successfully")
+            elif (revision is None) or (revision != self._revision):
                 # The snap is installed, but we are changing it (e.g., switching channels).
                 logger.info(
                     "Refreshing snap %s, revision %s, tracking %s", self._name, revision, channel
                 )
                 self._refresh(channel=channel, cohort=cohort, revision=revision, devmode=devmode)
-            logger.info("The snap installation completed successfully")
+                logger.info("The snap refresh completed successfully")
+            else:
+                logger.info("Snap refresh was unnecessary %s", self._name)
 
         self._update_snap_apps()
         self._state = state
