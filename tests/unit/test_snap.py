@@ -558,7 +558,7 @@ class TestSnapBareMethods(unittest.TestCase):
         )
 
         mock_check_output.reset_mock()
-        # ensure that calling refresh with the same revision doesn't subprocess out
+        # Ensure that calling refresh with the same revision doesn't subprocess out.
         snap.ensure("curl", "latest", classic=True, revision="233", cohort="+")
         mock_check_output.assert_not_called()
 
