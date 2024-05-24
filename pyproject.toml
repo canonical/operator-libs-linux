@@ -40,3 +40,4 @@ max-complexity = 14
 
 [tool.codespell]
 skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.vscode,.coverage"
+ignore-words-list = "assertIn"
