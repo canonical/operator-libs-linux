@@ -544,6 +544,25 @@ class TestSnapBareMethods(unittest.TestCase):
         )
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
+    def test_revision_doesnt_refresh(self, mock_check_output):
+        snap.add("curl", revision="233", cohort="+")
+        mock_check_output.assert_called_with(
+            [
+                "snap",
+                "install",
+                "curl",
+                '--revision="233"',
+                '--cohort="+"',
+            ],
+            universal_newlines=True,
+        )
+
+        mock_check_output.reset_mock()
+        # Ensure that calling refresh with the same revision doesn't subprocess out.
+        snap.ensure("curl", "latest", classic=True, revision="233", cohort="+")
+        mock_check_output.assert_not_called()
+
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
     def test_can_ensure_states(self, mock_subprocess):
         mock_subprocess.return_value = 0
         foo = snap.ensure("curl", "latest", classic=True, channel="latest/test")
