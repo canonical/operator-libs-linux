@@ -116,6 +116,22 @@ def test_snap_set_and_get_with_typed():
 
     assert lxd.get("criu.enable", typed=True) == "true"
     assert lxd.get("ceph.external", typed=True) == "false"
+    assert lxd.get(None, typed=True) == {
+        "true": True,
+        "false": False,
+        "integer": 1,
+        "float": 2.0,
+        "list": [1, 2.0, True, False, None],
+        "dict": {
+            "true": True,
+            "false": False,
+            "integer": 1,
+            "float": 2.0,
+            "list": [1, 2.0, True, False, None],
+        },
+        "criu": {"enable": "true"},
+        "ceph": {"external": "false"},
+    }
 
 
 def test_snap_set_and_get_untyped():
