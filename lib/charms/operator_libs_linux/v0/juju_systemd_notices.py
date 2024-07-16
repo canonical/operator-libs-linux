@@ -79,19 +79,20 @@ class ApplicationCharm(CharmBase):
 ```
 """
 
-__all__ = ["ServiceStartedEvent", "ServiceStoppedEvent", "SystemdNotices"]
+__all__ = ["Service", "ServiceStartedEvent", "ServiceStoppedEvent", "SystemdNotices"]
 
 import argparse
 import asyncio
 import functools
 import logging
-import re
 import signal
 import subprocess
 import textwrap
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import Mapping, Optional
 
+import yaml
 from dbus_fast.aio import MessageBus
 from dbus_fast.constants import BusType, MessageType
 from dbus_fast.errors import DBusError
@@ -111,12 +112,11 @@ LIBPATCH = 1
 
 # juju-systemd-notices charm library dependencies.
 # Charm library dependencies are installed when the consuming charm is packed.
-PYDEPS = ["dbus-fast>=1.90.2"]
+PYDEPS = ["dbus-fast>=1.90.2", "pyyaml>=6.0.1"]
 
 _logger = logging.getLogger(__name__)
 _juju_unit = None
 _service_states = {}
-_service_hook_regex_filter = re.compile(r"service-(?P<service>[\w\\:-]*)-(?:started|stopped)")
 _DBUS_CHAR_MAPPINGS = {
     "_5f": "_",  # _ must be first since char mappings contain _.
     "_40": "@",
@@ -148,6 +148,22 @@ _enable_service = functools.partial(_systemctl, "enable")
 _disable_service = functools.partial(_systemctl, "disable")
 
 
+@dataclass
+class Service:
+    """Systemd service to observe.
+
+    Args:
+        name: Name of systemd service to observe on dbus.
+        alias: Event name alias for service.
+    """
+
+    name: str
+    alias: Optional[str] = None
+
+    def __post_init__(self) -> None:  # noqa D105
+        self.alias = self.alias or self.name
+
+
 class ServiceStartedEvent(EventBase):
     """Event emitted when service has started."""
 
@@ -159,7 +175,7 @@ class ServiceStoppedEvent(EventBase):
 class SystemdNotices:
     """Observe systemd services on your machine base."""
 
-    def __init__(self, charm: CharmBase, services: List[str]) -> None:
+    def __init__(self, charm: CharmBase, *services: Service) -> None:
         """Instantiate systemd notices service."""
         self._charm = charm
         self._services = services
@@ -170,39 +186,65 @@ class SystemdNotices:
             "Attaching systemd notice events to charm %s", self._charm.__class__.__name__
         )
         for service in self._services:
-            self._charm.on.define_event(f"service_{service}_started", ServiceStartedEvent)
-            self._charm.on.define_event(f"service_{service}_stopped", ServiceStoppedEvent)
+            self._charm.on.define_event(f"service_{service.alias}_started", ServiceStartedEvent)
+            self._charm.on.define_event(f"service_{service.alias}_stopped", ServiceStoppedEvent)
 
     def subscribe(self) -> None:
         """Subscribe charmed operator to observe status of systemd services."""
+        self._generate_hooks()
+        self._generate_config()
+        self._start()
+
+    def stop(self) -> None:
+        """Stop charmed operator from observing the status of subscribed services."""
+        _stop_service(self._service_file.name)
+        # Notices daemon is disabled so that the service will not restart after machine reboot.
+        _disable_service(self._service_file.name)
+
+    def _generate_hooks(self) -> None:
+        """Generate legacy event hooks for observed systemd services."""
         _logger.debug("Generating systemd notice hooks for %s", self._services)
-        start_hooks = [Path(f"hooks/service-{service}-started") for service in self._services]
-        stop_hooks = [Path(f"hooks/service-{service}-stopped") for service in self._services]
+        start_hooks = [Path(f"hooks/service-{s.alias}-started") for s in self._services]
+        stop_hooks = [Path(f"hooks/service-{s.alias}-stopped") for s in self._services]
         for hook in start_hooks + stop_hooks:
             if hook.exists():
                 _logger.debug("Hook %s already exists. Skipping...", hook.name)
             else:
                 hook.symlink_to(self._charm.framework.charm_dir / "dispatch")
 
+    def _generate_config(self) -> None:
+        """Generate watch file for systemd notices daemon."""
+        _logger.debug("Generating watch file for %s", self._services)
+        config = {"services": {s.name: s.alias for s in self._services}}
+
+        config_file = self._charm.framework.charm_dir / "watch.yaml"
+        if config_file.exists():
+            _logger.debug("Overwriting existing watch file %s", config_file.name)
+        with config_file.open("wt") as fout:
+            yaml.dump(config, fout)
+        config_file.chmod(0o600)
+
+    def _start(self) -> None:
+        """Start systemd notices daemon to observe subscribed services."""
         _logger.debug("Starting %s daemon", self._service_file.name)
         if self._service_file.exists():
             _logger.debug("Overwriting existing service file %s", self._service_file.name)
         self._service_file.write_text(
             textwrap.dedent(
                 f"""
-                [Unit]
-                Description=Juju systemd notices daemon
-                After=multi-user.target
+                    [Unit]
+                    Description=Juju systemd notices daemon
+                    After=multi-user.target
 
-                [Service]
-                Type=simple
-                Restart=always
-                WorkingDirectory={self._charm.framework.charm_dir}
-                Environment="PYTHONPATH={self._charm.framework.charm_dir / "venv"}"
-                ExecStart=/usr/bin/python3 {__file__} {self._charm.unit.name}
+                    [Service]
+                    Type=simple
+                    Restart=always
+                    WorkingDirectory={self._charm.framework.charm_dir}
+                    Environment="PYTHONPATH={self._charm.framework.charm_dir / "venv"}"
+                    ExecStart=/usr/bin/python3 {__file__} {self._charm.unit.name}
 
-                [Install]
-                WantedBy=multi-user.target
+                    [Install]
+                    WantedBy=multi-user.target
                 """
             ).strip()
         )
@@ -213,12 +255,6 @@ class SystemdNotices:
         _enable_service(self._service_file.name)
         _start_service(self._service_file.name)
         _logger.debug("Started %s daemon", self._service_file.name)
-
-    def stop(self) -> None:
-        """Stop charmed operator from observing the status of subscribed services."""
-        _stop_service(self._service_file.name)
-        # Notices daemon is disabled so that the service will not restart after machine reboot.
-        _disable_service(self._service_file.name)
 
 
 def _name_to_dbus_path(name: str) -> str:
@@ -254,6 +290,16 @@ def _dbus_path_to_name(path: str) -> str:
         name = name.replace(key, value)
 
     return name
+
+
+@functools.lru_cache(maxsize=32)
+def _read_config() -> Mapping[str, str]:
+    """Read systemd notices daemon configuration to service names and aliases."""
+    config_file = Path.cwd() / "watch.yaml"
+    _logger.debug("Loading observed services from configuration file %s", config_file)
+
+    with config_file.open("rt") as fin:
+        return yaml.safe_load(fin)["services"]
 
 
 def _systemd_unit_changed(msg: Message) -> bool:
@@ -310,8 +356,10 @@ async def _send_juju_notification(service: str, state: str) -> None:
     if service.endswith(".service"):
         service = service[0:-len(".service")]  # fmt: skip
 
+    watched_services = _read_config()
+    alias = watched_services[service]
     event_name = "started" if state == "active" else "stopped"
-    hook = f"service-{service}-{event_name}"
+    hook = f"service-{alias}-{event_name}"
     cmd = ["/usr/bin/juju-exec", _juju_unit, f"hooks/{hook}"]
 
     _logger.debug("Invoking hook %s with command: %s", hook, " ".join(cmd))
@@ -364,20 +412,8 @@ async def _async_load_services() -> None:
     will be queried from systemd to determine it's initial state.
     """
     global _juju_unit
-    hooks_dir = Path.cwd() / "hooks"
-    _logger.info("Loading services from hooks in %s", hooks_dir)
 
-    if not hooks_dir.exists():
-        _logger.warning("Hooks dir %s does not exist.", hooks_dir)
-        return
-
-    watched_services = []
-    # Get service-{service}-(started|stopped) hooks defined by the charm.
-    for hook in hooks_dir.iterdir():
-        match = _service_hook_regex_filter.match(hook.name)
-        if match:
-            watched_services.append(match.group("service"))
-
+    watched_services = _read_config()
     _logger.info("Services from hooks are %s", watched_services)
     if not watched_services:
         return
@@ -386,7 +422,7 @@ async def _async_load_services() -> None:
 
     # Loop through all the services and be sure that a new watcher is
     # started for new ones.
-    for service in watched_services:
+    for service in watched_services.keys():
         # The .service suffix is necessary and will cause lookup failures of the
         # service unit when readying the watcher if absent from the service name.
         service = f"{service}.service"
