@@ -7,7 +7,6 @@
 import argparse
 import subprocess
 import unittest
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from charms.operator_libs_linux.v0.juju_systemd_notices import (
@@ -46,7 +45,9 @@ class MockNoticesCharm(CharmBase):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-        self.notices = SystemdNotices(self, Service("foobar"), Service("snap.test.service", alias="service"))
+        self.notices = SystemdNotices(
+            self, Service("foobar"), Service("snap.test.service", alias="service")
+        )
         event_handler_bindings = {
             self.on.install: self._on_install,
             self.on.stop: self._on_stop,
@@ -213,7 +214,10 @@ class TestJujuSystemdNoticesDaemon(unittest.IsolatedAsyncioTestCase):
         ):
             self.assertTrue(_systemd_unit_changed(mock_message))
 
-    @patch("charms.operator_libs_linux.v0.juju_systemd_notices._read_config", return_value={"foobar": "foobar"})
+    @patch(
+        "charms.operator_libs_linux.v0.juju_systemd_notices._read_config",
+        return_value={"foobar": "foobar"},
+    )
     @patch("charms.operator_libs_linux.v0.juju_systemd_notices._juju_unit", "foobar/0")
     @patch("asyncio.create_subprocess_exec")
     async def test_send_juju_notification(self, mock_subcmd, *_) -> None:
