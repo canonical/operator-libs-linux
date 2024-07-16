@@ -28,6 +28,7 @@ systemd service and handle events based on the current emitted state:
 
 ```python
 from charms.operator_libs_linux.v0.juju_systemd_notices import (
+    Service,
     ServiceStartedEvent,
     ServiceStoppedEvent,
     SystemdNotices,
@@ -41,7 +42,7 @@ class ApplicationCharm(CharmBase):
         super().__init__(*args, **kwargs)
 
         # Register services with charm. This adds the events to observe.
-        self._systemd_notices = SystemdNotices(self, ["slurmd"])
+        self._systemd_notices = SystemdNotices(self, Service("snap.slurm.slurmd", alias="slurmd"))
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.service_slurmd_started, self._on_slurmd_started)
@@ -58,7 +59,7 @@ class ApplicationCharm(CharmBase):
     def _on_start(self, _: StartEvent) -> None:
         # This will trigger the juju-systemd-notices daemon to
         # emit a `service-slurmd-started` event.
-        systemd.service_start("slurmd")
+        snap.slurmd.enable()
 
     def _on_stop(self, _: StopEvent) -> None:
         # To stop the juju-systemd-notices service running in the background.
@@ -72,7 +73,7 @@ class ApplicationCharm(CharmBase):
 
         # This will trigger the juju-systemd-notices daemon to
         # emit a `service-slurmd-stopped` event.
-        systemd.service_stop("slurmd")
+        snap.slurmd.stop()
 
     def _on_slurmd_stopped(self, _: ServiceStoppedEvent) -> None:
         self.unit.status = BlockedStatus("slurmd not running")
