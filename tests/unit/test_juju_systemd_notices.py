@@ -7,6 +7,7 @@
 import argparse
 import subprocess
 import unittest
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from charms.operator_libs_linux.v0.juju_systemd_notices import (
@@ -98,7 +99,12 @@ class TestJujuSystemdNoticesCharmAPI(unittest.TestCase):
     def test_generate_config(self, mock_exists) -> None:
         """Test that watch configuration file is generated correctly."""
         with Patcher() as patcher:
-            patcher.fs.create_file("no-disk-path/watch.yaml")
+            # Set charm_dir to "/" because mocked charm_dir default
+            # `no-disk-path` does not exist within the fake filesystem.
+            # Tried creating `no-disk-path` in the fake filesystem, but
+            # the mocked objects could not find it.
+            self.harness.charm.framework.charm_dir = Path("/")
+            patcher.fs.create_file("watch.yaml")
 
             # Scenario 1 - Generate success but no pre-existing watch configuration.
             mock_exists.return_value = False
