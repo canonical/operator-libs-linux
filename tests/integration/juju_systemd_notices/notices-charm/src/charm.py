@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2023 Canonical Ltd.
+# Copyright 2023-2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 """Minimal charm for testing the juju_systemd_notices charm library.
@@ -12,6 +12,7 @@ import logging
 import charms.operator_libs_linux.v1.systemd as systemd
 import daemon
 from charms.operator_libs_linux.v0.juju_systemd_notices import (
+    Service,
     ServiceStartedEvent,
     ServiceStoppedEvent,
     SystemdNotices,
@@ -29,7 +30,7 @@ class NoticesCharm(CharmBase):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-        self._systemd_notices = SystemdNotices(self, ["test"])
+        self._systemd_notices = SystemdNotices(self, Service("test"))
         event_handler_bindings = {
             self.on.install: self._on_install,
             self.on.start: self._on_start,
