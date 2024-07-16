@@ -221,8 +221,7 @@ class SystemdNotices:
         config_file = self._charm.framework.charm_dir / "watch.yaml"
         if config_file.exists():
             _logger.debug("Overwriting existing watch file %s", config_file.name)
-        with config_file.open("wt") as fout:
-            yaml.dump(config, fout)
+        config_file.write_text(yaml.dump(config))
         config_file.chmod(0o600)
 
     def _start(self) -> None:
