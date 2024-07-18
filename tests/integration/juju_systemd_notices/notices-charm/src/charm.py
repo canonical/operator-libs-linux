@@ -12,7 +12,6 @@ import logging
 import charms.operator_libs_linux.v1.systemd as systemd
 import daemon
 from charms.operator_libs_linux.v0.juju_systemd_notices import (
-    Service,
     ServiceStartedEvent,
     ServiceStoppedEvent,
     SystemdNotices,
@@ -30,7 +29,7 @@ class NoticesCharm(CharmBase):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-        self._systemd_notices = SystemdNotices(self, Service("test"))
+        self._systemd_notices = SystemdNotices(self, ["test"])
         event_handler_bindings = {
             self.on.install: self._on_install,
             self.on.start: self._on_start,
