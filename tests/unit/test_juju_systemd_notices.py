@@ -29,14 +29,6 @@ from dbus_fast.errors import DBusError
 from ops.charm import CharmBase, InstallEvent, StopEvent
 from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
-from pyfakefs.fake_filesystem_unittest import Patcher
-
-mock_watch_config = """
----
-services:
-  foobar: foobar
-  snap.test.service: service
-"""
 
 
 class MockNoticesCharm(CharmBase):
@@ -94,20 +86,17 @@ class TestJujuSystemdNoticesCharmAPI(unittest.TestCase):
         mock_exists.return_value = True
         self.harness.charm.notices._generate_hooks()
 
+    @patch("pathlib.Path.write_text")
     @patch("pathlib.Path.exists")
-    def test_generate_service(self, mock_exists) -> None:
+    def test_generate_service(self, mock_exists, _) -> None:
         """Test that watch configuration file is generated correctly."""
-        with Patcher() as patcher:
-            name = self.harness.charm.unit.name.replace("/", "-")
-            patcher.fs.create_file(f"/etc/systemd/system/juju-{name}-systemd-notices.service")
+        # Scenario 1 - Generate success but no pre-existing watch configuration.
+        mock_exists.return_value = False
+        self.harness.charm.notices._generate_service()
 
-            # Scenario 1 - Generate success but no pre-existing watch configuration.
-            mock_exists.return_value = False
-            self.harness.charm.notices._generate_service()
-
-            # Scenario 2 - Generate success but pre-existing watch configuration.
-            mock_exists.return_value = True
-            self.harness.charm.notices._generate_service()
+        # Scenario 2 - Generate success but pre-existing watch configuration.
+        mock_exists.return_value = True
+        self.harness.charm.notices._generate_service()
 
     @patch("subprocess.check_output")
     def test_start(self, mock_subp) -> None:
