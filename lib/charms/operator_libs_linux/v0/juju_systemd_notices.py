@@ -316,7 +316,6 @@ def _systemd_unit_changed(msg: Message) -> bool:
     if "ActiveState" not in properties:
         return False
 
-    global _service_states
     if service not in _service_states:
         _logger.debug("Dropping event for unwatched service: %s", service)
         return False
@@ -346,7 +345,6 @@ async def _send_juju_notification(service: str, state: str) -> None:
     if service.endswith(".service"):
         service = service[0:-len(".service")]  # fmt: skip
 
-    global _observed_services
     alias = _observed_services[service]
     event_name = "started" if state == "active" else "stopped"
     hook = f"service-{alias}-{event_name}"
@@ -405,7 +403,6 @@ async def _async_load_services() -> None:
 
     # Loop through all the services and be sure that a new watcher is
     # started for new ones.
-    global _observed_services
     _logger.info("Services to observe are %s", _observed_services)
     for service in _observed_services:
         # The .service suffix is necessary and will cause lookup failures of the
@@ -491,7 +488,6 @@ def _main():
     global _juju_unit
     _juju_unit = args.unit
 
-    global _observed_services
     for s in args.services:
         service, alias = s.split("=")
         _observed_services[service] = alias
