@@ -42,7 +42,7 @@ class ApplicationCharm(CharmBase):
         super().__init__(*args, **kwargs)
 
         # Register services with charm. This adds the events to observe.
-        self._systemd_notices = SystemdNotices(self, Service("snap.slurm.slurmd", alias="slurmd"))
+        self._systemd_notices = SystemdNotices(self, [Service("snap.slurm.slurmd", alias="slurmd")])
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.service_slurmd_started, self._on_slurmd_started)
