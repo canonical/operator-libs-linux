@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2023 Canonical Ltd.
+# Copyright 2023-2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 """Minimal charm for testing the juju_systemd_notices charm library.

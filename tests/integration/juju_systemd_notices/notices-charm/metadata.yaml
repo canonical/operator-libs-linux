@@ -1,8 +1,0 @@
-# Copyright 2023 Canonical Ltd.
-# See LICENSE file for licensing details.
-
-name: juju-systemd-notices
-description: |
-  Test charm used for the juju_systemd_notices charm library integration tests.
-summary: |
-  A charm with a minimal daemon for testing the juju-systemd-notices charm library.
