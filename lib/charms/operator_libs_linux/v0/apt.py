@@ -122,7 +122,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 13
+LIBPATCH = 14
 
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
@@ -837,7 +837,7 @@ def remove_package(
 
 def update() -> None:
     """Update the apt cache via `apt-get update`."""
-    subprocess.run(["apt-get", "update"], capture_output=True, check=True)
+    subprocess.run(["apt-get", "update", "--error-on=any"], capture_output=True, check=True)
 
 
 def import_key(key: str) -> str:
