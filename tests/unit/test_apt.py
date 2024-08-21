@@ -511,7 +511,9 @@ class TestAptBareMethods(unittest.TestCase):
             apt_cache_aisleriot,
         ]
         pkg = apt.add_package("aisleriot")
-        mock_subprocess.assert_any_call(["apt-get", "update"], capture_output=True, check=True)
+        mock_subprocess.assert_any_call(
+            ["apt-get", "update", "--error-on=any"], capture_output=True, check=True
+        )
         self.assertEqual(pkg.name, "aisleriot")
         self.assertEqual(pkg.present, True)
 
@@ -527,7 +529,9 @@ class TestAptBareMethods(unittest.TestCase):
         ] * 2  # Double up for the retry after update
         with self.assertRaises(apt.PackageError) as ctx:
             apt.add_package("nothere")
-        mock_subprocess.assert_any_call(["apt-get", "update"], capture_output=True, check=True)
+        mock_subprocess.assert_any_call(
+            ["apt-get", "update", "--error-on=any"], capture_output=True, check=True
+        )
         self.assertEqual("<charms.operator_libs_linux.v0.apt.PackageError>", ctx.exception.name)
         self.assertIn("Failed to install packages: nothere", ctx.exception.message)
 
