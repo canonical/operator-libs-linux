@@ -684,6 +684,19 @@ class TestSnapBareMethods(unittest.TestCase):
             universal_newlines=True,
         )
 
+    @patch(
+        "charms.operator_libs_linux.v2.snap.subprocess.check_output",
+        side_effect=lambda *args, **kwargs: "",  # pyright: ignore[reportUnknownLambdaType]
+    )
+    def test_snap_unset(self, mock_subprocess: MagicMock):
+        foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
+        key: str = "test_key"
+        self.assertEqual(foo.unset(key), "")
+        mock_subprocess.assert_called_with(
+            ["snap", "unset", "foo", key],
+            universal_newlines=True,
+        )
+
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_call")
     def test_system_set(self, mock_subprocess):
         snap._system_set("refresh.hold", "foobar")
