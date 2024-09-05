@@ -350,6 +350,15 @@ class TestSnapCache(unittest.TestCase):
             capture_output=True,
         )
 
+    @patch(
+        "charms.operator_libs_linux.v2.snap.subprocess.run",
+        side_effect=CalledProcessError(returncode=1, cmd=""),
+    )
+    def test_snap_daemon_commands_raise_snap_error(self, mock_subprocess: MagicMock):
+        foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
+        with self.assertRaises(snap.SnapError):
+            foo.start(["bad", "arguments"], enable=True)
+
     @patch("charms.operator_libs_linux.v2.snap.subprocess.run")
     def test_snap_connect(self, mock_subprocess):
         mock_subprocess.return_value = MagicMock()
