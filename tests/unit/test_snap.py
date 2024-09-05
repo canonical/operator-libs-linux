@@ -5,6 +5,7 @@ import datetime
 import json
 import unittest
 from subprocess import CalledProcessError
+from typing import Iterable, Optional
 from unittest.mock import MagicMock, mock_open, patch
 
 import fake_snapd as fake_snapd
@@ -659,6 +660,47 @@ class TestSnapBareMethods(unittest.TestCase):
             snap.add("nothere")
         self.assertEqual("<charms.operator_libs_linux.v2.snap.SnapError>", ctx.exception.name)
         self.assertIn("Failed to install or refresh snap(s): nothere", ctx.exception.message)
+
+    def test_snap_get(self):
+        def fake_snap(command: str, optargs: Optional[Iterable[str]] = None) -> str:
+            assert command == "get"
+            assert optargs is not None
+            optargs = list(optargs)
+            if optargs == ["-d"]:
+                return json.dumps(keys_and_values)
+            if len(optargs) == 1:  # [<some-key>]
+                key = optargs[0]
+                if key in keys_and_values:
+                    return str(keys_and_values[key])
+                raise snap.SnapError()
+            if len(optargs) == 2 and optargs[0] == "-d":  # ["-d", <some-key>]
+                key = optargs[1]
+                if key in keys_and_values:
+                    return json.dumps({key: keys_and_values[key]})
+                return json.dumps({})
+            raise snap.SnapError("Bad arguments:", command, optargs)
+
+        foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
+        foo._snap = MagicMock(side_effect=fake_snap)
+        keys_and_values = {
+            "key_w_string_value": "string",
+            "key_w_float_value": 4.2,
+            "key_w_int_value": 13,
+            "key_w_json_value": {"key1": "string", "key2": 4.2, "key3": 13},
+        }
+        for key, value in keys_and_values.items():
+            self.assertEqual(foo.get(key, typed=True), value)
+            self.assertEqual(foo.get(key, typed=False), str(value))
+            self.assertEqual(foo.get(key), str(value))
+        self.assertEqual(foo.get(None, typed=True), keys_and_values)
+        self.assertEqual(foo.get("", typed=True), keys_and_values)
+        self.assertIs(foo.get("missing_key", typed=True), None)
+        with self.assertRaises(snap.SnapError):
+            foo.get("missing_key", typed=False)
+        with self.assertRaises(TypeError):
+            foo.get(None, typed=False)  # pyright: ignore[reportCallIssue, reportArgumentType]
+        with self.assertRaises(TypeError):
+            foo.get(None)  # pyright: ignore[reportArgumentType]
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
     def test_snap_set_typed(self, mock_subprocess):
