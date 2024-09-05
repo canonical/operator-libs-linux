@@ -366,6 +366,22 @@ class TestSnapCache(unittest.TestCase):
             capture_output=True,
         )
 
+        foo.restart()
+        mock_subprocess.assert_called_with(
+            ["snap", "restart", "foo"],
+            universal_newlines=True,
+            check=True,
+            capture_output=True,
+        )
+
+        foo.restart(["bar", "baz"], reload=True)
+        mock_subprocess.assert_called_with(
+            ["snap", "restart", "--reload", "foo.bar", "foo.baz"],
+            universal_newlines=True,
+            check=True,
+            capture_output=True,
+        )
+
     @patch(
         "charms.operator_libs_linux.v2.snap.subprocess.run",
         side_effect=CalledProcessError(returncode=1, cmd=""),
