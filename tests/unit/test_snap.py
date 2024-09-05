@@ -292,6 +292,42 @@ class TestSnapCache(unittest.TestCase):
         )
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
+    def test_refresh_revision_devmode_cohort_args(self, mock_subprocess: MagicMock):
+        foo = snap.Snap(
+            name="foo",
+            state=snap.SnapState.Present,
+            channel="stable",
+            revision="1",
+            confinement="devmode",
+            apps=None,
+            cohort="A",
+        )
+        foo.ensure(snap.SnapState.Latest, revision="2", devmode=True)
+        mock_subprocess.assert_called_with(
+            [
+                "snap",
+                "refresh",
+                "foo",
+                '--revision="2"',
+                "--devmode",
+                '--cohort="A"',
+            ],
+            universal_newlines=True,
+        )
+
+        foo._refresh(leave_cohort=True)
+        mock_subprocess.assert_called_with(
+            [
+                "snap",
+                "refresh",
+                "foo",
+                "--leave-cohort",
+            ],
+            universal_newlines=True,
+        )
+        self.assertEqual(foo._cohort, "")
+
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
     def test_no_subprocess_when_not_installed(self, mock_subprocess: MagicMock):
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
         not_installed_states = (snap.SnapState.Absent, snap.SnapState.Available)
