@@ -305,6 +305,7 @@ class TestSnapCache(unittest.TestCase):
         )
         with self.assertRaises(snap.SnapAPIError) as ctx:
             s._load_installed_snaps()
+        repr(ctx.exception)  # ensure custom __repr__ doesn't error
         self.assertEqual("<charms.operator_libs_linux.v2.snap.SnapAPIError>", ctx.exception.name)
         self.assertIn("snapd is not running", ctx.exception.message)
 
@@ -312,6 +313,12 @@ class TestSnapCache(unittest.TestCase):
         foo1 = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
         foo2 = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
         self.assertEqual(foo1, foo2)
+
+    def test_snap_magic_methods(self):
+        foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
+        self.assertEqual(hash(foo), hash((foo._name, foo._revision)))
+        str(foo)  # ensure custom __str__ doesn't error
+        repr(foo)  # ensure custom __repr__ doesn't error
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
     def test_can_run_snap_commands(self, mock_subprocess: MagicMock):
@@ -747,6 +754,7 @@ class TestSnapBareMethods(unittest.TestCase):
         mock_subprocess.side_effect = raise_error
         with self.assertRaises(snap.SnapError) as ctx:
             snap.add("nothere")
+        repr(ctx.exception)  # ensure custom __repr__ doesn't error
         self.assertEqual("<charms.operator_libs_linux.v2.snap.SnapError>", ctx.exception.name)
         self.assertIn("Failed to install or refresh snap(s): nothere", ctx.exception.message)
 
