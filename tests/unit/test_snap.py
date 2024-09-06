@@ -197,6 +197,11 @@ class SnapCacheTester(snap.SnapCache):
 
 
 class TestSnapCache(unittest.TestCase):
+    def test_error_on_not_snapd_installed(self):
+        with patch.object(snap.SnapCache, "snapd_installed", new=False):
+            with self.assertRaises(snap.SnapError):
+                snap.SnapCache()
+
     @patch("builtins.open", new_callable=mock_open, read_data="foo\nbar\n  \n")
     @patch("os.path.isfile")
     def test_can_load_snap_cache(self, mock_exists, m):
