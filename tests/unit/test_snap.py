@@ -1,6 +1,8 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+# pyright: reportPrivateUsage=false
+
 import datetime
 import json
 import unittest
