@@ -202,6 +202,39 @@ class TestSnapCache(unittest.TestCase):
             with self.assertRaises(snap.SnapError):
                 snap.SnapCache()
 
+    @patch(
+        "charms.operator_libs_linux.v2.snap.subprocess.check_output",
+        return_value=0,
+    )
+    @patch.object(snap, "SnapCache", new=SnapCacheTester)
+    def test_new_snap_cache_on_first_decorated(self, _mock_check_output: MagicMock):
+        """Test that the snap cache is created when a decorated function is called.
+
+        add, remove and ensure are decorated with cache_init, which initialises a new cache
+        when these functions are called if there isn't one yet
+        """
+
+        class FakeCache:
+            cache = None
+
+            def __getitem__(self, name: str) -> snap.Snap:
+                return self.cache[name]  # pyright: ignore
+
+        with patch.object(snap, "_Cache", new=FakeCache()):
+            self.assertIsNone(snap._Cache.cache)
+            snap.add(snap_names="curl")
+            self.assertIsInstance(snap._Cache.cache, snap.SnapCache)
+
+        with patch.object(snap, "_Cache", new=FakeCache()):
+            self.assertIsNone(snap._Cache.cache)
+            snap.remove(snap_names="curl")
+            self.assertIsInstance(snap._Cache.cache, snap.SnapCache)
+
+        with patch.object(snap, "_Cache", new=FakeCache()):
+            self.assertIsNone(snap._Cache.cache)
+            snap.ensure(snap_names="curl", state="latest")
+            self.assertIsInstance(snap._Cache.cache, snap.SnapCache)
+
     @patch("builtins.open", new_callable=mock_open, read_data="foo\nbar\n  \n")
     @patch("os.path.isfile")
     def test_can_load_snap_cache(self, mock_exists, m):
