@@ -1064,3 +1064,11 @@ class TestSnapBareMethods(unittest.TestCase):
             universal_newlines=True,
         )
         mock_subprocess.reset_mock()
+
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
+    def test_held(self, mock_subprocess: MagicMock):
+        foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
+        mock_subprocess.return_value = {}
+        self.assertEqual(foo.held, False)
+        mock_subprocess.return_value = {"hold:": "key isn't checked"}
+        self.assertEqual(foo.held, True)
