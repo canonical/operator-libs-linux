@@ -348,7 +348,7 @@ class TestSnapCache(unittest.TestCase):
         foo.state = snap.SnapState.Absent
         mock_subprocess.assert_called_with(["snap", "remove", "foo"], universal_newlines=True)
 
-        foo.ensure(snap.SnapState.Latest, revision=123)
+        foo.ensure(snap.SnapState.Latest, revision="123")
         mock_subprocess.assert_called_with(
             ["snap", "install", "foo", "--classic", '--revision="123"'], universal_newlines=True
         )
