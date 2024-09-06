@@ -246,6 +246,12 @@ class TestSnapCache(unittest.TestCase):
         self.assertIn("foo", s._snap_map)
         self.assertEqual(len(s._snap_map), 2)
 
+    @patch("os.path.isfile", return_value=False)
+    def test_no_load_if_catalog_not_populated(self, mock_isfile: MagicMock):
+        s = SnapCacheTester()
+        s._load_available_snaps()
+        self.assertFalse(s._snap_map)  # pyright: ignore[reportUnknownMemberType]
+
     @patch("builtins.open", new_callable=mock_open, read_data="curl\n")
     @patch("os.path.isfile")
     def test_can_lazy_load_snap_info(self, mock_exists, m):
