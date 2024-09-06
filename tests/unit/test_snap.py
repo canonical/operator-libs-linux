@@ -998,6 +998,7 @@ class TestSnapBareMethods(unittest.TestCase):
         mock_subprocess.return_value = "curl XXX installed"
         for kwargs, cmd_args in [
             ({"classic": True}, ["--classic"]),
+            ({"devmode": True}, ["--devmode"]),
             ({"dangerous": True}, ["--dangerous"]),
             ({"classic": True, "dangerous": True}, ["--classic", "--dangerous"]),
         ]:
