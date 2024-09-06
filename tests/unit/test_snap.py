@@ -713,7 +713,7 @@ class TestSnapBareMethods(unittest.TestCase):
         snap._Cache.cache._load_available_snaps()
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_can_run_bare_changes(self, mock_subprocess):
+    def test_can_run_bare_changes(self, mock_subprocess: MagicMock):
         mock_subprocess.return_value = 0
         foo = snap.add("curl", classic=True, channel="latest")
         mock_subprocess.assert_called_with(
@@ -721,10 +721,19 @@ class TestSnapBareMethods(unittest.TestCase):
             universal_newlines=True,
         )
         self.assertTrue(foo.present)
+        snap.add("curl", state="latest")  # cover string conversion path
+        mock_subprocess.assert_called_with(
+            ["snap", "refresh", "curl", '--channel="latest"'],
+            universal_newlines=True,
+        )
+        with self.assertRaises(TypeError):  # cover error path
+            snap.add(snap_names=[])
 
         bar = snap.remove("curl")
         mock_subprocess.assert_called_with(["snap", "remove", "curl"], universal_newlines=True)
         self.assertFalse(bar.present)
+        with self.assertRaises(TypeError):  # cover error path
+            snap.remove(snap_names=[])
 
         baz = snap.add("curl", classic=True, revision=123)
         mock_subprocess.assert_called_with(
