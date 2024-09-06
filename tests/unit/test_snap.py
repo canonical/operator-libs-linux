@@ -325,6 +325,8 @@ class TestSnapCache(unittest.TestCase):
         mock_subprocess.return_value = 0
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
         self.assertEqual(foo.present, True)
+        foo.state = snap.SnapState.Present
+        mock_subprocess.assert_not_called()
 
         foo.ensure(snap.SnapState.Absent)
         mock_subprocess.assert_called_with(["snap", "remove", "foo"], universal_newlines=True)
