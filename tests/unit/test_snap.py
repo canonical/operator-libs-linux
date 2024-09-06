@@ -810,7 +810,7 @@ class TestSnapBareMethods(unittest.TestCase):
         self.assertTrue(baz.present)
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_raises_snap_not_found_error(self, mock_subprocess):
+    def test_raises_snap_error_on_failed_subprocess(self, mock_subprocess: MagicMock):
         def raise_error(cmd, **kwargs):
             # If we can't find the snap, we should raise a CalledProcessError.
             #
@@ -820,6 +820,22 @@ class TestSnapBareMethods(unittest.TestCase):
         mock_subprocess.side_effect = raise_error
         with self.assertRaises(snap.SnapError) as ctx:
             snap.add("nothere")
+        repr(ctx.exception)  # ensure custom __repr__ doesn't error
+        self.assertEqual("<charms.operator_libs_linux.v2.snap.SnapError>", ctx.exception.name)
+        self.assertIn("Failed to install or refresh snap(s): nothere", ctx.exception.message)
+
+    def test_raises_snap_error_on_snap_not_found(self):
+        """A cache failure will also ultimately result in a SnapError."""
+
+        class NotFoundCache:
+            cache = None
+
+            def __getitem__(self, name: str) -> snap.Snap:
+                raise snap.SnapNotFoundError()
+
+        with patch.object(snap, "_Cache", new=NotFoundCache()):
+            with self.assertRaises(snap.SnapError) as ctx:
+                snap.add("nothere")
         repr(ctx.exception)  # ensure custom __repr__ doesn't error
         self.assertEqual("<charms.operator_libs_linux.v2.snap.SnapError>", ctx.exception.name)
         self.assertIn("Failed to install or refresh snap(s): nothere", ctx.exception.message)
