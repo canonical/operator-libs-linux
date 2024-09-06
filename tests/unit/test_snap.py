@@ -639,6 +639,61 @@ class TestSocketClient(unittest.TestCase):
         finally:
             shutdown()
 
+    def test_internals(self):
+        """Test some internal paths that aren't covered by existing public methods."""
+        # test NotImplementedError raised when missing socket.AF_UNIX
+        with patch("builtins.hasattr", return_value=False):
+            # test timeout not provided
+            s = snap._UnixSocketConnection("localhost")
+            with self.assertRaises(NotImplementedError):
+                s.connect()  # hasattr(socket, "AF_UNIX") == False
+
+        shutdown, socket_path = fake_snapd.start_server()
+        try:
+            # test path when _UnixSocketConnection.timeout somehow becomes None
+            s = snap._UnixSocketConnection("localhost", socket_path=socket_path, timeout=1)
+            s.timeout = None
+            with patch.object(snap.socket.socket, "connect"):
+                s.connect()
+            self.assertEqual(s.sock.gettimeout(), None)
+
+            client = snap.SnapClient(
+                socket_path,
+                # cover path in __init__ when opener is provided
+                opener=snap.SnapClient._get_default_opener(  # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]
+                    socket_path
+                ),
+            )
+            # test calling SnapClient._request with a body argument
+            with patch.object(client, "_request_raw", side_effect=client._request_raw) as mock_raw:
+                body = {"some": "body"}
+                with self.assertRaises(snap.SnapAPIError):
+                    client._request(  # pyright: ignore[reportUnknownMemberType]
+                        "GET", "snaps", body=body
+                    )
+                mock_raw.assert_called_with(
+                    "GET",  # method
+                    "snaps",  # path
+                    None,  # query
+                    {"Accept": "application/json", "Content-Type": "application/json"},  # headers
+                    json.dumps(body).encode("utf-8"),  # body
+                )
+            # test calling _request_raw with no headers
+            with patch.object(
+                snap.urllib.request, "Request", side_effect=snap.urllib.request.Request
+            ) as mock_request:
+                with self.assertRaises(snap.SnapAPIError):
+                    client._request_raw("GET", "snaps")  # pyright: ignore[reportUnknownMemberType]
+            self.assertEqual(mock_request.call_args.kwargs["headers"], {})
+            # test error on invalid response
+            with patch.object(snap.json, "loads", return_value={}):
+                with self.assertRaises(snap.SnapAPIError) as ctx:
+                    client._request_raw("GET", "snaps")  # pyright: ignore[reportUnknownMemberType]
+            self.assertEqual(ctx.exception.body, {})
+            self.assertEqual(ctx.exception.message, "KeyError - 'result'")
+        finally:
+            shutdown()
+
 
 class TestSnapBareMethods(unittest.TestCase):
     @patch("builtins.open", new_callable=mock_open, read_data="curl\n")
