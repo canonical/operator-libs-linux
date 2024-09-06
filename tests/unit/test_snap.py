@@ -197,7 +197,7 @@ class SnapCacheTester(snap.SnapCache):
 
 
 class TestSnapCache(unittest.TestCase):
-    @patch("builtins.open", new_callable=mock_open, read_data="foo\nbar\n")
+    @patch("builtins.open", new_callable=mock_open, read_data="foo\nbar\n  \n")
     @patch("os.path.isfile")
     def test_can_load_snap_cache(self, mock_exists, m):
         m.return_value.__iter__ = lambda self: self
