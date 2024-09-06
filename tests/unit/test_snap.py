@@ -1010,6 +1010,30 @@ class TestSnapBareMethods(unittest.TestCase):
             mock_subprocess.reset_mock()
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
+    def test_install_local_snap_api_error(self, mock_subprocess: MagicMock):
+        """install_local raises a SnapError if cache access raises a SnapAPIError."""
+
+        class APIErrorCache:
+            def __getitem__(self, key):
+                raise snap.SnapAPIError(body={}, code=123, status="status", message="message")
+
+        mock_subprocess.return_value = "curl XXX installed"
+        with patch.object(snap, "SnapCache", new=APIErrorCache):
+            with self.assertRaises(snap.SnapError) as ctx:
+                snap.install_local("./curl.snap")
+        self.assertEqual(ctx.exception.message, "Failed to find snap curl in Snap cache")
+
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
+    def test_install_local_called_process_error(self, mock_subprocess: MagicMock):
+        """install_local raises a SnapError if the subprocess raises a CalledProcessError."""
+        mock_subprocess.side_effect = CalledProcessError(
+            returncode=1, cmd="cmd", output="dummy-output"
+        )
+        with self.assertRaises(snap.SnapError) as ctx:
+            snap.install_local("./curl.snap")
+        self.assertEqual(ctx.exception.message, "Could not install snap ./curl.snap: dummy-output")
+
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
     def test_alias(self, mock_subprocess):
         mock_subprocess.return_value = ""
         foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
