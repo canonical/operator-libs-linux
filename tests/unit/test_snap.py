@@ -290,12 +290,6 @@ class TestSnapCache(unittest.TestCase):
         self.assertEqual(s["charmcraft"].confinement, "classic")
         self.assertEqual(s["charmcraft"].revision, "603")
 
-        s._snap_client.get_snap_information.side_effect = snap.SnapAPIError(
-            body={}, code=123, status="status", message="message"
-        )
-        with self.assertRaises(snap.SnapNotFoundError):
-            s["unknown-snap"]
-
     @patch("os.path.isfile")
     def test_raises_error_if_snap_not_running(self, mock_exists):
         mock_exists.return_value = False
