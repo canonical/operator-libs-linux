@@ -349,6 +349,7 @@ class TestSnapCache(unittest.TestCase):
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
     def test_refresh_revision_devmode_cohort_args(self, mock_subprocess: MagicMock):
+        """Test that ensure and _refresh succeed and call the correct snap commands."""
         foo = snap.Snap(
             name="foo",
             state=snap.SnapState.Present,
@@ -385,6 +386,7 @@ class TestSnapCache(unittest.TestCase):
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
     def test_no_subprocess_when_not_installed(self, mock_subprocess: MagicMock):
+        """Don't call out to snap when ensuring an uninstalled state when not installed."""
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
         not_installed_states = (snap.SnapState.Absent, snap.SnapState.Available)
         for _state in not_installed_states:
@@ -530,7 +532,8 @@ class TestSnapCache(unittest.TestCase):
         "charms.operator_libs_linux.v2.snap.subprocess.run",
         side_effect=CalledProcessError(returncode=1, cmd=""),
     )
-    def test_snap_snap_connect_raises_snap_error(self, mock_subprocess: MagicMock):
+    def test_snap_connect_raises_snap_error(self, mock_subprocess: MagicMock):
+        """Ensure that a SnapError is raised when Snap.connect is called with bad arguments."""
         foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
         with self.assertRaises(snap.SnapError):
             foo.connect(plug="bad", slot="argument")
