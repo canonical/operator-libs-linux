@@ -932,7 +932,7 @@ class TestSnapBareMethods(unittest.TestCase):
     def test_snap_unset(self, mock_subprocess: MagicMock):
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
         key: str = "test_key"
-        self.assertEqual(foo.unset(key), "")
+        self.assertEqual(foo.unset(key), "")  # pyright: ignore[reportUnknownMemberType]
         mock_subprocess.assert_called_with(
             ["snap", "unset", "foo", key],
             universal_newlines=True,
