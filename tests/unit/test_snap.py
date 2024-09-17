@@ -424,7 +424,7 @@ class TestSnapCache(unittest.TestCase):
             ["snap", "install", "foo", "--devmode", '--revision="123"'], universal_newlines=True
         )
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError):  # devmode and classic are mutually exclusive
             foo.ensure(snap.SnapState.Latest, devmode=True, classic=True)
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.run")
