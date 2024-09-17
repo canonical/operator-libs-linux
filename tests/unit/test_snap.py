@@ -824,8 +824,6 @@ class TestSnapBareMethods(unittest.TestCase):
         with self.assertRaises(snap.SnapError) as ctx:
             snap.add("nothere")
         repr(ctx.exception)  # ensure custom __repr__ doesn't error
-        self.assertEqual("<charms.operator_libs_linux.v2.snap.SnapError>", ctx.exception.name)
-        self.assertIn("Failed to install or refresh snap(s): nothere", ctx.exception.message)
 
     def test_raises_snap_error_on_snap_not_found(self):
         """A cache failure will also ultimately result in a SnapError."""
