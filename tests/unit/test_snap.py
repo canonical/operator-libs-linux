@@ -197,10 +197,10 @@ class SnapCacheTester(snap.SnapCache):
 
 
 class TestSnapCache(unittest.TestCase):
+    @patch.object(snap.SnapCache, "snapd_installed", new=False)
     def test_error_on_not_snapd_installed(self):
-        with patch.object(snap.SnapCache, "snapd_installed", new=False):
-            with self.assertRaises(snap.SnapError):
-                snap.SnapCache()
+        with self.assertRaises(snap.SnapError):
+            snap.SnapCache()
 
     @patch(
         "charms.operator_libs_linux.v2.snap.subprocess.check_output",
