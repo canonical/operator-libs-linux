@@ -214,23 +214,23 @@ class TestSnapCache(unittest.TestCase):
         when these functions are called if there isn't one yet
         """
 
-        class FakeCache:
+        class CachePlaceholder:
             cache = None
 
             def __getitem__(self, name: str) -> snap.Snap:
                 return self.cache[name]  # pyright: ignore
 
-        with patch.object(snap, "_Cache", new=FakeCache()):
+        with patch.object(snap, "_Cache", new=CachePlaceholder()):
             self.assertIsNone(snap._Cache.cache)
             snap.add(snap_names="curl")
             self.assertIsInstance(snap._Cache.cache, snap.SnapCache)
 
-        with patch.object(snap, "_Cache", new=FakeCache()):
+        with patch.object(snap, "_Cache", new=CachePlaceholder()):
             self.assertIsNone(snap._Cache.cache)
             snap.remove(snap_names="curl")
             self.assertIsInstance(snap._Cache.cache, snap.SnapCache)
 
-        with patch.object(snap, "_Cache", new=FakeCache()):
+        with patch.object(snap, "_Cache", new=CachePlaceholder()):
             self.assertIsNone(snap._Cache.cache)
             snap.ensure(snap_names="curl", state="latest")
             self.assertIsInstance(snap._Cache.cache, snap.SnapCache)
