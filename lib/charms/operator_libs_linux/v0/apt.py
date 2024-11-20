@@ -1391,8 +1391,9 @@ class RepositoryMapping(Mapping):
         if current_paragraph:
             yield current_paragraph
 
-    @staticmethod
+    @classmethod
     def _parse_deb822_paragraph(
+        cls,
         lines: List[Tuple[int, str]],
         filename: str = "",
     ) -> List[DebianRepository]:
@@ -1405,20 +1406,7 @@ class RepositoryMapping(Mapping):
         Raises:
           InvalidSourceError if the source type is unknown or contains malformed entries
         """
-        parts: Dict[str, List[str]] = {}
-        line_numbers: Dict[str, int] = {}
-        current = None
-        for n, line in lines:
-            if line.startswith(" "):  # continuation of previous key's value
-                assert current is not None
-                parts[current].append(line)
-                continue
-            assert not line.startswith("#")  # comments should be stripped out
-            raw_key, _, raw_value = line.partition(":")
-            current = raw_key.strip()
-            parts[current] = [raw_value.lstrip()]
-            line_numbers[current] = n
-        options = {k: "\n".join(v) for k, v in parts.items()}
+        options, line_numbers = cls._get_deb822_options(lines)
 
         enabled_field = options.pop("Enabled", "yes")
         if enabled_field == "yes":
@@ -1489,6 +1477,26 @@ class RepositoryMapping(Mapping):
             )
             for repotype, uri, suite in itertools.product(repotypes, uris, suites)
         ]
+
+    @staticmethod
+    def _get_deb822_options(
+        lines: Iterable[Tuple[int, str]]
+    ) -> Tuple[Dict[str, str], Dict[str, int]]:
+        parts: Dict[str, List[str]] = {}
+        line_numbers: Dict[str, int] = {}
+        current = None
+        for n, line in lines:
+            assert "#" not in line  # comments should be stripped out
+            if line.startswith(" "):  # continuation of previous key's value
+                assert current is not None
+                parts[current].append(line.rstrip())  # preserve indent
+                continue
+            raw_key, _, raw_value = line.partition(":")
+            current = raw_key.strip()
+            parts[current] = [raw_value.strip()]
+            line_numbers[current] = n
+        options = {k: "\n".join(v) for k, v in parts.items()}
+        return options, line_numbers
 
     def add(self, repo: DebianRepository, default_filename: Optional[bool] = False) -> None:
         """Add a new repository to the system.
