@@ -1367,11 +1367,9 @@ class RepositoryMapping(Mapping):
         """Parse lines from a deb822 file into a list of repos and a list of errors."""
         repositories: List[DebianRepository] = []
         errors: List[InvalidSourceError] = []
-        for line_number, paragraph in cls._iter_deb822_paragraphs(lines):
+        for paragraph in cls._iter_deb822_paragraphs(lines):
             try:
-                repos = cls._parse_deb822_paragraph(
-                    paragraph, filename=filename, line_number=line_number
-                )
+                repos = cls._parse_deb822_paragraph(paragraph, filename=filename)
             except InvalidSourceError as e:
                 errors.append(e)
             else:
@@ -1379,46 +1377,38 @@ class RepositoryMapping(Mapping):
         return repositories, errors
 
     @staticmethod
-    def _iter_deb822_paragraphs(lines: Iterable[str]) -> Iterator[Tuple[int, List[str]]]:
-        current_paragraph: Optional[Tuple[int, List[str]]] = None
+    def _iter_deb822_paragraphs(lines: Iterable[str]) -> Iterator[List[Tuple[int, str]]]:
+        current_paragraph: List[Tuple[int, str]] = []
         for n, line in enumerate(lines):  # 0 indexed line numbers, following `load`
             if line.startswith("#"):
                 continue
             if not line:  # blank lines separate paragraphs
-                if current_paragraph is not None:
+                if current_paragraph:
                     yield current_paragraph
-                    current_paragraph = None
+                    current_paragraph = []
                 continue
-            if current_paragraph is None:
-                current_paragraph = (n, [])
-            _line_number, paragraph_lines = current_paragraph
-            paragraph_lines.append(line)
-        if current_paragraph is not None:
+            current_paragraph.append((n, line))
+        if current_paragraph:
             yield current_paragraph
 
     @staticmethod
     def _parse_deb822_paragraph(
-        lines: List[str],
+        lines: List[Tuple[int, str]],
         filename: str = "",
-        line_number: Optional[int] = None,
     ) -> List[DebianRepository]:
-        """Parse a list of lines forming a deb822 style repository definition.
+        """Parse a list of numbered lines forming a deb822 style repository definition.
 
         Args:
-          lines: a list of lines forming a deb822 paragraph
+          lines: a list of numbered lines forming a deb822 paragraph
           filename: the name of the file being read (for DebianRepository and errors)
-          line_number: the line number the paragraph starts on (for errors)
 
         Raises:
           InvalidSourceError if the source type is unknown or contains malformed entries
         """
-        line_number_msg = (
-            str(line_number) if line_number is not None else "(no line number specified)"
-        )
-
         parts: Dict[str, List[str]] = {}
+        line_numbers: Dict[str, int] = {}
         current = None
-        for line in lines:
+        for n, line in lines:
             if line.startswith(" "):  # continuation of previous key's value
                 assert current is not None
                 parts[current].append(line)
@@ -1427,6 +1417,7 @@ class RepositoryMapping(Mapping):
             raw_key, _, raw_value = line.partition(":")
             current = raw_key.strip()
             parts[current] = [raw_value.lstrip()]
+            line_numbers[current] = n
         options = {k: "\n".join(v) for k, v in parts.items()}
 
         enabled_field = options.pop("Enabled", "yes")
@@ -1436,9 +1427,15 @@ class RepositoryMapping(Mapping):
             enabled = False
         else:
             raise InvalidSourceError(
-                "Malformed value for entry 'Enabled' for paragraph starting on line %s in %s!",
-                line_number_msg,
-                filename,
+                (
+                    "Bad value '{value}' for entry 'Enabled' (line {enabled_line})"
+                    " in file {file}. If 'Enabled' is present it must be one of"
+                    " yes or no (if absent it defaults to yes)."
+                ).format(
+                    value=enabled_field,
+                    enabled_line=line_numbers["Enabled"],
+                    file=filename,
+                )
             )
 
         gpg_key = options.pop("Signed-By", "")
@@ -1451,24 +1448,31 @@ class RepositoryMapping(Mapping):
             if "Components" in options:
                 raise InvalidSourceError(
                     (
-                        "For paragraph starting on line %s in %s,"
-                        " since 'Suites' specifies a path relative to"
-                        " 'URIs', 'Components' must be ommitted.",
-                    ),
-                    line_number_msg,
-                    filename,
+                        "Since 'Suites' (line {suites_line}) specifies"
+                        " a path relative to  'URIs' (line {uris_line}),"
+                        " 'Components' (line {components_line}) must be  ommitted"
+                        " (in file {file})."
+                    ).format(
+                        suites_line=line_numbers["Suites"],
+                        uris_line=line_numbers["URIs"],
+                        components_line=line_numbers["Components"],
+                        file=filename,
+                    )
                 )
             components = []
         else:
             if "Components" not in options:
                 raise InvalidSourceError(
                     (
-                        "For paragraph starting on line %s in %s,"
-                        " since 'Suites' does not specify a path relative to"
-                        " 'URIs', 'Components' must be present.",
-                    ),
-                    line_number_msg,
-                    filename,
+                        "Since 'Suites' (line {suites_line}) does not specify"
+                        " a path relative to  'URIs' (line {uris_line}),"
+                        " 'Components' must be  present in this paragraph"
+                        " (in file {file})."
+                    ).format(
+                        suites_line=line_numbers["Suites"],
+                        uris_line=line_numbers["URIs"],
+                        file=filename,
+                    )
                 )
             components = options.pop("Components").split()
 
