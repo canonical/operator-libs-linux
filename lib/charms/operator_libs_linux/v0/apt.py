@@ -102,6 +102,7 @@ if "deb-us.archive.ubuntu.com-xenial" not in repositories:
 
 import fileinput
 import glob
+import itertools
 import logging
 import os
 import re
@@ -109,7 +110,7 @@ import subprocess
 from collections.abc import Mapping
 from enum import Enum
 from subprocess import PIPE, CalledProcessError, check_output
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Dict, Iterable, Iterator, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -122,7 +123,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 14
+LIBPATCH = 15
 
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
@@ -1198,7 +1199,7 @@ class RepositoryMapping(Mapping):
     """
 
     def __init__(self):
-        self._repository_map = {}
+        self._repository_map: Dict[str, DebianRepository] = {}
         # Repositories that we're adding -- used to implement mode param
         self.default_file = "/etc/apt/sources.list"
 
@@ -1209,6 +1210,9 @@ class RepositoryMapping(Mapping):
         # read sources.list.d
         for file in glob.iglob("/etc/apt/sources.list.d/*.list"):
             self.load(file)
+
+        for file in glob.iglob("/etc/apt/sources.list.d/*.sources"):
+            self.load_deb822(file)
 
     def __contains__(self, key: str) -> bool:
         """Magic method for checking presence of repo in mapping."""
@@ -1231,13 +1235,13 @@ class RepositoryMapping(Mapping):
         self._repository_map[repository_uri] = repository
 
     def load(self, filename: str):
-        """Load a repository source file into the cache.
+        """Load a one-line-style format repository source file into the cache.
 
         Args:
           filename: the path to the repository file
         """
-        parsed = []
-        skipped = []
+        parsed: List[int] = []
+        skipped: List[int] = []
         with open(filename, "r") as f:
             for n, line in enumerate(f):
                 try:
@@ -1313,6 +1317,159 @@ class RepositoryMapping(Mapping):
             )
         else:
             raise InvalidSourceError("An invalid sources line was found in %s!", filename)
+
+    def load_deb822(self, filename: str) -> None:
+        """Load a deb822 format repository source file into the cache.
+
+        Args:
+          filename: the path to the repository file
+
+        In contrast to one-line-style, the deb822 format specifies a repository
+        using a multi-line paragraph. Paragraphs are separated by whitespace,
+        and each definition consists of lines that are either key: value pairs,
+        or continuations of the previous value.
+
+        Read more about the deb822 format here:
+            https://manpages.ubuntu.com/manpages/noble/en/man5/sources.list.5.html
+        For instance, ubuntu 24.04 (noble) lists its sources using deb822 style in:
+            /etc/apt/sources.list.d/ubuntu.sources
+
+        The semantics of `load_deb822` slightly different to `load`:
+            `load` calls `_parse`, with reads a commented out line as an entry that is not enabled
+            `load_deb822` strips out comments entirely when parsing a file into paragraphs, and
+                `_parse_deb822_paragraph` assumes that comments have been removed entirely,
+                instead reading the 'Enabled' key to determine if an entry is enabled
+        """
+        parsed: List[int] = []
+        skipped: List[InvalidSourceError] = []
+        with open(filename, "r") as f:
+            for line_number, paragraph in self._iter_paragraphs(f):
+                try:
+                    repos = self._parse_deb822_paragraph(
+                        paragraph, filename=filename, line_number=line_number
+                    )
+                except InvalidSourceError as e:
+                    skipped.append(e)
+                    continue
+                for repo in repos:
+                    repo_identifier = "{}-{}-{}".format(repo.repotype, repo.uri, repo.release)
+                    self._repository_map[repo_identifier] = repo
+                    parsed.append(line_number)
+
+        if skipped:
+            logger.debug(
+                "the following errors were encountered when reading deb822 format sources:\n%s",
+                "\n".join(str(error) for error in skipped),
+            )
+
+        if parsed:
+            logger.info("parsed %d apt package repositories", len(parsed))
+        else:
+            raise InvalidSourceError("all repository lines in '{}' were invalid!".format(filename))
+
+    @staticmethod
+    def _iter_paragraphs(lines: Iterable[str]) -> Iterator[Tuple[int, List[str]]]:
+        current: Optional[Tuple[int, List[str]]] = None
+        for n, line in enumerate(lines):  # 0 indexed line numbers, following `load`
+            if line.startswith("#"):
+                continue
+            if not line:
+                if current is not None:
+                    yield current
+                    current = None
+                continue
+            if current is None:
+                current = (n, [])
+            _line_number, paragraph_lines = current
+            paragraph_lines.append(line)
+        if current is not None:
+            yield current
+
+    @staticmethod
+    def _parse_deb822_paragraph(
+        lines: List[str],
+        filename: str,
+        line_number: int,
+    ) -> List[DebianRepository]:
+        """Parse a list of lines forming a deb822 style repository definition.
+
+        Args:
+          lines: a list of lines forming a deb822 paragraph
+          filename: the name of the file being read (for DebianRepository and errors)
+          line_number: the line number the paragraph starts on (for errors)
+
+        Raises:
+          InvalidSourceError if the source type is unknown or contains malformed entries
+        """
+        parts: Dict[str, List[str]] = {}
+        current = None
+        for line in lines:
+            if line.startswith(" "):  # continuation of previous key's value
+                assert current is not None
+                parts[current].append(line)
+                continue
+            assert not line.startswith("#")  # comments should be stripped out
+            raw_key, _, raw_value = line.partition(":")
+            current = raw_key.strip()
+            parts[current] = [raw_value.lstrip()]
+        options = {k: "\n".join(v) for k, v in parts.items()}
+
+        enabled_field = options.pop("Enabled", "yes")
+        if enabled_field == "yes":
+            enabled = True
+        elif enabled_field == "no":
+            enabled = False
+        else:
+            raise InvalidSourceError(
+                "Malformed value for entry 'Enabled' for paragraph starting on line %s in %s!",
+                line_number,
+                filename,
+            )
+
+        gpg_key = options.pop("Signed-By", "")
+        repotypes = options.pop("Types").split()
+        uris = options.pop("URIs").split()
+        suites = options.pop("Suites").split()
+
+        components: List[str]
+        if len(suites) == 1 and suites[0].endswith("/"):
+            if "Components" in options:
+                raise InvalidSourceError(
+                    (
+                        "For paragraph starting on line %s in %s,"
+                        " since 'Suites' specifies a path relative to"
+                        " 'URIs', 'Components' must be ommitted.",
+                    ),
+                    line_number,
+                    filename,
+                )
+            components = []
+        else:
+            if "Components" not in options:
+                raise InvalidSourceError(
+                    (
+                        "For paragraph starting on line %s in %s,"
+                        " since 'Suites' does not specify a path relative to"
+                        " 'URIs', 'Components' must be present.",
+                    ),
+                    line_number,
+                    filename,
+                )
+            components = options.pop("Components").split()
+
+        return [
+            DebianRepository(
+                enabled=enabled,
+                repotype=repotype,
+                uri=uri,
+                release=suite,
+                groups=components,
+                filename=filename,
+                gpg_key_filename=gpg_key,  # TODO: gpg_key can be a literal key, not just a filename
+                options=options,
+            )
+            for repotype, uri, suite in itertools.product(repotypes, uris, suites)
+        ]
 
     def add(self, repo: DebianRepository, default_filename: Optional[bool] = False) -> None:
         """Add a new repository to the system.
