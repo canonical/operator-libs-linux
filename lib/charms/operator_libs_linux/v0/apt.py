@@ -1337,59 +1337,70 @@ class RepositoryMapping(Mapping):
         The semantics of `load_deb822` slightly different to `load`:
             `load` calls `_parse`, with reads a commented out line as an entry that is not enabled
             `load_deb822` strips out comments entirely when parsing a file into paragraphs, and
-                `_parse_deb822_paragraph` assumes that comments have been removed entirely,
+                assumes that comments have been removed when parsing individual paragraphs/entry,
                 instead reading the 'Enabled' key to determine if an entry is enabled
         """
-        parsed: List[int] = []
-        skipped: List[InvalidSourceError] = []
         with open(filename, "r") as f:
-            for line_number, paragraph in self._iter_paragraphs(f):
-                try:
-                    repos = self._parse_deb822_paragraph(
-                        paragraph, filename=filename, line_number=line_number
-                    )
-                except InvalidSourceError as e:
-                    skipped.append(e)
-                    continue
-                for repo in repos:
-                    repo_identifier = "{}-{}-{}".format(repo.repotype, repo.uri, repo.release)
-                    self._repository_map[repo_identifier] = repo
-                    parsed.append(line_number)
+            repos, errors = self._parse_deb822_lines(f, filename=filename)
 
-        if skipped:
+        for repo in repos:
+            repo_identifier = "{}-{}-{}".format(repo.repotype, repo.uri, repo.release)
+            self._repository_map[repo_identifier] = repo
+
+        if errors:
             logger.debug(
                 "the following errors were encountered when reading deb822 format sources:\n%s",
-                "\n".join(str(error) for error in skipped),
+                "\n".join(str(e) for e in errors),
             )
 
-        if parsed:
-            logger.info("parsed %d apt package repositories", len(parsed))
+        if repos:
+            logger.info("parsed %d apt package repositories", len(repos))
         else:
             raise InvalidSourceError("all repository lines in '{}' were invalid!".format(filename))
 
+    @classmethod
+    def _parse_deb822_lines(
+        cls,
+        lines: Iterable[str],
+        filename: str = "",
+    ) -> Tuple[List[DebianRepository], List[InvalidSourceError]]:
+        """Parse lines from a deb822 file into a list of repos and a list of errors."""
+        repositories: List[DebianRepository] = []
+        errors: List[InvalidSourceError] = []
+        for line_number, paragraph in cls._iter_deb822_paragraphs(lines):
+            try:
+                repos = cls._parse_deb822_paragraph(
+                    paragraph, filename=filename, line_number=line_number
+                )
+            except InvalidSourceError as e:
+                errors.append(e)
+            else:
+                repositories.extend(repos)
+        return repositories, errors
+
     @staticmethod
-    def _iter_paragraphs(lines: Iterable[str]) -> Iterator[Tuple[int, List[str]]]:
-        current: Optional[Tuple[int, List[str]]] = None
+    def _iter_deb822_paragraphs(lines: Iterable[str]) -> Iterator[Tuple[int, List[str]]]:
+        current_paragraph: Optional[Tuple[int, List[str]]] = None
         for n, line in enumerate(lines):  # 0 indexed line numbers, following `load`
             if line.startswith("#"):
                 continue
-            if not line:
-                if current is not None:
-                    yield current
-                    current = None
+            if not line:  # blank lines separate paragraphs
+                if current_paragraph is not None:
+                    yield current_paragraph
+                    current_paragraph = None
                 continue
-            if current is None:
-                current = (n, [])
-            _line_number, paragraph_lines = current
+            if current_paragraph is None:
+                current_paragraph = (n, [])
+            _line_number, paragraph_lines = current_paragraph
             paragraph_lines.append(line)
-        if current is not None:
-            yield current
+        if current_paragraph is not None:
+            yield current_paragraph
 
     @staticmethod
     def _parse_deb822_paragraph(
         lines: List[str],
-        filename: str,
-        line_number: int,
+        filename: str = "",
+        line_number: Optional[int] = None,
     ) -> List[DebianRepository]:
         """Parse a list of lines forming a deb822 style repository definition.
 
@@ -1401,6 +1412,10 @@ class RepositoryMapping(Mapping):
         Raises:
           InvalidSourceError if the source type is unknown or contains malformed entries
         """
+        line_number_msg = (
+            str(line_number) if line_number is not None else "(no line number specified)"
+        )
+
         parts: Dict[str, List[str]] = {}
         current = None
         for line in lines:
@@ -1422,7 +1437,7 @@ class RepositoryMapping(Mapping):
         else:
             raise InvalidSourceError(
                 "Malformed value for entry 'Enabled' for paragraph starting on line %s in %s!",
-                line_number,
+                line_number_msg,
                 filename,
             )
 
@@ -1440,7 +1455,7 @@ class RepositoryMapping(Mapping):
                         " since 'Suites' specifies a path relative to"
                         " 'URIs', 'Components' must be ommitted.",
                     ),
-                    line_number,
+                    line_number_msg,
                     filename,
                 )
             components = []
@@ -1452,7 +1467,7 @@ class RepositoryMapping(Mapping):
                         " since 'Suites' does not specify a path relative to"
                         " 'URIs', 'Components' must be present.",
                     ),
-                    line_number,
+                    line_number_msg,
                     filename,
                 )
             components = options.pop("Components").split()
