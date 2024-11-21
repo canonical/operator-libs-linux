@@ -1,7 +1,10 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+# pyright: reportPrivateUsage=false
+
 import subprocess
+import typing
 import unittest
 from unittest.mock import ANY, mock_open, patch
 
@@ -574,21 +577,18 @@ class TestApt(unittest.TestCase):
         assert isinstance(error, apt.InvalidSourceError)
 
     def test_load_deb822_ubuntu_sources(self):
-        with (
-            patch(
-                "os.path.isfile", new=lambda f: False
-            ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
-            patch(
-                "glob.iglob", new=lambda s: []
-            ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
-        ):
-            repository_mapping = apt.RepositoryMapping()
+        def isnt_file(f: str) -> bool:
+            return False
+
+        def iglob_nothing(s: str) -> typing.Iterable[str]:
+            return []
+
+        with patch("os.path.isfile", new=isnt_file):
+            with patch("glob.iglob", new=iglob_nothing):
+                repository_mapping = apt.RepositoryMapping()
         assert not repository_mapping._repository_map
-        mopen = mock_open(read_data=ubuntu_sources_deb822)
-        mopen.return_value.__iter__ = lambda self: iter(
-            self.readline, ""
-        )  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
-        with patch("builtins.open", new=mopen):
+
+        with patch("builtins.open", new_callable=mock_open, read_data=ubuntu_sources_deb822):
             repository_mapping.load_deb822("")
         assert sorted(repository_mapping._repository_map.keys()) == [
             "deb-http://nz.archive.ubuntu.com/ubuntu/-noble",
@@ -598,25 +598,22 @@ class TestApt(unittest.TestCase):
         ]
 
     def test_load_deb822_w_comments(self):
-        with (
-            patch(
-                "os.path.isfile", new=lambda f: False
-            ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
-            patch(
-                "glob.iglob", new=lambda s: []
-            ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
-        ):
-            repository_mapping = apt.RepositoryMapping()
+        def isnt_file(f: str) -> bool:
+            return False
+
+        def iglob_nothing(s: str) -> typing.Iterable[str]:
+            return []
+
+        with patch("os.path.isfile", new=isnt_file):
+            with patch("glob.iglob", new=iglob_nothing):
+                repository_mapping = apt.RepositoryMapping()
         assert not repository_mapping._repository_map
-        mopen = mock_open(read_data=ubuntu_sources_deb822_with_comments)
-        mopen.return_value.__iter__ = lambda self: iter(
-            self.readline, ""
-        )  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
-        with (
-            patch("builtins.open", new=mopen),
-            patch.object(apt.logger, "debug") as debug,
+
+        with patch(
+            "builtins.open", new_callable=mock_open, read_data=ubuntu_sources_deb822_with_comments
         ):
-            repository_mapping.load_deb822("FILENAME")
+            with patch.object(apt.logger, "debug") as debug:
+                repository_mapping.load_deb822("FILENAME")
         assert sorted(repository_mapping._repository_map.keys()) == [
             "deb-http://nz.archive.ubuntu.com/ubuntu/-noble",
             "deb-http://nz.archive.ubuntu.com/ubuntu/-noble-backports",
@@ -633,41 +630,29 @@ class TestApt(unittest.TestCase):
 
         They should be equivalent with the sample data being used.
         """
-        mopen_list = mock_open(read_data=ubuntu_sources_one_line)
-        mopen_list.return_value.__iter__ = lambda self: iter(
-            self.readline, ""
-        )  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
-        with (
-            patch(
-                "os.path.isfile", new=lambda f: False
-            ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
-            patch(
-                "glob.iglob",
-                new=(
-                    lambda s: ["FILENAME"] if s.endswith(".list") else []
-                ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
-            ),
-            patch("builtins.open", new=mopen_list),
-        ):
-            repository_mapping_list = apt.RepositoryMapping()
 
-        mopen_sources = mock_open(read_data=ubuntu_sources_deb822)
-        mopen_sources.return_value.__iter__ = lambda self: iter(
-            self.readline, ""
-        )  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
-        with (
-            patch(
-                "os.path.isfile", new=lambda f: False
-            ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
-            patch(
-                "glob.iglob",
-                new=(
-                    lambda s: ["FILENAME"] if s.endswith(".sources") else []
-                ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
-            ),
-            patch("builtins.open", new=mopen_sources),
-        ):
-            repository_mapping_sources = apt.RepositoryMapping()
+        def isnt_file(f: str) -> bool:
+            return False
+
+        def iglob_list(s: str) -> typing.Iterable[str]:
+            if s.endswith(".list"):
+                return ["FILENAME"]
+            return []
+
+        def iglob_sources(s: str) -> typing.Iterable[str]:
+            if s.endswith(".sources"):
+                return ["FILENAME"]
+            return []
+
+        with patch("builtins.open", new_callable=mock_open, read_data=ubuntu_sources_one_line):
+            with patch("os.path.isfile", new=isnt_file):
+                with patch("glob.iglob", new=iglob_list):
+                    repository_mapping_list = apt.RepositoryMapping()
+
+        with patch("builtins.open", new_callable=mock_open, read_data=ubuntu_sources_deb822):
+            with patch("os.path.isfile", new=isnt_file):
+                with patch("glob.iglob", new=iglob_sources):
+                    repository_mapping_sources = apt.RepositoryMapping()
 
         list_keys = sorted(repository_mapping_list._repository_map.keys())
         sources_keys = sorted(repository_mapping_sources._repository_map.keys())
