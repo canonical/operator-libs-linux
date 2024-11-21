@@ -172,6 +172,41 @@ Task: ubuntu-desktop, ubuntukylin-desktop, ubuntu-budgie-desktop
 Description-md5: e7f99df3aa92cf870d335784e155ec33
 """
 
+ubuntu_sources_deb822 = """
+Types: deb
+URIs: http://nz.archive.ubuntu.com/ubuntu/
+Suites: noble noble-updates noble-backports
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: http://security.ubuntu.com/ubuntu
+Suites: noble-security
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+"""
+
+ubuntu_sources_deb822_with_comments = """
+Components: main restricted universe multiverse  # this lib doesn't care about order
+Types: deb  # this could include deb-src as well or instead
+URIs: http://nz.archive.ubuntu.com/ubuntu/
+    # there can be multiple space separated URIs
+    # sources are specified in priority order
+    # apt does some de-duplication of sources after parsing too
+#Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+# let's make this insecure! (jk, just testing parsing)
+Suites: noble noble-updates noble-backports
+
+Foo: Bar  # this is a separate (malformed) entry
+
+#Types: deb
+#URIs: http://security.ubuntu.com/ubuntu
+#Suites: noble-security
+#Components: main restricted universe multiverse
+#Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+## disable security updates while we're at it
+"""
+
 
 class TestApt(unittest.TestCase):
     @patch("charms.operator_libs_linux.v0.apt.check_output")
@@ -382,6 +417,41 @@ class TestApt(unittest.TestCase):
         self.assertEqual(
             ("2", "9.8-7ubuntu6"), apt.DebianPackage._get_epoch_from_version("2:9.8-7ubuntu6")
         )
+
+    def test_iter_deb822_paragraphs_ubuntu_sources(self):
+        lines = ubuntu_sources_deb822.strip().split("\n")
+        paras = list(apt.RepositoryMapping._iter_deb822_paragraphs(lines))
+        assert paras == [
+            [
+                (0, "Types: deb"),
+                (1, "URIs: http://nz.archive.ubuntu.com/ubuntu/"),
+                (2, "Suites: noble noble-updates noble-backports"),
+                (3, "Components: main restricted universe multiverse"),
+                (4, "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg"),
+            ],
+            [
+                (6, "Types: deb"),
+                (7, "URIs: http://security.ubuntu.com/ubuntu"),
+                (8, "Suites: noble-security"),
+                (9, "Components: main restricted universe multiverse"),
+                (10, "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg"),
+            ],
+        ]
+
+    def test_iter_deb822_paragraphs_ubuntu_sources_w_comments(self):
+        lines = ubuntu_sources_deb822_with_comments.strip().split("\n")
+        paras = list(apt.RepositoryMapping._iter_deb822_paragraphs(lines))
+        assert paras == [
+            [
+                (0, "Components: main restricted universe multiverse"),
+                (1, "Types: deb"),
+                (2, "URIs: http://nz.archive.ubuntu.com/ubuntu/"),
+                (8, "Suites: noble noble-updates noble-backports"),
+            ],
+            [
+                (10, "Foo: Bar"),
+            ],
+        ]
 
 
 class TestAptBareMethods(unittest.TestCase):
