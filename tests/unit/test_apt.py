@@ -207,6 +207,13 @@ Foo: Bar  # this is a separate (malformed) entry
 ## disable security updates while we're at it
 """
 
+ubuntu_sources_one_line = """
+deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://nz.archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse
+deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://nz.archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse
+deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://nz.archive.ubuntu.com/ubuntu/ noble-backports main restricted universe multiverse
+deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
+"""
+
 
 class TestApt(unittest.TestCase):
     @patch("charms.operator_libs_linux.v0.apt.check_output")
@@ -614,6 +621,50 @@ class TestApt(unittest.TestCase):
             1,  # number of errors
             "Missing key 'Types' for entry starting on line 11 in FILENAME."
         )
+
+    def test_init_with_deb822(self):
+        """Mock file opening to initialise a RepositoryMapping from deb822 and one-line-style.
+
+        They should be equivalent with the sample data being used.
+        """
+        mopen_list = mock_open(read_data=ubuntu_sources_one_line)
+        mopen_list.return_value.__iter__ = lambda self: iter(self.readline, '')  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
+        with (
+            patch('os.path.isfile', new=lambda f: False),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
+            patch(
+                'glob.iglob',
+                new=(lambda s: ['FILENAME'] if s.endswith('.list') else []),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
+            ),
+            patch('builtins.open', new=mopen_list),
+        ):
+            repository_mapping_list = apt.RepositoryMapping()
+
+        mopen_sources = mock_open(read_data=ubuntu_sources_deb822)
+        mopen_sources.return_value.__iter__ = lambda self: iter(self.readline, '')  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
+        with (
+            patch('os.path.isfile', new=lambda f: False),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
+            patch(
+                'glob.iglob',
+                new=(lambda s: ['FILENAME'] if s.endswith('.sources') else []),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
+            ),
+            patch('builtins.open', new=mopen_sources),
+        ):
+            repository_mapping_sources = apt.RepositoryMapping()
+
+        list_keys = sorted(repository_mapping_list._repository_map.keys())
+        sources_keys = sorted(repository_mapping_sources._repository_map.keys())
+        assert (sources_keys == list_keys)
+
+        for list_key, sources_key in zip(list_keys, sources_keys):
+            list_repo = repository_mapping_list[list_key]
+            sources_repo = repository_mapping_sources[sources_key]
+            assert list_repo.enabled == sources_repo.enabled
+            assert list_repo.repotype == sources_repo.repotype
+            assert list_repo.uri == sources_repo.uri
+            assert list_repo.release == sources_repo.release
+            assert list_repo.groups == sources_repo.groups
+            assert list_repo.gpg_key == sources_repo.gpg_key
+            assert list_repo.options == sources_repo.options   # pyright: ignore[reportUnknownMemberType]
 
 
 class TestAptBareMethods(unittest.TestCase):
