@@ -1335,10 +1335,10 @@ class RepositoryMapping(Mapping):
             /etc/apt/sources.list.d/ubuntu.sources
 
         The semantics of `load_deb822` slightly different to `load`:
-            `load` calls `_parse`, with reads a commented out line as an entry that is not enabled
+            `load` calls `_parse`, which reads a commented out line as an entry that is not enabled
             `load_deb822` strips out comments entirely when parsing a file into paragraphs, and
                 assumes that comments have been removed when parsing individual paragraphs/entry,
-                instead reading the 'Enabled' key to determine if an entry is enabled
+                instead only reading the 'Enabled' key to determine if an entry is enabled
         """
         with open(filename, "r") as f:
             repos, errors = self._parse_deb822_lines(f, filename=filename)
