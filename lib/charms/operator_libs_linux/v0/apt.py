@@ -1378,16 +1378,21 @@ class RepositoryMapping(Mapping):
 
     @staticmethod
     def _iter_deb822_paragraphs(lines: Iterable[str]) -> Iterator[List[Tuple[int, str]]]:
+        """Given lines from a deb822 format file, yield paragraphs.
+
+        A paragraph is a list of numbered lines that make up a source entry,
+        with comments stripped out (but accounted for in line numbering).
+        """
         current_paragraph: List[Tuple[int, str]] = []
         for n, line in enumerate(lines):  # 0 indexed line numbers, following `load`
-            if line.startswith("#"):
-                continue
             if not line:  # blank lines separate paragraphs
                 if current_paragraph:
                     yield current_paragraph
                     current_paragraph = []
                 continue
-            current_paragraph.append((n, line))
+            content, _delim, _comment = line.partition("#")
+            if content.strip():  # skip (potentially indented) comment line
+                current_paragraph.append((n, content.rstrip()))  # preserve indent
         if current_paragraph:
             yield current_paragraph
 
