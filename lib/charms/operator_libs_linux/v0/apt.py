@@ -1432,9 +1432,20 @@ class RepositoryMapping(Mapping):
             )
 
         gpg_key = options.pop("Signed-By", "")
-        repotypes = options.pop("Types").split()
-        uris = options.pop("URIs").split()
-        suites = options.pop("Suites").split()
+
+        try:
+            repotypes = options.pop("Types").split()
+            uris = options.pop("URIs").split()
+            suites = options.pop("Suites").split()
+        except KeyError as e:
+            [key] = e.args
+            raise InvalidSourceError(
+                "Missing key '{key}' for entry starting on line {line} in {file}.".format(
+                    key=key,
+                    line=min(line_numbers.values()),
+                    file=filename,
+                )
+            )
 
         components: List[str]
         if len(suites) == 1 and suites[0].endswith("/"):
