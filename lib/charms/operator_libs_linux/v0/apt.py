@@ -1349,7 +1349,8 @@ class RepositoryMapping(Mapping):
 
         if errors:
             logger.debug(
-                "the following errors were encountered when reading deb822 format sources:\n%s",
+                "the following %d error(s) were encountered when reading deb822 format sources:\n%s",
+                len(errors),
                 "\n".join(str(e) for e in errors),
             )
 
