@@ -517,6 +517,46 @@ class TestApt(unittest.TestCase):
         assert opts_1_options == {'Foo': 'Bar'}
         assert opts_1_line_numbers == {'Foo': 10}
 
+    def test_parse_deb822_paragraph_ubuntu_sources(self):
+        lines = ubuntu_sources_deb822.strip().split("\n")
+        main, security = apt.RepositoryMapping._iter_deb822_paragraphs(lines)
+        repos = apt.RepositoryMapping._parse_deb822_paragraph(main)
+        assert len(repos) == 3
+        for repo, suite in zip(repos, ("noble", "noble-updates", "noble-backports")):
+            assert repo.enabled
+            assert repo.repotype == "deb"
+            assert repo.uri == "http://nz.archive.ubuntu.com/ubuntu/"
+            assert repo.release == suite
+            assert repo.groups == ["main", "restricted", "universe", "multiverse"]
+            assert repo.filename == ""
+            assert repo.gpg_key == "/usr/share/keyrings/ubuntu-archive-keyring.gpg"
+        repos = apt.RepositoryMapping._parse_deb822_paragraph(security)
+        assert len(repos) == 1
+        [repo] = repos
+        assert repo.enabled
+        assert repo.repotype == "deb"
+        assert repo.uri == "http://security.ubuntu.com/ubuntu"
+        assert repo.release == "noble-security"
+        assert repo.groups == ["main", "restricted", "universe", "multiverse"]
+        assert repo.filename == ""
+        assert repo.gpg_key == "/usr/share/keyrings/ubuntu-archive-keyring.gpg"
+
+    def test_parse_deb822_paragraph_w_comments(self):
+        lines = ubuntu_sources_deb822_with_comments.strip().split("\n")
+        ok_para, bad_para = apt.RepositoryMapping._iter_deb822_paragraphs(lines)
+        repos = apt.RepositoryMapping._parse_deb822_paragraph(ok_para)
+        assert len(repos) == 3
+        for repo, suite in zip(repos, ("noble", "noble-updates", "noble-backports")):
+            assert repo.enabled
+            assert repo.repotype == "deb"
+            assert repo.uri == "http://nz.archive.ubuntu.com/ubuntu/"
+            assert repo.release == suite
+            assert repo.groups == ["main", "restricted", "universe", "multiverse"]
+            assert repo.filename == ""
+            assert repo.gpg_key == ""
+        with self.assertRaises(apt.InvalidSourceError):
+            apt.RepositoryMapping._parse_deb822_paragraph(bad_para)
+
 
 class TestAptBareMethods(unittest.TestCase):
     @patch("charms.operator_libs_linux.v0.apt.check_output")
