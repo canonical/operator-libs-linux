@@ -1385,7 +1385,7 @@ class RepositoryMapping(Mapping):
         """
         current_paragraph: List[Tuple[int, str]] = []
         for n, line in enumerate(lines):  # 0 indexed line numbers, following `load`
-            if not line:  # blank lines separate paragraphs
+            if not line.strip():  # blank lines separate paragraphs
                 if current_paragraph:
                     yield current_paragraph
                     current_paragraph = []
