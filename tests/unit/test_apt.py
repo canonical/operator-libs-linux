@@ -557,6 +557,21 @@ class TestApt(unittest.TestCase):
         with self.assertRaises(apt.InvalidSourceError):
             apt.RepositoryMapping._parse_deb822_paragraph(bad_para)
 
+    def test_parse_deb822_lines_ubuntu_sources(self):
+        lines = ubuntu_sources_deb822.strip().split("\n")
+        repos, errors = apt.RepositoryMapping._parse_deb822_lines(lines)
+        print(repos[0].__dict__)
+        assert len(repos) == 4
+        assert not errors
+
+    def test_parse_deb822_lines_w_comments(self):
+        lines = ubuntu_sources_deb822_with_comments.strip().split("\n")
+        repos, errors = apt.RepositoryMapping._parse_deb822_lines(lines)
+        assert len(repos) == 3
+        assert len(errors) == 1
+        [error] = errors
+        assert isinstance(error, apt.InvalidSourceError)
+
 
 class TestAptBareMethods(unittest.TestCase):
     @patch("charms.operator_libs_linux.v0.apt.check_output")
