@@ -453,6 +453,70 @@ class TestApt(unittest.TestCase):
             ],
         ]
 
+    def test_get_deb822_options_ubuntu_sources(self):
+        lines = ubuntu_sources_deb822.strip().split("\n")
+        paras = list(apt.RepositoryMapping._iter_deb822_paragraphs(lines))
+        opts = [
+            apt.RepositoryMapping._get_deb822_options(p)
+            for p in paras
+        ]
+        opts_0, opts_1 = opts
+        opts_0_options, opts_0_line_numbers = opts_0
+        opts_1_options, opts_1_line_numbers = opts_1
+        assert opts_0_options == {
+            'Types': 'deb',
+            'URIs': 'http://nz.archive.ubuntu.com/ubuntu/',
+            'Components': 'main restricted universe multiverse',
+            'Suites': 'noble noble-updates noble-backports',
+            'Signed-By': '/usr/share/keyrings/ubuntu-archive-keyring.gpg',
+        }
+        assert opts_0_line_numbers == {
+            'Types': 0,
+            'URIs': 1,
+            'Suites': 2,
+            'Components': 3,
+            'Signed-By': 4,
+        }
+        assert opts_1_options == {
+            'Types': 'deb',
+            'URIs': 'http://security.ubuntu.com/ubuntu',
+            'Components': 'main restricted universe multiverse',
+            'Suites': 'noble-security',
+            'Signed-By': '/usr/share/keyrings/ubuntu-archive-keyring.gpg',
+        }
+        assert opts_1_line_numbers == {
+            'Types': 6,
+            'URIs': 7,
+            'Suites': 8,
+            'Components': 9,
+            'Signed-By': 10,
+        }
+
+    def test_get_deb822_options_w_comments(self):
+        lines = ubuntu_sources_deb822_with_comments.strip().split("\n")
+        paras = list(apt.RepositoryMapping._iter_deb822_paragraphs(lines))
+        opts = [
+            apt.RepositoryMapping._get_deb822_options(p)
+            for p in paras
+        ]
+        opts_0, opts_1 = opts
+        opts_0_options, opts_0_line_numbers = opts_0
+        opts_1_options, opts_1_line_numbers = opts_1
+        assert opts_0_options == {
+            'Components': 'main restricted universe multiverse',
+            'Types': 'deb',
+            'URIs': 'http://nz.archive.ubuntu.com/ubuntu/',
+            'Suites': 'noble noble-updates noble-backports',
+        }
+        assert opts_0_line_numbers == {
+            'Components': 0,
+            'Types': 1,
+            'URIs': 2,
+            'Suites': 8,
+        }
+        assert opts_1_options == {'Foo': 'Bar'}
+        assert opts_1_line_numbers == {'Foo': 10}
+
 
 class TestAptBareMethods(unittest.TestCase):
     @patch("charms.operator_libs_linux.v0.apt.check_output")
