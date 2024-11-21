@@ -3,7 +3,7 @@
 
 import subprocess
 import unittest
-from unittest.mock import mock_open, patch, ANY
+from unittest.mock import ANY, mock_open, patch
 
 from charms.operator_libs_linux.v0 import apt
 
@@ -463,66 +463,60 @@ class TestApt(unittest.TestCase):
     def test_get_deb822_options_ubuntu_sources(self):
         lines = ubuntu_sources_deb822.strip().split("\n")
         paras = list(apt.RepositoryMapping._iter_deb822_paragraphs(lines))
-        opts = [
-            apt.RepositoryMapping._get_deb822_options(p)
-            for p in paras
-        ]
+        opts = [apt.RepositoryMapping._get_deb822_options(p) for p in paras]
         opts_0, opts_1 = opts
         opts_0_options, opts_0_line_numbers = opts_0
         opts_1_options, opts_1_line_numbers = opts_1
         assert opts_0_options == {
-            'Types': 'deb',
-            'URIs': 'http://nz.archive.ubuntu.com/ubuntu/',
-            'Components': 'main restricted universe multiverse',
-            'Suites': 'noble noble-updates noble-backports',
-            'Signed-By': '/usr/share/keyrings/ubuntu-archive-keyring.gpg',
+            "Types": "deb",
+            "URIs": "http://nz.archive.ubuntu.com/ubuntu/",
+            "Components": "main restricted universe multiverse",
+            "Suites": "noble noble-updates noble-backports",
+            "Signed-By": "/usr/share/keyrings/ubuntu-archive-keyring.gpg",
         }
         assert opts_0_line_numbers == {
-            'Types': 0,
-            'URIs': 1,
-            'Suites': 2,
-            'Components': 3,
-            'Signed-By': 4,
+            "Types": 0,
+            "URIs": 1,
+            "Suites": 2,
+            "Components": 3,
+            "Signed-By": 4,
         }
         assert opts_1_options == {
-            'Types': 'deb',
-            'URIs': 'http://security.ubuntu.com/ubuntu',
-            'Components': 'main restricted universe multiverse',
-            'Suites': 'noble-security',
-            'Signed-By': '/usr/share/keyrings/ubuntu-archive-keyring.gpg',
+            "Types": "deb",
+            "URIs": "http://security.ubuntu.com/ubuntu",
+            "Components": "main restricted universe multiverse",
+            "Suites": "noble-security",
+            "Signed-By": "/usr/share/keyrings/ubuntu-archive-keyring.gpg",
         }
         assert opts_1_line_numbers == {
-            'Types': 6,
-            'URIs': 7,
-            'Suites': 8,
-            'Components': 9,
-            'Signed-By': 10,
+            "Types": 6,
+            "URIs": 7,
+            "Suites": 8,
+            "Components": 9,
+            "Signed-By": 10,
         }
 
     def test_get_deb822_options_w_comments(self):
         lines = ubuntu_sources_deb822_with_comments.strip().split("\n")
         paras = list(apt.RepositoryMapping._iter_deb822_paragraphs(lines))
-        opts = [
-            apt.RepositoryMapping._get_deb822_options(p)
-            for p in paras
-        ]
+        opts = [apt.RepositoryMapping._get_deb822_options(p) for p in paras]
         opts_0, opts_1 = opts
         opts_0_options, opts_0_line_numbers = opts_0
         opts_1_options, opts_1_line_numbers = opts_1
         assert opts_0_options == {
-            'Components': 'main restricted universe multiverse',
-            'Types': 'deb',
-            'URIs': 'http://nz.archive.ubuntu.com/ubuntu/',
-            'Suites': 'noble noble-updates noble-backports',
+            "Components": "main restricted universe multiverse",
+            "Types": "deb",
+            "URIs": "http://nz.archive.ubuntu.com/ubuntu/",
+            "Suites": "noble noble-updates noble-backports",
         }
         assert opts_0_line_numbers == {
-            'Components': 0,
-            'Types': 1,
-            'URIs': 2,
-            'Suites': 8,
+            "Components": 0,
+            "Types": 1,
+            "URIs": 2,
+            "Suites": 8,
         }
-        assert opts_1_options == {'Foo': 'Bar'}
-        assert opts_1_line_numbers == {'Foo': 10}
+        assert opts_1_options == {"Foo": "Bar"}
+        assert opts_1_line_numbers == {"Foo": 10}
 
     def test_parse_deb822_paragraph_ubuntu_sources(self):
         lines = ubuntu_sources_deb822.strip().split("\n")
@@ -581,14 +575,20 @@ class TestApt(unittest.TestCase):
 
     def test_load_deb822_ubuntu_sources(self):
         with (
-            patch('os.path.isfile', new=lambda f: False),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
-            patch('glob.iglob', new=lambda s: []),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
+            patch(
+                "os.path.isfile", new=lambda f: False
+            ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
+            patch(
+                "glob.iglob", new=lambda s: []
+            ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
         ):
             repository_mapping = apt.RepositoryMapping()
         assert not repository_mapping._repository_map
         mopen = mock_open(read_data=ubuntu_sources_deb822)
-        mopen.return_value.__iter__ = lambda self: iter(self.readline, '')  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
-        with patch('builtins.open', new=mopen):
+        mopen.return_value.__iter__ = lambda self: iter(
+            self.readline, ""
+        )  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
+        with patch("builtins.open", new=mopen):
             repository_mapping.load_deb822("")
         assert sorted(repository_mapping._repository_map.keys()) == [
             "deb-http://nz.archive.ubuntu.com/ubuntu/-noble",
@@ -599,16 +599,22 @@ class TestApt(unittest.TestCase):
 
     def test_load_deb822_w_comments(self):
         with (
-            patch('os.path.isfile', new=lambda f: False),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
-            patch('glob.iglob', new=lambda s: []),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
+            patch(
+                "os.path.isfile", new=lambda f: False
+            ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
+            patch(
+                "glob.iglob", new=lambda s: []
+            ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
         ):
             repository_mapping = apt.RepositoryMapping()
         assert not repository_mapping._repository_map
         mopen = mock_open(read_data=ubuntu_sources_deb822_with_comments)
-        mopen.return_value.__iter__ = lambda self: iter(self.readline, '')  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
+        mopen.return_value.__iter__ = lambda self: iter(
+            self.readline, ""
+        )  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
         with (
-            patch('builtins.open', new=mopen),
-            patch.object(apt.logger, 'debug') as debug,
+            patch("builtins.open", new=mopen),
+            patch.object(apt.logger, "debug") as debug,
         ):
             repository_mapping.load_deb822("FILENAME")
         assert sorted(repository_mapping._repository_map.keys()) == [
@@ -619,7 +625,7 @@ class TestApt(unittest.TestCase):
         debug.assert_called_once_with(
             ANY,
             1,  # number of errors
-            "Missing key 'Types' for entry starting on line 11 in FILENAME."
+            "Missing key 'Types' for entry starting on line 11 in FILENAME.",
         )
 
     def test_init_with_deb822(self):
@@ -628,32 +634,44 @@ class TestApt(unittest.TestCase):
         They should be equivalent with the sample data being used.
         """
         mopen_list = mock_open(read_data=ubuntu_sources_one_line)
-        mopen_list.return_value.__iter__ = lambda self: iter(self.readline, '')  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
+        mopen_list.return_value.__iter__ = lambda self: iter(
+            self.readline, ""
+        )  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
         with (
-            patch('os.path.isfile', new=lambda f: False),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
             patch(
-                'glob.iglob',
-                new=(lambda s: ['FILENAME'] if s.endswith('.list') else []),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
+                "os.path.isfile", new=lambda f: False
+            ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
+            patch(
+                "glob.iglob",
+                new=(
+                    lambda s: ["FILENAME"] if s.endswith(".list") else []
+                ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
             ),
-            patch('builtins.open', new=mopen_list),
+            patch("builtins.open", new=mopen_list),
         ):
             repository_mapping_list = apt.RepositoryMapping()
 
         mopen_sources = mock_open(read_data=ubuntu_sources_deb822)
-        mopen_sources.return_value.__iter__ = lambda self: iter(self.readline, '')  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
+        mopen_sources.return_value.__iter__ = lambda self: iter(
+            self.readline, ""
+        )  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
         with (
-            patch('os.path.isfile', new=lambda f: False),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
             patch(
-                'glob.iglob',
-                new=(lambda s: ['FILENAME'] if s.endswith('.sources') else []),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
+                "os.path.isfile", new=lambda f: False
+            ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
+            patch(
+                "glob.iglob",
+                new=(
+                    lambda s: ["FILENAME"] if s.endswith(".sources") else []
+                ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
             ),
-            patch('builtins.open', new=mopen_sources),
+            patch("builtins.open", new=mopen_sources),
         ):
             repository_mapping_sources = apt.RepositoryMapping()
 
         list_keys = sorted(repository_mapping_list._repository_map.keys())
         sources_keys = sorted(repository_mapping_sources._repository_map.keys())
-        assert (sources_keys == list_keys)
+        assert sources_keys == list_keys
 
         for list_key, sources_key in zip(list_keys, sources_keys):
             list_repo = repository_mapping_list[list_key]
@@ -664,7 +682,10 @@ class TestApt(unittest.TestCase):
             assert list_repo.release == sources_repo.release
             assert list_repo.groups == sources_repo.groups
             assert list_repo.gpg_key == sources_repo.gpg_key
-            assert list_repo.options == sources_repo.options   # pyright: ignore[reportUnknownMemberType]
+            assert (
+                list_repo.options  # pyright: ignore[reportUnknownMemberType]
+                == sources_repo.options  # pyright: ignore[reportUnknownMemberType]
+            )
 
 
 class TestAptBareMethods(unittest.TestCase):
