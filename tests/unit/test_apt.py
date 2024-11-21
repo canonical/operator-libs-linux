@@ -3,7 +3,7 @@
 
 import subprocess
 import unittest
-from unittest.mock import patch
+from unittest.mock import mock_open, patch, ANY
 
 from charms.operator_libs_linux.v0 import apt
 
@@ -571,6 +571,49 @@ class TestApt(unittest.TestCase):
         assert len(errors) == 1
         [error] = errors
         assert isinstance(error, apt.InvalidSourceError)
+
+    def test_load_deb822_ubuntu_sources(self):
+        with (
+            patch('os.path.isfile', new=lambda f: False),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
+            patch('glob.iglob', new=lambda s: []),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
+        ):
+            repository_mapping = apt.RepositoryMapping()
+        assert not repository_mapping._repository_map
+        mopen = mock_open(read_data=ubuntu_sources_deb822)
+        mopen.return_value.__iter__ = lambda self: iter(self.readline, '')  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
+        with patch('builtins.open', new=mopen):
+            repository_mapping.load_deb822("")
+        assert sorted(repository_mapping._repository_map.keys()) == [
+            "deb-http://nz.archive.ubuntu.com/ubuntu/-noble",
+            "deb-http://nz.archive.ubuntu.com/ubuntu/-noble-backports",
+            "deb-http://nz.archive.ubuntu.com/ubuntu/-noble-updates",
+            "deb-http://security.ubuntu.com/ubuntu-noble-security",
+        ]
+
+    def test_load_deb822_w_comments(self):
+        with (
+            patch('os.path.isfile', new=lambda f: False),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
+            patch('glob.iglob', new=lambda s: []),  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
+        ):
+            repository_mapping = apt.RepositoryMapping()
+        assert not repository_mapping._repository_map
+        mopen = mock_open(read_data=ubuntu_sources_deb822_with_comments)
+        mopen.return_value.__iter__ = lambda self: iter(self.readline, '')  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType, reportUnknownMemberType]
+        with (
+            patch('builtins.open', new=mopen),
+            patch.object(apt.logger, 'debug') as debug,
+        ):
+            repository_mapping.load_deb822("FILENAME")
+        assert sorted(repository_mapping._repository_map.keys()) == [
+            "deb-http://nz.archive.ubuntu.com/ubuntu/-noble",
+            "deb-http://nz.archive.ubuntu.com/ubuntu/-noble-backports",
+            "deb-http://nz.archive.ubuntu.com/ubuntu/-noble-updates",
+        ]
+        debug.assert_called_once_with(
+            ANY,
+            1,  # number of errors
+            "Missing key 'Types' for entry starting on line 11 in FILENAME."
+        )
 
 
 class TestAptBareMethods(unittest.TestCase):
