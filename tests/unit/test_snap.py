@@ -902,28 +902,24 @@ class TestSnapBareMethods(unittest.TestCase):
         with self.assertRaises(TypeError):
             foo.get(None)  # pyright: ignore[reportArgumentType]
 
-    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_snap_set_typed(self, mock_subprocess):
+    @patch("charms.operator_libs_linux.v2.snap.SnapClient.put_snap_config")
+    def test_snap_set_typed(self, put_snap_config):
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
 
         config = {"n": 42, "s": "string", "d": {"nested": True}}
 
         foo.set(config, typed=True)
-        mock_subprocess.assert_called_with(
-            ["snap", "set", "foo", "-t", "n=42", 's="string"', 'd={"nested": true}'],
-            universal_newlines=True,
-        )
+        put_snap_config.assert_called_with("foo", {"n": 42, "s": "string", "d": {"nested": True}})
 
-    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_snap_set_untyped(self, mock_subprocess):
+    @patch("charms.operator_libs_linux.v2.snap.SnapClient.put_snap_config")
+    def test_snap_set_untyped(self, put_snap_config):
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
 
         config = {"n": 42, "s": "string", "d": {"nested": True}}
 
         foo.set(config, typed=False)
-        mock_subprocess.assert_called_with(
-            ["snap", "set", "foo", "n=42", "s=string", "d={'nested': True}"],
-            universal_newlines=True,
+        put_snap_config.assert_called_with(
+            "foo", {"n": "42", "s": "string", "d": "{'nested': True}"}
         )
 
     @patch(

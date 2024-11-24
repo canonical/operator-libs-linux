@@ -5,6 +5,7 @@
 
 import logging
 import re
+import time
 from datetime import datetime, timedelta
 from subprocess import CalledProcessError, check_output, run
 
@@ -65,7 +66,11 @@ def test_snap_refresh():
 def test_snap_set_and_get_with_typed():
     cache = snap.SnapCache()
     lxd = cache["lxd"]
-    lxd.ensure(snap.SnapState.Latest, channel="latest")
+    try:
+        lxd.ensure(snap.SnapState.Latest, channel="latest")
+    except snap.SnapError:
+        time.sleep(60)
+        lxd.ensure(snap.SnapState.Latest, channel="latest")
     configs = {
         "true": True,
         "false": False,
@@ -137,7 +142,11 @@ def test_snap_set_and_get_with_typed():
 def test_snap_set_and_get_untyped():
     cache = snap.SnapCache()
     lxd = cache["lxd"]
-    lxd.ensure(snap.SnapState.Latest, channel="latest")
+    try:
+        lxd.ensure(snap.SnapState.Latest, channel="latest")
+    except snap.SnapError:
+        time.sleep(60)
+        lxd.ensure(snap.SnapState.Latest, channel="latest")
 
     lxd.set({"foo": "true", "bar": True}, typed=False)
     assert lxd.get("foo", typed=False) == "true"
