@@ -1059,17 +1059,6 @@ class DebianRepository:
 
         WARNING: disable is currently not implemented for repositories defined
         by a deb822 stanza. Raises a NotImplementedError in this case.
-
-        Potential semantics for disable on a deb822 defined repository are
-        described below. Please open an issue if you require the ability to
-        disable deb822 defined repositories.
-
-        Multiple DebianRepository objects may be defined by the same stanza.
-        If the stanza that defines this object defines other DebianRepository
-        objects, an error will be raised on attempting to disable this repository,
-        unless an `always_disable_deb822_stanza` is passed, in which case the entire
-        stanza should be disabled -- which will also disable all other repositories
-        defined by the same stanza.
         """
         if self._deb822_stanza is not None:
             raise NotImplementedError(
