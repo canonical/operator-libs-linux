@@ -343,7 +343,7 @@ class Snap(object):
         """
         if not typed:
             config = {k: str(v) for k, v in config.items()}
-        self._snap_client.put_snap_config(self._name, config)
+        self._snap_client._put_snap_conf(self._name, config)
 
     def unset(self, key) -> str:
         """Unset a snap configuration value.
@@ -774,12 +774,15 @@ class SnapClient:
             return self._wait(response["change"])
         return response["result"]
 
-    def _wait(self, change_id: int) -> JSONType:
+    def _wait(self, change_id: str, timeout=300) -> JSONType:
         """Wait for an async change to complete.
 
         The poll time is 100 milliseconds, the same as in snap clients.
         """
+        deadline = time.time() + timeout
         while True:
+            if time.time() > deadline:
+                raise TimeoutError(f"timeout waiting for snap change {change_id}")
             response = self._request("GET", f"changes/{change_id}")
             status = response["status"]
             if status == "Done":
@@ -840,7 +843,7 @@ class SnapClient:
         """Query the snap server for apps belonging to a named, currently installed snap."""
         return self._request("GET", "apps", {"names": name, "select": "service"})
 
-    def put_snap_config(self, name: str, conf: Dict[str, Any]):
+    def _put_snap_conf(self, name: str, conf: Dict[str, Any]):
         """Set the configuration details for an installed snap."""
         return self._request("PUT", f"snaps/{name}/conf", body=conf)
 
