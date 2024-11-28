@@ -108,9 +108,10 @@ import os
 import re
 import subprocess
 import textwrap
+import typing
 from enum import Enum
 from subprocess import PIPE, CalledProcessError, check_output
-from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, Iterator, List, Literal, Mapping, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -1408,72 +1409,62 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         else:
             raise InvalidSourceError("An invalid sources line was found in %s!", filename)
 
-    def add(self, repo: DebianRepository, default_filename: Optional[bool] = False) -> None:
-        """Add a new repository to the system. May have destructive or surprising behaviour.
+    @typing.overload
+    def add(  # pyright: ignore[reportOverlappingOverload]
+        self,
+        repo: DebianRepository,
+        default_filename: Optional[bool] = False,
+        update_cache: Literal[False] = False,
+    ) -> None: ...
+    @typing.overload
+    def add(
+        self,
+        repo: DebianRepository,
+        default_filename: Optional[bool] = False,
+        update_cache: Literal[True] = True,
+    ) -> "RepositoryMapping": ...
+    def add(  # noqa: D417  # undocumented-param: default_filename intentionally undocumented
+        self,
+        repo: DebianRepository,
+        default_filename: Optional[bool] = False,
+        update_cache: bool = False,
+    ) -> Optional["RepositoryMapping"]:
+        """Add a new repository to the system using apt-add-repository.
 
-        Will write in the deb822 format if:
-            1. repo.filename has the '.sources' extension
-            2. repo.filename is unset (""), but /etc/apt/sources.list.d/ubuntu.sources exists
-        Otherwise the one-per-line style will be used.
+        Args:
+            repo: a DebianRepository object where repo.enabled is True
+            update_cache: if True, apt-add-repository will update the package cache
+                and then a new RepositoryMapping object will be returned.
+                If False, then apt-add-repository is run with the --no-update option,
+                and an entry for repo is added to this RepositoryMapping
+        Returns:
+            None, or a new RepositoryMapping object if update_cache is True
+
+        raises:
+            ValueError if repo.enabled is False
+            CalledProcessError if there's an error running apt-add-repository
 
         WARNING: the default_filename keyword argument is provided for backwards compatibility
         only. It is not used, and was not used in the previous revision of this library.
-
-        WARNING: in the one-per-line format case, will mutate repo.options to add the 'signed-by'
-        key if both options and gpg_file are truthy (for example if a gpg_key_filename and
-        non-empty options were provided at DebianRepository initialisation time). If options were
-        not provided or are empty, but a gpg_key is available, will silently fail to include it.
-
-        WARNING: if repo.filename is falsey, the new filename is calculated only from the repo's
-        uri and release, but repos are assumed to be uniquely identified by the combination of
-        repotype, uri, and release. Adding two repos with differing repotypes but identical uris
-        and releases will result in the second repo clobbering the file written by the first.
-        In this case, repo.filename must be set appropriately to avoid data loss.
-
-        WARNING: if repo.filename is truthy, and that file exists, this method will clobber that
-        file with a single entry for the repo being added. Set it to a falsey value to have a new
-        filename derived from its uri and release (which will also clobber any existing file), or
-        set the filename that you want to write to -- or construct a new DebianRepository object
-        with the filename you want to write to.
-        For example: repo.filename = my_filename
-        For example: DebianRepository(uri=repo.uri, filename=my_filename, ...)
-
-        WARNING: if repo.enabled is falsey, the repository will be added in the disabled state.
-        Note that repo.disable() does not affect this value. If repo.enabled does not match the
-        value you expect, construct a new DebianRepository object with the appropriate value.
-        For example: DebianRepository(uri=repo.uri, enabled=my_value, ...)
         """
-        if repo.filename:
-            fname = repo.filename
-        else:
-            fname = "{}-{}.{}".format(
-                DebianRepository.prefix_from_uri(repo.uri),
-                repo.release.replace("/", "-"),
-                "sources" if os.path.isfile(self.default_sources) else "list",
-            )
-
-        _, fname_extension = fname.rsplit(".", maxsplit=1)
-        if fname_extension == "sources":
-            text = "\n".join(
-                "{}: {}".format(key, value)
-                for key, value in _opts_from_repository(
-                    repo,
-                    stanza=repo._deb822_stanza,  # pyright: ignore[reportPrivateUsage]
-                )
-            )
-        else:
-            options = repo.options if repo.options else {}
-            if repo.gpg_key:
-                options["signed-by"] = repo.gpg_key
-            text = (
-                "{}".format("#" if not repo.enabled else "")
-                + "{} {}{} ".format(repo.repotype, repo.make_options_string(), repo.uri)
-                + "{} {}\n".format(repo.release, " ".join(repo.groups))
-            )
-
-        with open(fname, "wb") as f:
-            f.write(text.encode("utf-8"))
-
+        if not repo.enabled:
+            raise ValueError("{repo}.enabled is {value}".format(repo=repo, value=repo.enabled))
+        cmd = [
+            "apt-add-repository",
+            "--dry-run",
+            "--yes",
+            f"--uri={repo.uri}",
+            f"--pocket={repo.release}",
+        ]
+        if repo.repotype == "deb-src":
+            cmd.append("--enable-source")
+        for component in repo.groups:
+            cmd.append(f"--component={component}")
+        if not update_cache:
+            cmd.append("--no-update")
+        subprocess.run(cmd, check=True)
+        if update_cache:
+            return RepositoryMapping()
         self._repository_map["{}-{}-{}".format(repo.repotype, repo.uri, repo.release)] = repo
 
     def disable(self, repo: DebianRepository) -> None:

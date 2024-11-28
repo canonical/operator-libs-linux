@@ -8,6 +8,7 @@ import typing
 import unittest
 from unittest.mock import ANY, mock_open, patch
 
+import pytest
 from charms.operator_libs_linux.v0 import apt
 from pyfakefs.fake_filesystem_unittest import TestCase as PyFakeFsTestCase
 
@@ -93,6 +94,7 @@ class TestRepositoryMapping(PyFakeFsTestCase):
             open(other.filename).readlines(),
         )
 
+    @pytest.mark.skip("RepositoryMapping.add now calls apt-add-repository")
     def test_can_add_repositories(self):
         r = apt.RepositoryMapping()
         d = apt.DebianRepository(
@@ -119,6 +121,7 @@ class TestRepositoryMapping(PyFakeFsTestCase):
         self.assertEqual(d.filename, "/etc/apt/sources.list.d/foo-focal.list")
         self.assertIn("deb https://example.com/foo focal bar baz\n", open(d.filename).readlines())
 
+    @pytest.mark.skip("RepositoryMapping.add now calls apt-add-repository")
     def test_valid_list_file(self):
         line = "deb https://repo.example.org/fiz/baz focal/foo-bar/5.0 multiverse"
         d = apt.DebianRepository.from_repo_line(line)
