@@ -4,7 +4,10 @@
 # pyright: reportPrivateUsage=false
 
 import datetime
+import io
 import json
+import time
+import typing
 import unittest
 from subprocess import CalledProcessError
 from typing import Any, Dict, Iterable, Optional
@@ -697,6 +700,141 @@ class TestSocketClient(unittest.TestCase):
         finally:
             shutdown()
 
+    def test_wait_changes(self):
+        change_finished = False
+
+        def _request_raw(
+            method: str,
+            path: str,
+            query: Dict = None,
+            headers: Dict = None,
+            data: bytes = None,
+        ) -> typing.IO[bytes]:
+            nonlocal change_finished
+            if method == "PUT" and path == "snaps/test/conf":
+                return io.BytesIO(
+                    json.dumps(
+                        {
+                            "type": "async",
+                            "status-code": 202,
+                            "status": "Accepted",
+                            "result": None,
+                            "change": "97",
+                        }
+                    ).encode("utf-8")
+                )
+            if method == "GET" and path == "changes/97" and not change_finished:
+                change_finished = True
+                return io.BytesIO(
+                    json.dumps(
+                        {
+                            "type": "sync",
+                            "status-code": 200,
+                            "status": "OK",
+                            "result": {
+                                "id": "97",
+                                "kind": "configure-snap",
+                                "summary": 'Change configuration of "test" snap',
+                                "status": "Doing",
+                                "tasks": [
+                                    {
+                                        "id": "1029",
+                                        "kind": "run-hook",
+                                        "summary": 'Run configure hook of "test" snap',
+                                        "status": "Doing",
+                                        "progress": {"label": "", "done": 1, "total": 1},
+                                        "spawn-time": "2024-11-28T20:02:47.498399651+00:00",
+                                        "data": {"affected-snaps": ["test"]},
+                                    }
+                                ],
+                                "ready": False,
+                                "spawn-time": "2024-11-28T20:02:47.49842583+00:00",
+                            },
+                        }
+                    ).encode("utf-8")
+                )
+            if method == "GET" and path == "changes/97" and change_finished:
+                return io.BytesIO(
+                    json.dumps(
+                        {
+                            "type": "sync",
+                            "status-code": 200,
+                            "status": "OK",
+                            "result": {
+                                "id": "98",
+                                "kind": "configure-snap",
+                                "summary": 'Change configuration of "test" snap',
+                                "status": "Done",
+                                "tasks": [
+                                    {
+                                        "id": "1030",
+                                        "kind": "run-hook",
+                                        "summary": 'Run configure hook of "test" snap',
+                                        "status": "Done",
+                                        "progress": {"label": "", "done": 1, "total": 1},
+                                        "spawn-time": "2024-11-28T20:06:41.415929854+00:00",
+                                        "ready-time": "2024-11-28T20:06:41.797437537+00:00",
+                                        "data": {"affected-snaps": ["test"]},
+                                    }
+                                ],
+                                "ready": True,
+                                "spawn-time": "2024-11-28T20:06:41.415955681+00:00",
+                                "ready-time": "2024-11-28T20:06:41.797440022+00:00",
+                            },
+                        }
+                    ).encode("utf-8")
+                )
+            raise RuntimeError("unknown request")
+
+        client = snap.SnapClient()
+        with patch.object(client, "_request_raw", _request_raw), patch.object(time, "sleep"):
+            client._put_snap_conf("test", {"foo": "bar"})
+
+    def test_wait_failed(self):
+        def _request_raw(
+            method: str,
+            path: str,
+            query: Dict = None,
+            headers: Dict = None,
+            data: bytes = None,
+        ) -> typing.IO[bytes]:
+            if method == "PUT" and path == "snaps/test/conf":
+                return io.BytesIO(
+                    json.dumps(
+                        {
+                            "type": "async",
+                            "status-code": 202,
+                            "status": "Accepted",
+                            "result": None,
+                            "change": "97",
+                        }
+                    ).encode("utf-8")
+                )
+            if method == "GET" and path == "changes/97":
+                return io.BytesIO(
+                    json.dumps(
+                        {
+                            "type": "sync",
+                            "status-code": 200,
+                            "status": "OK",
+                            "result": {
+                                "id": "97",
+                                "kind": "configure-snap",
+                                "summary": 'Change configuration of "test" snap',
+                                "status": "Error",
+                                "ready": False,
+                                "spawn-time": "2024-11-28T20:02:47.49842583+00:00",
+                            },
+                        }
+                    ).encode("utf-8")
+                )
+            raise RuntimeError("unknown request")
+
+        client = snap.SnapClient()
+        with patch.object(client, "_request_raw", _request_raw), patch.object(time, "sleep"):
+            with self.assertRaises(snap.SnapError):
+                client._put_snap_conf("test", {"foo": "bar"})
+
 
 class TestSnapBareMethods(unittest.TestCase):
     @patch("builtins.open", new_callable=mock_open, read_data="curl\n")
@@ -902,28 +1040,24 @@ class TestSnapBareMethods(unittest.TestCase):
         with self.assertRaises(TypeError):
             foo.get(None)  # pyright: ignore[reportArgumentType]
 
-    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_snap_set_typed(self, mock_subprocess):
+    @patch("charms.operator_libs_linux.v2.snap.SnapClient._put_snap_conf")
+    def test_snap_set_typed(self, put_snap_conf):
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
 
         config = {"n": 42, "s": "string", "d": {"nested": True}}
 
         foo.set(config, typed=True)
-        mock_subprocess.assert_called_with(
-            ["snap", "set", "foo", "-t", "n=42", 's="string"', 'd={"nested": true}'],
-            universal_newlines=True,
-        )
+        put_snap_conf.assert_called_with("foo", {"n": 42, "s": "string", "d": {"nested": True}})
 
-    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_snap_set_untyped(self, mock_subprocess):
+    @patch("charms.operator_libs_linux.v2.snap.SnapClient._put_snap_conf")
+    def test_snap_set_untyped(self, put_snap_conf):
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
 
         config = {"n": 42, "s": "string", "d": {"nested": True}}
 
         foo.set(config, typed=False)
-        mock_subprocess.assert_called_with(
-            ["snap", "set", "foo", "n=42", "s=string", "d={'nested': True}"],
-            universal_newlines=True,
+        put_snap_conf.assert_called_with(
+            "foo", {"n": "42", "s": "string", "d": "{'nested': True}"}
         )
 
     @patch(
