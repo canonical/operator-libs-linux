@@ -107,7 +107,6 @@ import logging
 import os
 import re
 import subprocess
-import textwrap
 import typing
 from enum import Enum
 from subprocess import PIPE, CalledProcessError, check_output
@@ -915,6 +914,9 @@ class GPGKeyError(Error):
 class DebianRepository:
     """An abstraction to represent a repository."""
 
+    _deb822_stanza: Optional["_Deb822Stanza"] = None
+    """set by Deb822Stanza after creating a DebianRepository"""
+
     def __init__(
         self,
         enabled: bool,
@@ -925,7 +927,6 @@ class DebianRepository:
         filename: Optional[str] = "",
         gpg_key_filename: Optional[str] = "",
         options: Optional[Dict[str, str]] = None,
-        deb822_stanza: Optional["_Deb822Stanza"] = None,
     ):
         self._enabled = enabled
         self._repotype = repotype
@@ -935,7 +936,6 @@ class DebianRepository:
         self._filename = filename
         self._gpg_key_filename = gpg_key_filename
         self._options = options
-        self._deb822_stanza = deb822_stanza
 
     @property
     def enabled(self):
@@ -997,14 +997,15 @@ class DebianRepository:
         a complex repo string.
         """
         options = self._options if self._options else {}
-        if self._gpg_key_filename:
-            options["signed-by"] = self._gpg_key_filename
 
-        return (
-            "[{}] ".format(" ".join(["{}={}".format(k, v) for k, v in options.items()]))
-            if options
-            else ""
-        )
+        gpg_key_filename = self.gpg_key  # ensure getter logic is run
+        if gpg_key_filename:
+            options["signed-by"] = gpg_key_filename
+
+        if not options:
+            return ""
+
+        return "[{}] ".format(" ".join("{}={}".format(k, v) for k, v in options.items()))
 
     @staticmethod
     def prefix_from_uri(uri: str) -> str:
@@ -1063,20 +1064,8 @@ class DebianRepository:
         """
         if self._deb822_stanza is not None:
             raise NotImplementedError(
-                textwrap.dedent(
-                    """
-                    Disabling a repository defined by a deb822 format source is not implemented.
-                        Please raise an issue if you require this feature.
-                        This repository is:
-                    {str_self}
-                         Defined by the deb822 stanza:
-                    {str_stanza}
-                    )
-                    """.format(
-                        str_self=textwrap.indent(str(self), "    " * 2),
-                        str_stanza=textwrap.indent(str(self._deb822_stanza), "    " * 2),
-                    )
-                ).strip()
+                "Disabling a repository defined by a deb822 format source is not implemented."
+                " Please raise an issue if you require this feature."
             )
         searcher = "{} {}{} {}".format(
             self.repotype, self.make_options_string(), self.uri, self.release
@@ -1334,7 +1323,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         parsed: List[int] = []
         skipped: List[int] = []
         with open(filename, "r") as f:
-            for n, line in enumerate(f):
+            for n, line in enumerate(f, start=1):  # 1 indexed line numbers
                 try:
                     repo = self._parse(line, filename)
                 except InvalidSourceError:
@@ -1436,13 +1425,18 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
             update_cache: if True, apt-add-repository will update the package cache
                 and then a new RepositoryMapping object will be returned.
                 If False, then apt-add-repository is run with the --no-update option,
-                and an entry for repo is added to this RepositoryMapping
+                and an entry for repo is added to this RepositoryMapping, and you
+                can call `update` manually before installing any packages.
+
         Returns:
             None, or a new RepositoryMapping object if update_cache is True
 
         raises:
-            ValueError if repo.enabled is False
-            CalledProcessError if there's an error running apt-add-repository
+            ValueError: if repo.enabled is False
+            CalledProcessError: if there's an error running apt-add-repository
+
+        WARNING: Does not associate the repository with a signing key.
+        Use the `import_key` method to add a signing key globally.
 
         WARNING: the default_filename keyword argument is provided for backwards compatibility
         only. It is not used, and was not used in the previous revision of this library.
@@ -1487,16 +1481,26 @@ class _Deb822Stanza:
     def __init__(self, numbered_lines: List[Tuple[int, str]], filename: str = ""):
         self._numbered_lines = numbered_lines
         self._filename = filename
-        self._gpg_key_from_stanza: Optional[str] = None  # may be set in _parse_stanzas
-        self._gpg_key_filename: Optional[str] = None  # may be set in _parse_stanzas
-        self._repositories = self._parse_stanza(lines=numbered_lines, filename=filename)
+        self._options, self._line_numbers = _deb822_stanza_to_options(numbered_lines)
+        repos, gpg_key_info = _deb822_options_to_repos(
+            self._options, line_numbers=self._line_numbers, filename=filename
+        )
+        for repo in repos:
+            repo._deb822_stanza = self  # pyright: ignore[reportPrivateUsage]
+        self._repositories = repos
+        self._gpg_key_filename, self._gpg_key_from_stanza = gpg_key_info
+
+    @property
+    def repositories(self) -> Tuple[DebianRepository, ...]:
+        """The repositories defined by this deb822 stanza."""
+        return self._repositories
 
     def get_gpg_key_filename(self) -> str:
         """Return the path to the GPG key for this repository.
 
         Import the key first, if the key itself was provided in the stanza.
         """
-        if self._gpg_key_filename is not None:
+        if self._gpg_key_filename:
             return self._gpg_key_filename
         if self._gpg_key_from_stanza is None:
             return ""
@@ -1505,152 +1509,19 @@ class _Deb822Stanza:
         self._gpg_key_filename = import_key(self._gpg_key_from_stanza)
         return self._gpg_key_filename
 
-    @property
-    def repositories(self) -> Tuple[DebianRepository, ...]:
-        """The repositories defined by this deb822 stanza."""
-        return self._repositories
-
-    def __str__(self) -> str:
-        """Return formatted representation of object instantiation."""
-        return textwrap.dedent(
-            """
-            {name}(
-                filename={filename},
-                numbered_lines=[
-                    {lines}
-                ],
-            )
-            """.format(
-                name=self.__class__.__name__,
-                filename=self._filename,
-                lines="\n        ".join(str(line) for line in self._numbered_lines),
-            )
-        ).strip()
-
-    def _parse_stanza(
-        self, lines: List[Tuple[int, str]], filename: str = ""
-    ) -> Tuple[DebianRepository, ...]:
-        """Return a list of DebianRepository objects defined by this deb822 stanza.
-
-        Raises:
-          InvalidSourceError if the source type is unknown or contains malformed entries
-        """
-        options, line_numbers = self._get_options(lines)
-        # Enabled
-        enabled_field = options.pop("Enabled", "yes")
-        if enabled_field == "yes":
-            enabled = True
-        elif enabled_field == "no":
-            enabled = False
-        else:
-            raise InvalidSourceError(
-                (
-                    "Bad value '{value}' for entry 'Enabled' (line {enabled_line})"
-                    " in file {file}. If 'Enabled' is present it must be one of"
-                    " yes or no (if absent it defaults to yes)."
-                ).format(
-                    value=enabled_field,
-                    enabled_line=line_numbers["Enabled"],
-                    file=filename,
-                )
-            )
-        # Signed-By
-        gpg_key_file = options.pop("Signed-By", "")
-        if "\n" in gpg_key_file:
-            # actually a literal multi-line gpg-key rather than a filename
-            self._gpg_key_from_stanza = gpg_key_file
-            gpg_key_file = ""
-        # Types
-        try:
-            repotypes = options.pop("Types").split()
-            uris = options.pop("URIs").split()
-            suites = options.pop("Suites").split()
-        except KeyError as e:
-            [key] = e.args
-            raise InvalidSourceError(
-                "Missing key '{key}' for entry starting on line {line} in {file}.".format(
-                    key=key,
-                    line=min(line_numbers.values()),
-                    file=filename,
-                )
-            )
-        # Components
-        components: List[str]
-        if len(suites) == 1 and suites[0].endswith("/"):
-            if "Components" in options:
-                raise InvalidSourceError(
-                    (
-                        "Since 'Suites' (line {suites_line}) specifies"
-                        " a path relative to  'URIs' (line {uris_line}),"
-                        " 'Components' (line {components_line}) must be  ommitted"
-                        " (in file {file})."
-                    ).format(
-                        suites_line=line_numbers["Suites"],
-                        uris_line=line_numbers["URIs"],
-                        components_line=line_numbers["Components"],
-                        file=filename,
-                    )
-                )
-            components = []
-        else:
-            if "Components" not in options:
-                raise InvalidSourceError(
-                    (
-                        "Since 'Suites' (line {suites_line}) does not specify"
-                        " a path relative to  'URIs' (line {uris_line}),"
-                        " 'Components' must be  present in this paragraph"
-                        " (in file {file})."
-                    ).format(
-                        suites_line=line_numbers["Suites"],
-                        uris_line=line_numbers["URIs"],
-                        file=filename,
-                    )
-                )
-            components = options.pop("Components").split()
-        return tuple(
-            DebianRepository(
-                enabled=enabled,
-                repotype=repotype,
-                uri=uri,
-                release=suite,
-                groups=components,
-                filename=filename,
-                gpg_key_filename=gpg_key_file,
-                options=options,
-                deb822_stanza=self,
-            )
-            for repotype, uri, suite in itertools.product(repotypes, uris, suites)
-        )
-
-    @staticmethod
-    def _get_options(
-        lines: Iterable[Tuple[int, str]],
-    ) -> Tuple[Dict[str, str], Dict[str, int]]:
-        parts: Dict[str, List[str]] = {}
-        line_numbers: Dict[str, int] = {}
-        current = None
-        for n, line in lines:
-            assert "#" not in line  # comments should be stripped out
-            if line.startswith(" "):  # continuation of previous key's value
-                assert current is not None
-                parts[current].append(line.rstrip())  # preserve indent
-                continue
-            raw_key, _, raw_value = line.partition(":")
-            current = raw_key.strip()
-            parts[current] = [raw_value.strip()]
-            line_numbers[current] = n
-        options = {k: "\n".join(v) for k, v in parts.items()}
-        return options, line_numbers
-
 
 def _iter_deb822_stanzas(lines: Iterable[str]) -> Iterator[List[Tuple[int, str]]]:
     """Given lines from a deb822 format file, yield a stanza of lines.
 
-    A stanza is a list of numbered lines that make up a source entry,
-    with comments stripped out (but accounted for in line numbering).
+    Args:
+        lines: an iterable of lines from a deb822 sources file
+
+    Yields:
+        lists of numbered lines (a tuple of line number and line) that make up
+        a deb822 stanza, with comments stripped out (but accounted for in line numbering)
     """
     current_paragraph: List[Tuple[int, str]] = []
-    for n, line in enumerate(lines):  # 0 indexed line numbers, following `load`
+    for n, line in enumerate(lines, start=1):  # 1 indexed line numbers
         if not line.strip():  # blank lines separate paragraphs
             if current_paragraph:
                 yield current_paragraph
@@ -1663,30 +1534,135 @@ def _iter_deb822_stanzas(lines: Iterable[str]) -> Iterator[List[Tuple[int, str]]
         yield current_paragraph
 
 
-def _opts_from_repository(
-    repo: DebianRepository, stanza: Optional[_Deb822Stanza] = None
-) -> Dict[str, str]:
-    """Return repo information as deb822 format keys and values."""
-    opts = {
-        "Enabled": ("yes" if repo.enabled else "no"),
-        "Types": repo.repotype,
-        "URIs": repo.uri,
-        "Suites": repo.release,
-    }
+def _deb822_stanza_to_options(
+    lines: Iterable[Tuple[int, str]],
+) -> Tuple[Dict[str, str], Dict[str, int]]:
+    """Turn numbered lines into a dict of options and a dict of line numbers.
+
+    Args:
+        lines: an iterable of numbered lines (a tuple of line number and line)
+
+    Returns:
+        a dictionary of option names to (potentially multiline) values, and
+        a dictionary of option names to starting line number
+    """
+    parts: Dict[str, List[str]] = {}
+    line_numbers: Dict[str, int] = {}
+    current = None
+    for n, line in lines:
+        assert "#" not in line  # comments should be stripped out
+        if line.startswith(" "):  # continuation of previous key's value
+            assert current is not None
+            parts[current].append(line.rstrip())  # preserve indent
+            continue
+        raw_key, _, raw_value = line.partition(":")
+        current = raw_key.strip()
+        parts[current] = [raw_value.strip()]
+        line_numbers[current] = n
+    options = {k: "\n".join(v) for k, v in parts.items()}
+    return options, line_numbers
+
+
+def _deb822_options_to_repos(
+    options: Dict[str, str], line_numbers: Mapping[str, int] = {}, filename: str = ""
+) -> Tuple[Tuple[DebianRepository, ...], Tuple[str, Optional[str]]]:
+    """Return a collections of DebianRepository objects defined by this deb822 stanza.
+
+    Args:
+        options: a dictionary of deb822 field names to string options
+        line_numbers: a dictionary of field names to line numbers (for error messages)
+        filename: the file the options were read from (for repository object and errors)
+
+    Returns:
+        a tuple of `DebianRepository`s, and
+        a tuple of the gpg key filename and optional in-stanza provided key itself
+
+    Raises:
+      InvalidSourceError if any options are malformed or required options are missing
+    """
+    # Enabled
+    enabled_field = options.pop("Enabled", "yes")
+    if enabled_field == "yes":
+        enabled = True
+    elif enabled_field == "no":
+        enabled = False
+    else:
+        raise InvalidSourceError(
+            (
+                "Bad value '{value}' for entry 'Enabled' (line {enabled_line})"
+                " in file {file}. If 'Enabled' is present it must be one of"
+                " yes or no (if absent it defaults to yes)."
+            ).format(
+                value=enabled_field,
+                enabled_line=line_numbers.get("Enabled"),
+                file=filename,
+            )
+        )
     # Signed-By
-    # use the actual gpg key if it was provided in the stanza
-    # otherwise use the filename if that was provided
-    gpg_key: Optional[str] = None
-    if stanza is not None:
-        gpg_key = stanza._gpg_key_from_stanza
-    if gpg_key is None:  # no inline gpg key provided
-        gpg_key = repo.gpg_key
-    if gpg_key:
-        opts["Signed-By"] = gpg_key
+    gpg_key_file = options.pop("Signed-By", "")
+    gpg_key_from_stanza: Optional[str] = None
+    if "\n" in gpg_key_file:
+        # actually a literal multi-line gpg-key rather than a filename
+        gpg_key_from_stanza = gpg_key_file
+        gpg_key_file = ""
+    # Types
+    try:
+        repotypes = options.pop("Types").split()
+        uris = options.pop("URIs").split()
+        suites = options.pop("Suites").split()
+    except KeyError as e:
+        [key] = e.args
+        raise InvalidSourceError(
+            "Missing required entry '{key}' for entry starting on line {line} in {file}.".format(
+                key=key,
+                line=min(line_numbers.values()) if line_numbers else None,
+                file=filename,
+            )
+        )
     # Components
-    if repo.groups:
-        opts["Components"] = " ".join(repo.groups)
-    # options
-    if repo.options is not None:
-        opts.update(repo.options)
-    return opts
+    components: List[str]
+    if len(suites) == 1 and suites[0].endswith("/"):
+        if "Components" in options:
+            raise InvalidSourceError(
+                (
+                    "Since 'Suites' (line {suites_line}) specifies"
+                    " a path relative to  'URIs' (line {uris_line}),"
+                    " 'Components' (line {components_line}) must be  ommitted"
+                    " (in file {file})."
+                ).format(
+                    suites_line=line_numbers.get("Suites"),
+                    uris_line=line_numbers.get("URIs"),
+                    components_line=line_numbers.get("Components"),
+                    file=filename,
+                )
+            )
+        components = []
+    else:
+        if "Components" not in options:
+            raise InvalidSourceError(
+                (
+                    "Since 'Suites' (line {suites_line}) does not specify"
+                    " a path relative to  'URIs' (line {uris_line}),"
+                    " 'Components' must be  present in this paragraph"
+                    " (in file {file})."
+                ).format(
+                    suites_line=line_numbers.get("Suites"),
+                    uris_line=line_numbers.get("URIs"),
+                    file=filename,
+                )
+            )
+        components = options.pop("Components").split()
+    repos = tuple(
+        DebianRepository(
+            enabled=enabled,
+            repotype=repotype,
+            uri=uri,
+            release=suite,
+            groups=components,
+            filename=filename,
+            gpg_key_filename=gpg_key_file,
+            options=options,
+        )
+        for repotype, uri, suite in itertools.product(repotypes, uris, suites)
+    )
+    return repos, (gpg_key_file, gpg_key_from_stanza)
