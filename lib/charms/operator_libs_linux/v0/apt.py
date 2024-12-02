@@ -846,7 +846,17 @@ def remove_package(
 
 def update() -> None:
     """Update the apt cache via `apt-get update`."""
-    subprocess.run(["apt-get", "update", "--error-on=any"], capture_output=True, check=True)
+    cmd = ["apt-get", "update", "--error-on=any"]
+    try:
+        subprocess.run(cmd, capture_output=True, check=True)
+    except CalledProcessError as e:
+        logger.error(
+            "%s:\nstdout:\n%s\nstderr:\n%s",
+            " ".join(cmd),
+            e.stdout.decode(),
+            e.stderr.decode(),
+        )
+        raise
 
 
 def import_key(key: str) -> str:
