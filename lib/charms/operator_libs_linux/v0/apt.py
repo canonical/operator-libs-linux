@@ -807,12 +807,17 @@ def _add(
 
 
 def remove_package(
-    package_names: Union[str, List[str]]
+    package_names: Union[str, List[str]],
+    autoremove: bool = False,
 ) -> Union[DebianPackage, List[DebianPackage]]:
     """Remove package(s) from the system.
 
     Args:
         package_names: the name of a package
+        autoremove: run `apt autoremove` after uninstalling packages.
+            You probably want to do this if you're removing a metapackage,
+            otherwise the concrete packages will still be there.
+            False by default for backwards compatibility.
 
     Raises:
         PackageNotFoundError if the package is not found.
@@ -830,6 +835,9 @@ def remove_package(
             packages.append(pkg)
         except PackageNotFoundError:
             logger.info("package '%s' was requested for removal, but it was not installed.", p)
+
+    if autoremove:
+        subprocess.run(["apt", "autoremove"], check=True)
 
     # the list of packages will be empty when no package is removed
     logger.debug("packages: '%s'", packages)
