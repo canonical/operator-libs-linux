@@ -1543,11 +1543,16 @@ class _Deb822Stanza:
     """
 
     def __init__(self, numbered_lines: List[Tuple[int, str]], filename: str = ""):
-        self._numbered_lines = numbered_lines
         self._filename = filename
-        self._options, self._line_numbers = _deb822_stanza_to_options(numbered_lines)
+        self._numbered_lines = numbered_lines
+        if not numbered_lines:
+            self._repositories = ()
+            self._gpg_key_filename = ""
+            self._gpg_key_from_stanza = None
+            return
+        options, line_numbers = _deb822_stanza_to_options(numbered_lines)
         repos, gpg_key_info = _deb822_options_to_repos(
-            self._options, line_numbers=self._line_numbers, filename=filename
+            options, line_numbers=line_numbers, filename=filename
         )
         for repo in repos:
             repo._deb822_stanza = self  # pyright: ignore[reportPrivateUsage]
