@@ -31,3 +31,15 @@ Types: deb
 URIs: http://nz.archive.ubuntu.com/ubuntu/
 Suites: noble noble-updates noble-backports
 # this is an error, must have at least one component if suites isn't an exact path
+
+Types: deb
+URIs: http://nz.archive.ubuntu.com/ubuntu/
+Suites: noble noble-updates noble-backports
+Components: main restricted universe multiverse
+Enabled: no
+
+Types: deb
+URIs: http://nz.archive.ubuntu.com/ubuntu/
+Suites: noble noble-updates noble-backports
+Components: main restricted universe multiverse
+Enabled: bad

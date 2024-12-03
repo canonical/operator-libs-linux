@@ -924,6 +924,35 @@ class InvalidSourceError(Error):
     """Exceptions for invalid source entries."""
 
 
+class MissingRequiredKeyError(InvalidSourceError):
+    """Missing a required value in a source file."""
+    def __init__(
+        self, message: str = "", *, file: str, line: Optional[int], key: str
+    ) -> None:
+        super().__init__(message, file, line, key)
+        self.file = file
+        self.line = line
+        self.key = key
+
+
+class BadValueError(InvalidSourceError):
+    """Bad value for an entry in a source file."""
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        file: str,
+        line: Optional[int],
+        key: str,
+        value: str,
+    ) -> None:
+        super().__init__(message, file, line, key, value)
+        self.file = file
+        self.line = line
+        self.key = key
+        self.value = value
+
+
 class GPGKeyError(Error):
     """Exceptions for GPG keys."""
 
@@ -1243,6 +1272,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
     _sources_subdir = "sources.list.d"
     _default_list_name = "sources.list"
     _default_sources_name = "ubuntu.sources"
+    _last_errors: Iterable[Error] = ()
 
     def __init__(self):
         self._repository_map: Dict[str, DebianRepository] = {}
@@ -1316,6 +1346,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
             self._repository_map[identifier] = repo
 
         if errors:
+            self._last_errors = errors
             logger.debug(
                 "the following %d error(s) were encountered when reading deb822 sources:\n%s",
                 len(errors),
@@ -1657,16 +1688,12 @@ def _deb822_options_to_repos(
     elif enabled_field == "no":
         enabled = False
     else:
-        raise InvalidSourceError(
-            (
-                "Bad value '{value}' for entry 'Enabled' (line {enabled_line})"
-                " in file {file}. If 'Enabled' is present it must be one of"
-                " yes or no (if absent it defaults to yes)."
-            ).format(
-                value=enabled_field,
-                enabled_line=line_numbers.get("Enabled"),
-                file=filename,
-            )
+        raise BadValueError(
+            "Must be one of yes or no (default: yes).",
+            file=filename,
+            line=line_numbers.get("Enabled"),
+            key="Enabled",
+            value=enabled_field,
         )
     # Signed-By
     gpg_key_file = options.pop("Signed-By", "")
@@ -1682,44 +1709,49 @@ def _deb822_options_to_repos(
         suites = options.pop("Suites").split()
     except KeyError as e:
         [key] = e.args
-        raise InvalidSourceError(
-            "Missing required entry '{key}' for entry starting on line {line} in {file}.".format(
-                key=key,
-                line=min(line_numbers.values()) if line_numbers else None,
-                file=filename,
-            )
+        raise MissingRequiredKeyError(
+            key=key,
+            line=min(line_numbers.values()) if line_numbers else None,
+            file=filename,
         )
     # Components
+    # suite can specify an exact path, in which case the components must be omitted and suite must end with a slash (/).
+    # If suite does not specify an exact path, at least one component must be present.
+    # https://manpages.ubuntu.com/manpages/noble/man5/sources.list.5.html
     components: List[str]
     if len(suites) == 1 and suites[0].endswith("/"):
         if "Components" in options:
-            raise InvalidSourceError(
-                (
-                    "Since 'Suites' (line {suites_line}) specifies"
-                    " a path relative to  'URIs' (line {uris_line}),"
-                    " 'Components' (line {components_line}) must be  ommitted"
-                    " (in file {file})."
-                ).format(
-                    suites_line=line_numbers.get("Suites"),
-                    uris_line=line_numbers.get("URIs"),
-                    components_line=line_numbers.get("Components"),
-                    file=filename,
-                )
+            msg = (
+                "Since 'Suites' (line {suites_line}) specifies"
+                " a path relative to  'URIs' (line {uris_line}),"
+                " 'Components' must be  ommitted."
+            ).format(
+                suites_line=line_numbers.get("Suites"),
+                uris_line=line_numbers.get("URIs"),
+            )
+            raise BadValueError(
+                msg,
+                file=filename,
+                line=line_numbers.get("Components"),
+                key="Components",
+                value=options["Components"],
             )
         components = []
     else:
         if "Components" not in options:
-            raise InvalidSourceError(
-                (
-                    "Since 'Suites' (line {suites_line}) does not specify"
-                    " a path relative to  'URIs' (line {uris_line}),"
-                    " 'Components' must be  present in this paragraph"
-                    " (in file {file})."
-                ).format(
-                    suites_line=line_numbers.get("Suites"),
-                    uris_line=line_numbers.get("URIs"),
-                    file=filename,
-                )
+            msg = (
+                "Since 'Suites' (line {suites_line}) does not specify"
+                " a path relative to  'URIs' (line {uris_line}),"
+                " 'Components' must be  present in this paragraph."
+            ).format(
+                suites_line=line_numbers.get("Suites"),
+                uris_line=line_numbers.get("URIs"),
+            )
+            raise MissingRequiredKeyError(
+                msg,
+                file=filename,
+                line=min(line_numbers.values()) if line_numbers else None,
+                key="Components",
             )
         components = options.pop("Components").split()
     repos = tuple(

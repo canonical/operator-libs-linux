@@ -242,32 +242,48 @@ class TestRepositoryMappingDeb822Behaviour(unittest.TestCase):
         ]
 
     def test_load_deb822_w_comments(self):
-        def isnt_file(f: str) -> bool:
-            return False
-
-        def iglob_nothing(s: str) -> typing.Iterable[str]:
-            return []
-
-        with patch("os.path.isfile", new=isnt_file):
-            with patch("glob.iglob", new=iglob_nothing):
-                repository_mapping = apt.RepositoryMapping()
-        assert not repository_mapping._repository_map
-
-        with patch(
-            "builtins.open", new_callable=mock_open, read_data=ubuntu_sources_deb822_with_comments
+        with patch.object(
+            apt.RepositoryMapping,
+            "_apt_dir",
+            str(FAKE_APT_DIRS / "noble-with-comments-etc"),
         ):
-            with patch.object(apt.logger, "debug") as debug:
-                repository_mapping.load_deb822("FILENAME")
+            repository_mapping = apt.RepositoryMapping()
+        # TODO: split cases into separate files and test load_deb822 instead
+        # this will make things a lot more understandable and maintainable
+
         assert sorted(repository_mapping._repository_map.keys()) == [
+            "deb-http://archive.ubuntu.com/ubuntu/-noble",
+            "deb-http://archive.ubuntu.com/ubuntu/-noble-backports",
+            "deb-http://archive.ubuntu.com/ubuntu/-noble-updates",
+            "deb-http://nz.archive.ubuntu.com/ubuntu/-an/exact/path/",
             "deb-http://nz.archive.ubuntu.com/ubuntu/-noble",
             "deb-http://nz.archive.ubuntu.com/ubuntu/-noble-backports",
             "deb-http://nz.archive.ubuntu.com/ubuntu/-noble-updates",
+            "deb-src-http://archive.ubuntu.com/ubuntu/-noble",
+            "deb-src-http://archive.ubuntu.com/ubuntu/-noble-backports",
+            "deb-src-http://archive.ubuntu.com/ubuntu/-noble-updates",
+            "deb-src-http://nz.archive.ubuntu.com/ubuntu/-noble",
+            "deb-src-http://nz.archive.ubuntu.com/ubuntu/-noble-backports",
+            "deb-src-http://nz.archive.ubuntu.com/ubuntu/-noble-updates",
         ]
-        debug.assert_called_once_with(
-            ANY,
-            1,  # number of errors
-            "Missing required entry 'Types' for entry starting on line 12 in FILENAME.",
-        )
+        errors = tuple(repository_mapping._last_errors)
+        assert len(errors) == 4
+        (
+            missing_types,
+            components_not_ommitted,
+            components_not_present,
+            bad_enabled_value,
+        ) = errors
+        assert isinstance(missing_types, apt.MissingRequiredKeyError)
+        assert missing_types.key == "Types"
+        assert isinstance(components_not_ommitted, apt.BadValueError)
+        assert components_not_ommitted.key == "Components"
+        assert components_not_ommitted.value == "main"
+        assert isinstance(components_not_present, apt.MissingRequiredKeyError)
+        assert components_not_present.key == "Components"
+        assert isinstance(bad_enabled_value, apt.BadValueError)
+        assert bad_enabled_value.key == "Enabled"
+        assert bad_enabled_value.value == "bad"
 
     def test_init_with_deb822(self):
         """Mock file opening to initialise a RepositoryMapping from deb822 and one-line-style.
@@ -307,15 +323,12 @@ class TestRepositoryMappingDeb822Behaviour(unittest.TestCase):
             )
 
     def test_disable_with_deb822(self):
-        def isnt_file(f: str) -> bool:
-            return False
-
-        def iglob_nothing(s: str) -> typing.Iterable[str]:
-            return []
-
-        with patch("os.path.isfile", new=isnt_file):
-            with patch("glob.iglob", new=iglob_nothing):
-                repository_mapping = apt.RepositoryMapping()
+        with patch.object(
+            apt.RepositoryMapping,
+            "_apt_dir",
+            str(FAKE_APT_DIRS / "empty"),
+        ):
+            repository_mapping = apt.RepositoryMapping()
         repo = apt.DebianRepository(
             enabled=True,
             repotype="deb",
