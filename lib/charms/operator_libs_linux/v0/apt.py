@@ -1235,10 +1235,17 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         ))
     """
 
+    _apt_dir = "/etc/apt"
+    _sources_subdir = "sources.list.d"
+    _default_list_name = "sources.list"
+    _default_sources_name = "ubuntu.sources"
+
     def __init__(self):
         self._repository_map: Dict[str, DebianRepository] = {}
-        self.default_file = "/etc/apt/sources.list"
-        self.default_sources = "/etc/apt/sources.list.d/ubuntu.sources"
+        self.default_file = os.path.join(self._apt_dir, self._default_list_name)
+        # ^ public attribute for backwards compatibility only
+        sources_dir = os.path.join(self._apt_dir, self._sources_subdir)
+        default_sources = os.path.join(sources_dir, self._default_sources_name)
 
         # read sources.list if it exists
         # ignore InvalidSourceError if ubuntu.sources also exists
@@ -1247,13 +1254,13 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
             try:
                 self.load(self.default_file)
             except InvalidSourceError:
-                if not os.path.isfile(self.default_sources):
+                if not os.path.isfile(default_sources):
                     raise
 
         # read sources.list.d
-        for file in glob.iglob("/etc/apt/sources.list.d/*.list"):
+        for file in glob.iglob(os.path.join(sources_dir, "*.list")):
             self.load(file)
-        for file in glob.iglob("/etc/apt/sources.list.d/*.sources"):
+        for file in glob.iglob(os.path.join(sources_dir, "*.sources")):
             self.load_deb822(file)
 
     def __contains__(self, key: Any) -> bool:
