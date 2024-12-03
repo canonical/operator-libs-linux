@@ -941,8 +941,8 @@ class DebianRepository:
         uri: str,
         release: str,
         groups: List[str],
-        filename: Optional[str] = "",
-        gpg_key_filename: Optional[str] = "",
+        filename: str = "",
+        gpg_key_filename: str = "",
         options: Optional[Dict[str, str]] = None,
     ):
         self._enabled = enabled
@@ -953,6 +953,24 @@ class DebianRepository:
         self._filename = filename
         self._gpg_key_filename = gpg_key_filename
         self._options = options
+
+    def _get_identifier(self) -> str:
+        """Return str identifier derived from repotype, uri, and release.
+
+        Private method used to produce the identifiers used by RepositoryMapping.
+        """
+        return "{}-{}-{}".format(self.repotype, self.uri, self.release)
+
+    def _to_line(self) -> str:
+        """Return the one-per-line format repository definition."""
+        return "{prefix}{repotype} {options}{uri} {release} {groups}".format(
+            prefix="" if self.enabled else "#",
+            repotype=self.repotype,
+            options=self.make_options_string(),
+            uri=self.uri,
+            release=self.release,
+            groups=" ".join(self.groups),
+        )
 
     @property
     def enabled(self):
@@ -995,6 +1013,16 @@ class DebianRepository:
             raise InvalidSourceError("apt source filenames should end in .list or .sources!")
         self._filename = fname
 
+    def _make_filename(self) -> str:
+        """Construct a filename from uri and release.
+
+        For internal use when a filename isn't set.
+        """
+        return "{}-{}.list".format(
+            DebianRepository.prefix_from_uri(self.uri),
+            self.release.replace("/", "-"),
+        )
+
     @property
     def gpg_key(self):
         """Returns the path to the GPG key for this repository."""
@@ -1022,7 +1050,8 @@ class DebianRepository:
         if not options:
             return ""
 
-        return "[{}] ".format(" ".join("{}={}".format(k, v) for k, v in options.items()))
+        pairs = ("{}={}".format(k, v) for k, v in sorted(options.items()))
+        return "[{}] ".format(" ".join(pairs))
 
     @staticmethod
     def prefix_from_uri(uri: str) -> str:
@@ -1041,38 +1070,19 @@ class DebianRepository:
             repo_line: a string representing a repository entry
             write_file: boolean to enable writing the new repo to disk
         """
-        repo = RepositoryMapping._parse(repo_line, "UserInput")
-        fname = "{}-{}.list".format(
-            DebianRepository.prefix_from_uri(repo.uri), repo.release.replace("/", "-")
+        repo = RepositoryMapping._parse(  # pyright: ignore[reportPrivateUsage]
+            repo_line, "UserInput"
         )
-        repo.filename = fname
-
-        options = repo.options if repo.options else {}
-        if repo.gpg_key:
-            options["signed-by"] = repo.gpg_key
-
-        # For Python 3.5 it's required to use sorted in the options dict in order to not have
-        # different results in the order of the options between executions.
-        options_str = (
-            "[{}] ".format(" ".join(["{}={}".format(k, v) for k, v in sorted(options.items())]))
-            if options
-            else ""
-        )
-
-        repo_str = (
-            "{}".format("#" if not repo.enabled else "")
-            + "{} {}{} ".format(repo.repotype, options_str, repo.uri)
-            + "{} {}\n".format(repo.release, " ".join(repo.groups))
-        )
-
+        repo.filename = repo._make_filename()
+        repo_str = repo._to_line() + "\n"
         if write_file:
             logger.info(
                 "DebianRepository.from_repo_line('%s', write_file=True)\nWriting to '%s':\n%s",
                 repo_line,
-                fname,
+                repo.filename,
                 repo_str,
             )
-            with open(fname, "wb") as f:
+            with open(repo.filename, "wb") as f:
                 f.write(repo_str.encode("utf-8"))
 
         return repo
@@ -1307,8 +1317,8 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
             repos, errors = self._parse_deb822_lines(f, filename=filename)
 
         for repo in repos:
-            repo_identifier = "{}-{}-{}".format(repo.repotype, repo.uri, repo.release)
-            self._repository_map[repo_identifier] = repo
+            identifier = repo._get_identifier()  # pyright: ignore[reportPrivateUsage]
+            self._repository_map[identifier] = repo
 
         if errors:
             logger.debug(
@@ -1442,9 +1452,9 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
             repo: a DebianRepository object where repo.enabled is True
             update_cache: if True, apt-add-repository will update the package cache
                 and then a new RepositoryMapping object will be returned.
-                If False, then apt-add-repository is run with the --no-update option,
-                and an entry for repo is added to this RepositoryMapping, and you
-                can call `update` manually before installing any packages.
+                If False, then apt-add-repository is run with the --no-update option.
+                An entry for the repo is added to this RepositoryMapping before returning it.
+                Don't forget to call `apt.update` manually before installing any packages!
 
         Returns:
             self, or a new RepositoryMapping object if update_cache is True
@@ -1462,30 +1472,33 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         self._add_apt_repository(repo, update_cache=update_cache, remove=False)
         if update_cache:
             return RepositoryMapping()
-        self._repository_map["{}-{}-{}".format(repo.repotype, repo.uri, repo.release)] = repo
+        identifier = repo._get_identifier()  # pyright: ignore[reportPrivateUsage]
+        self._repository_map[identifier] = repo
         return self
 
     def _remove(self, repo: DebianRepository, update_cache: bool = False) -> "RepositoryMapping":
         """Use add-apt-repository to remove a repository.
 
-        FIXME: doesn't seem to work
-
         Args:
             repo: a DebianRepository object where repo.enabled is True
             update_cache: if True, apt-add-repository will update the package cache
                 and then a new RepositoryMapping object will be returned.
-                If False, then apt-add-repository is run with the --no-update option,
-                and any entry for the repo is removed from this RepositoryMapping, and you
-                can call `update` manually before installing any packages.
+                If False, then apt-add-repository is run with the --no-update option.
+                Any entry for the repo is removed from this RepositoryMapping before returning it.
+                Don't forget to call `apt.update` manually before installing any packages!
 
         Returns:
             self, or a new RepositoryMapping object if update_cache is True
+
+        raises:
+            ValueError: if repo.enabled is False
+            CalledProcessError: if there's an error running apt-add-repository
         """
         self._add_apt_repository(repo, update_cache=update_cache, remove=True)
         if update_cache:
             return RepositoryMapping()
-        repo_id = "-".join((repo.repotype, repo.uri, repo.release))
-        self._repository_map.pop(repo_id, None)
+        identifier = repo._get_identifier()  # pyright: ignore[reportPrivateUsage]
+        self._repository_map.pop(identifier, None)
         return self
 
     def _add_apt_repository(
@@ -1496,30 +1509,23 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
     ) -> None:
         if not repo.enabled:
             raise ValueError("{repo}.enabled is {value}".format(repo=repo, value=repo.enabled))
+        line = repo._to_line()  # pyright: ignore[reportPrivateUsage]
         cmd = [
             "apt-add-repository",
             "--yes",
-            f"--uri={repo.uri}",
+            "--sourceslist=" + line,
         ]
-        ## FIXME: trying to compute pocket seems like a dead end -- add by repo line format instead?
-        # _, _, pocket = repo.release.partition("-")
-        # if pocket:
-        #     cmd.append(f"--pocket={pocket}")
-        if repo.repotype == "deb-src":
-            cmd.append("--enable-source")
-        for component in repo.groups:
-            cmd.append(f"--component={component}")
-        if not update_cache:
-            cmd.append("--no-update")
         if remove:
             cmd.append("--remove")
-        logger.info(" ".join(cmd))
+        if not update_cache:
+            cmd.append("--no-update")
+        logger.info("%s", cmd)
         try:
             subprocess.run(cmd, check=True, capture_output=True)
         except CalledProcessError as e:
             logger.error(
-                "%s:\nstdout:\n%s\nstderr:\n%s",
-                " ".join(cmd),
+                "subprocess.run(%s):\nstdout:\n%s\nstderr:\n%s",
+                cmd,
                 e.stdout.decode(),
                 e.stderr.decode(),
             )
