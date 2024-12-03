@@ -98,7 +98,7 @@ def test_install_package_from_external_repository():
     ## apt.add_package(...)
     apt.import_key(key)
     ## if: use implicit write_file
-    _repo = apt.DebianRepository.from_repo_line(line)
+    repo = apt.DebianRepository.from_repo_line(line)
     apt.update()
     repos_after = apt.RepositoryMapping()
     ## if: don't use implicit write_file
@@ -113,12 +113,11 @@ def test_install_package_from_external_repository():
     ## cleanup
     apt.remove_package("mongodb-org", autoremove=True)  # mongodb-org is a metapackage
     assert not get_command_path("mongod")
-    ## FIXME: RepositoryMapping._remove
-    # repos_after._remove(repo, update_cache=False)  # pyright: ignore[reportPrivateUsage]
-    # assert repo_id not in repos_after
-    # apt.update()
-    # repos_clean = apt.RepositoryMapping()
-    # assert repo_id not in repos_clean
+    repos_after._remove(repo, update_cache=False)  # pyright: ignore[reportPrivateUsage]
+    assert repo_id not in repos_after
+    apt.update()
+    repos_clean = apt.RepositoryMapping()
+    assert repo_id not in repos_clean
 
 
 def test_install_higher_version_package_from_external_repository():
@@ -167,14 +166,10 @@ def test_install_higher_version_package_from_external_repository():
     ## cleanup
     apt.remove_package("inkscape")
     assert not get_command_path("inkscape")
-    ## FIXME: RepositoryMapping._remove
-    # repos_after._remove(repo, update_cache=False)  # pyright: ignore[reportPrivateUsage]
-    # assert repo_id not in repos_after
-    # apt.update()
-    # repos_clean = apt.RepositoryMapping()
-    # assert repo_id not in repos_clean
-    # repos_clean = repos_after._remove(repo, update_cache=True)  # pyright: ignore[reportPrivateUsage]
-    # assert repo_id not in repos_clean
+    repos_clean = repos_after._remove(  # pyright: ignore[reportPrivateUsage]
+        repo, update_cache=True
+    )
+    assert repo_id not in repos_clean
 
 
 def test_from_apt_cache_error():
