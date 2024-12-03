@@ -1060,15 +1060,21 @@ class DebianRepository:
             else ""
         )
 
+        repo_str = (
+            "{}".format("#" if not repo.enabled else "")
+            + "{} {}{} ".format(repo.repotype, options_str, repo.uri)
+            + "{} {}\n".format(repo.release, " ".join(repo.groups))
+        )
+
         if write_file:
+            logger.info(
+                "DebianRepository.from_repo_line('%s', write_file=True)\nWriting to '%s':\n%s",
+                repo_line,
+                fname,
+                repo_str,
+            )
             with open(fname, "wb") as f:
-                f.write(
-                    (
-                        "{}".format("#" if not repo.enabled else "")
-                        + "{} {}{} ".format(repo.repotype, options_str, repo.uri)
-                        + "{} {}\n".format(repo.release, " ".join(repo.groups))
-                    ).encode("utf-8")
-                )
+                f.write(repo_str.encode("utf-8"))
 
         return repo
 
