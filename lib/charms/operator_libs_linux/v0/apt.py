@@ -107,10 +107,9 @@ import logging
 import os
 import re
 import subprocess
-import typing
 from enum import Enum
 from subprocess import PIPE, CalledProcessError, check_output
-from typing import Any, Dict, Iterable, Iterator, List, Literal, Mapping, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -1431,27 +1430,13 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         else:
             raise InvalidSourceError("An invalid sources line was found in %s!", filename)
 
-    @typing.overload
-    def add(  # pyright: ignore[reportOverlappingOverload]
-        self,
-        repo: DebianRepository,
-        default_filename: Optional[bool] = False,
-        update_cache: Literal[False] = False,
-    ) -> None: ...
-    @typing.overload
-    def add(
-        self,
-        repo: DebianRepository,
-        default_filename: Optional[bool] = False,
-        update_cache: Literal[True] = True,
-    ) -> "RepositoryMapping": ...
     def add(  # noqa: D417  # undocumented-param: default_filename intentionally undocumented
         self,
         repo: DebianRepository,
         default_filename: Optional[bool] = False,
         update_cache: bool = False,
-    ) -> Optional["RepositoryMapping"]:
-        """Add a new repository to the system using apt-add-repository.
+    ) -> "RepositoryMapping":
+        """Add a new repository to the system using add-apt-repository.
 
         Args:
             repo: a DebianRepository object where repo.enabled is True
@@ -1462,7 +1447,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
                 can call `update` manually before installing any packages.
 
         Returns:
-            None, or a new RepositoryMapping object if update_cache is True
+            self, or a new RepositoryMapping object if update_cache is True
 
         raises:
             ValueError: if repo.enabled is False
@@ -1474,25 +1459,71 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         WARNING: the default_filename keyword argument is provided for backwards compatibility
         only. It is not used, and was not used in the previous revision of this library.
         """
+        self._add_apt_repository(repo, update_cache=update_cache, remove=False)
+        if update_cache:
+            return RepositoryMapping()
+        self._repository_map["{}-{}-{}".format(repo.repotype, repo.uri, repo.release)] = repo
+        return self
+
+    def _remove(self, repo: DebianRepository, update_cache: bool = False) -> "RepositoryMapping":
+        """Use add-apt-repository to remove a repository.
+
+        FIXME: doesn't seem to work
+
+        Args:
+            repo: a DebianRepository object where repo.enabled is True
+            update_cache: if True, apt-add-repository will update the package cache
+                and then a new RepositoryMapping object will be returned.
+                If False, then apt-add-repository is run with the --no-update option,
+                and any entry for the repo is removed from this RepositoryMapping, and you
+                can call `update` manually before installing any packages.
+
+        Returns:
+            self, or a new RepositoryMapping object if update_cache is True
+        """
+        self._add_apt_repository(repo, update_cache=update_cache, remove=True)
+        if update_cache:
+            return RepositoryMapping()
+        repo_id = "-".join((repo.repotype, repo.uri, repo.release))
+        self._repository_map.pop(repo_id, None)
+        return self
+
+    def _add_apt_repository(
+        self,
+        repo: DebianRepository,
+        update_cache: bool = False,
+        remove: bool = False,
+    ) -> None:
         if not repo.enabled:
             raise ValueError("{repo}.enabled is {value}".format(repo=repo, value=repo.enabled))
         cmd = [
             "apt-add-repository",
-            "--dry-run",
             "--yes",
             f"--uri={repo.uri}",
-            f"--pocket={repo.release}",
         ]
+        ## FIXME: trying to compute pocket seems like a dead end -- add by repo line format instead?
+        # _, _, pocket = repo.release.partition("-")
+        # if pocket:
+        #     cmd.append(f"--pocket={pocket}")
         if repo.repotype == "deb-src":
             cmd.append("--enable-source")
         for component in repo.groups:
             cmd.append(f"--component={component}")
         if not update_cache:
             cmd.append("--no-update")
-        subprocess.run(cmd, check=True)
-        if update_cache:
-            return RepositoryMapping()
-        self._repository_map["{}-{}-{}".format(repo.repotype, repo.uri, repo.release)] = repo
+        if remove:
+            cmd.append("--remove")
+        logger.info(" ".join(cmd))
+        try:
+            subprocess.run(cmd, check=True, capture_output=True)
+        except CalledProcessError as e:
+            logger.error(
+                "%s:\nstdout:\n%s\nstderr:\n%s",
+                " ".join(cmd),
+                e.stdout.decode(),
+                e.stderr.decode(),
+            )
+            raise
 
     def disable(self, repo: DebianRepository) -> None:
         """Remove a repository by disabling it in the source file.
