@@ -127,6 +127,7 @@ LIBPATCH = 15
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
 OPTIONS_MATCHER = re.compile(r"\[.*?\]")
+_GPG_KEY_DIR = "/etc/apt/trusted.gpg.d/"
 
 
 class Error(Exception):
@@ -894,7 +895,7 @@ def import_key(key: str) -> str:
             key_bytes = key.encode("utf-8")
             key_name = DebianRepository._get_keyid_by_gpg_key(key_bytes)
             key_gpg = DebianRepository._dearmor_gpg_key(key_bytes)
-            gpg_key_filename = "/etc/apt/trusted.gpg.d/{}.gpg".format(key_name)
+            gpg_key_filename = os.path.join(_GPG_KEY_DIR, "{}.gpg".format(key_name))
             DebianRepository._write_apt_gpg_keyfile(
                 key_name=gpg_key_filename, key_material=key_gpg
             )
@@ -915,7 +916,7 @@ def import_key(key: str) -> str:
         key_asc = DebianRepository._get_key_by_keyid(key)
         # write the key in GPG format so that apt-key list shows it
         key_gpg = DebianRepository._dearmor_gpg_key(key_asc.encode("utf-8"))
-        gpg_key_filename = "/etc/apt/trusted.gpg.d/{}.gpg".format(key)
+        gpg_key_filename = os.path.join(_GPG_KEY_DIR, "{}.gpg".format(key))
         DebianRepository._write_apt_gpg_keyfile(key_name=gpg_key_filename, key_material=key_gpg)
         return gpg_key_filename
 
@@ -1272,7 +1273,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
     _sources_subdir = "sources.list.d"
     _default_list_name = "sources.list"
     _default_sources_name = "ubuntu.sources"
-    _last_errors: Iterable[Error] = ()
+    _last_errors: Tuple[Error, ...] = ()
 
     def __init__(self):
         self._repository_map: Dict[str, DebianRepository] = {}
@@ -1537,7 +1538,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
             raise ValueError("{repo}.enabled is {value}".format(repo=repo, value=repo.enabled))
         line = repo._to_line()  # pyright: ignore[reportPrivateUsage]
         cmd = [
-            "apt-add-repository",
+            "add-apt-repository",
             "--yes",
             "--sourceslist=" + line,
         ]
@@ -1597,9 +1598,10 @@ class _Deb822Stanza:
         return self._repositories
 
     def get_gpg_key_filename(self) -> str:
-        """Return the path to the GPG key for this repository.
+        """Return the path to the GPG key for this stanza.
 
         Import the key first, if the key itself was provided in the stanza.
+        Return an empty string if no filename or key was provided.
         """
         if self._gpg_key_filename:
             return self._gpg_key_filename
