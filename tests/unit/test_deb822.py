@@ -5,9 +5,13 @@
 
 import typing
 import unittest
+from pathlib import Path
 from unittest.mock import ANY, mock_open, patch
 
 from charms.operator_libs_linux.v0 import apt
+
+UNIT_TEST_DIR = Path(__file__).parent
+
 
 ubuntu_sources_deb822 = """
 Types: deb
@@ -201,16 +205,67 @@ class TestRepositoryMappingDeb822Behaviour(unittest.TestCase):
         [error] = errors
         assert isinstance(error, apt.InvalidSourceError)
 
+    def test_init_no_files(self):
+        with patch.object(
+            apt.RepositoryMapping,
+            "_apt_dir",
+            str(UNIT_TEST_DIR / "data/fake_apt_dir_empty"),
+        ):
+            repository_mapping = apt.RepositoryMapping()
+        assert not repository_mapping._repository_map
+
+    def test_init_with_good_sources_list(self):
+        with patch.object(
+            apt.RepositoryMapping,
+            "_apt_dir",
+            str(UNIT_TEST_DIR / "data/fake_apt_dir_bionic"),
+        ):
+            repository_mapping = apt.RepositoryMapping()
+        assert repository_mapping._repository_map
+
+    def test_init_with_bad_sources_list_no_fallback(self):
+        with patch.object(
+            apt.RepositoryMapping,
+            "_apt_dir",
+            str(UNIT_TEST_DIR / "data/fake_apt_dir_noble_no_sources"),
+        ):
+            with self.assertRaises(apt.InvalidSourceError):
+                apt.RepositoryMapping()
+
+    def test_init_with_bad_sources_list_fallback_ok(self):
+        with patch.object(
+            apt.RepositoryMapping,
+            "_apt_dir",
+            str(UNIT_TEST_DIR / "data/fake_apt_dir_noble"),
+        ):
+            repository_mapping = apt.RepositoryMapping()
+        assert repository_mapping._repository_map
+
+    def test_init_with_bad_ubuntu_sources(self):
+        with patch.object(
+            apt.RepositoryMapping,
+            "_apt_dir",
+            str(UNIT_TEST_DIR / "data/fake_apt_dir_noble_empty_sources"),
+        ):
+            with self.assertRaises(apt.InvalidSourceError):
+                apt.RepositoryMapping()
+
+    def test_init_with_third_party_inkscape_source(self):
+        with patch.object(
+            apt.RepositoryMapping,
+            "_apt_dir",
+            str(UNIT_TEST_DIR / "data/fake_apt_dir_noble_with_inkscape"),
+        ):
+            repository_mapping = apt.RepositoryMapping()
+        assert repository_mapping._repository_map
+
     def test_load_deb822_ubuntu_sources(self):
-        def isnt_file(f: str) -> bool:
-            return False
-
-        def iglob_nothing(s: str) -> typing.Iterable[str]:
-            return []
-
-        with patch("os.path.isfile", new=isnt_file):
-            with patch("glob.iglob", new=iglob_nothing):
-                repository_mapping = apt.RepositoryMapping()
+        with patch.object(
+            apt.RepositoryMapping,
+            "_apt_dir",
+            str(UNIT_TEST_DIR / "data/fake_apt_dir_empty"),
+        ):
+            repository_mapping = apt.RepositoryMapping()
         assert not repository_mapping._repository_map
 
         with patch("builtins.open", new_callable=mock_open, read_data=ubuntu_sources_deb822):
@@ -297,3 +352,23 @@ class TestRepositoryMappingDeb822Behaviour(unittest.TestCase):
                 == sources_repo.options  # pyright: ignore[reportUnknownMemberType]
             )
 
+    def test_disable_with_deb822(self):
+        def isnt_file(f: str) -> bool:
+            return False
+
+        def iglob_nothing(s: str) -> typing.Iterable[str]:
+            return []
+
+        with patch("os.path.isfile", new=isnt_file):
+            with patch("glob.iglob", new=iglob_nothing):
+                repository_mapping = apt.RepositoryMapping()
+        repo = apt.DebianRepository(
+            enabled=True,
+            repotype="deb",
+            uri="http://nz.archive.ubuntu.com/ubuntu/",
+            release="noble",
+            groups=["main", "restricted"],
+        )
+        repo._deb822_stanza = apt._Deb822Stanza(numbered_lines=[])
+        with self.assertRaises(NotImplementedError):
+            repository_mapping.disable(repo)
