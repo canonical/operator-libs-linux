@@ -1319,7 +1319,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
             )
 
         if repos:
-            logger.info("parsed %d apt package repositories", len(repos))
+            logger.info("parsed %d apt package repositories from %s", len(repos), filename)
         else:
             raise InvalidSourceError("all repository lines in '{}' were invalid!".format(filename))
 
@@ -1372,7 +1372,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
             logger.debug("skipped the following lines in file '%s': %s", filename, skip_list)
 
         if parsed:
-            logger.info("parsed %d apt package repositories", len(parsed))
+            logger.info("parsed %d apt package repositories from %s", len(parsed), filename)
         else:
             raise InvalidSourceError("all repository lines in '{}' were invalid!".format(filename))
 
