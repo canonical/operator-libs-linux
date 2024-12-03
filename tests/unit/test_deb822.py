@@ -10,7 +10,8 @@ from unittest.mock import ANY, mock_open, patch
 
 from charms.operator_libs_linux.v0 import apt
 
-UNIT_TEST_DIR = Path(__file__).parent
+TEST_DATA_DIR = Path(__file__).parent / "data"
+FAKE_APT_DIRS = TEST_DATA_DIR / "fake-apt-dirs"
 
 
 ubuntu_sources_deb822 = """
@@ -53,43 +54,6 @@ deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://nz.archive
 deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://nz.archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse
 deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://nz.archive.ubuntu.com/ubuntu/ noble-backports main restricted universe multiverse
 deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
-"""
-
-inkscape_sources_deb822 = """
-Types: deb
-URIs: https://ppa.launchpadcontent.net/inkscape.dev/stable/ubuntu/
-Suites: noble
-Components: main
-Signed-By:
- -----BEGIN PGP PUBLIC KEY BLOCK-----
- .
- mQINBGY0ViQBEACsQsdIRXzyEkk38x2oDt1yQ/Kt3dsiDKJFNLbs/xiDHrgIW6cU
- 1wZB0pfb3lCyG3/ZH5uvR0arCSHJvCvkdCFTqqkZndSA+/pXreCSLeP8CNawf/RM
- 3cNbdJlE8jXzaX2qzSEC9FDNqu4cQHIHR7xMAbSCPW8rxKvRCWmkZccfndDuQyN2
- vg3b2x9DWKS3DBRffivglF3yT49OuLemG5qJHujKOmNJZ32JoRniIivsuk1CCS1U
- NDK6xWkr13aNe056QhVAh2iPF6MRE85zail+mQxt4LAgl/aLR0JSDSpWkbQH7kbu
- 5cJVan8nYF9HelVJ3QuMwdz3VQn4YVO2Wc8s0YfnNdQttYaUx3lz35Fct6CaOqjP
- pgsZ4467lmB9ut74G+wDCQXmT232hsBkTz4D0DyVPB/ziBgGWUKti0AWNT/3kFww
- 2VM/80XADaDz0Sc/Hzi/cr9ZrbW3drMwoVvKtfMtOT7FMbeuPRWZKYZnDbvNm62e
- ToKVudE0ijfsksxbcHKmGdvWntCxlinp0i39Jfz6y54pppjmbHRQgasmqm2EQLfA
- RUNW/zB7gX80KTUCGjcLOTPajBIN5ZfjVITetryAFjv7fnK0qpf2OpqwF832W4V/
- S3GZtErupPktYG77Z9jOUxcJeEGYjWbVlbit8mTKDRdQUXOeOO6TzB4RcwARAQAB
- tCVMYXVuY2hwYWQgUFBBIGZvciBJbmtzY2FwZSBEZXZlbG9wZXJziQJOBBMBCgA4
- FiEEVr3/0vHJaz0VdeO4XJoLhs0vyzgFAmY0ViQCGwMFCwkIBwIGFQoJCAsCBBYC
- AwECHgECF4AACgkQXJoLhs0vyzh3RBAAo7Hee8i2I4n03/iq58lqml/OVJH9ZEle
- amk3e0wsiVS0QdT/zB8/AMVDB1obazBfrHKJP9Ck+JKH0uxaGRxYBohTbO3Y3sBO
- qRHz5VLcFzuyk7AA53AZkNx8Zbv6D0O4JTCPDJn9Gwbd/PpnvJm9Ri+zEiVPhXNu
- oSBryGM09un2Yvi0DA+ulouSKTy9dkbI1R7flPZ2M/mKT8Lk0n1pJu5FvgPC4E6R
- PT0Njw9+k/iHtP76U4SqHJZZx2I/TGlXMD1memyTK4adWZeGLaAiFadsoeJsDoDE
- MkHFxFkr9n0E4wJhRGgL0OxDWugJemkUvHbzXFNUaeX5Spw/aO7r1CtTh8lyqiom
- 4ebAkURjESRFOFzcsM7nyQnmt2OgQkEShSL3NrDMkj1+3+FgQtd8sbeVpmpGBq87
- J3iq0YMsUysWq8DJSz4RnBTfeGlJWJkl3XxB9VbG3BqqbN9fRp+ccgZ51g5/DEA/
- q8jYS7Ur5bAlSoeA4M3SvKSlQM8+aT35dteFzejvo1N+2n0E0KoymuRsDBdzby0z
- lJDKe244L5D6UPJo9YTmtE4kG/fGNZ5/JdRA+pbe7f/z84HVcJ3ziGdF/Nio/D8k
- uFjZP2M/mxC7j+WnmKAruqmY+5vkAEqUPTobsloDjT3B+z0rzWk8FG/G5KFccsBO
- 2ekz6IVTXVA=
- =VF33
- -----END PGP PUBLIC KEY BLOCK-----
 """
 
 
@@ -209,7 +173,7 @@ class TestRepositoryMappingDeb822Behaviour(unittest.TestCase):
         with patch.object(
             apt.RepositoryMapping,
             "_apt_dir",
-            str(UNIT_TEST_DIR / "data/fake_apt_dir_empty"),
+            str(FAKE_APT_DIRS / "empty"),
         ):
             repository_mapping = apt.RepositoryMapping()
         assert not repository_mapping._repository_map
@@ -218,7 +182,7 @@ class TestRepositoryMappingDeb822Behaviour(unittest.TestCase):
         with patch.object(
             apt.RepositoryMapping,
             "_apt_dir",
-            str(UNIT_TEST_DIR / "data/fake_apt_dir_bionic"),
+            str(FAKE_APT_DIRS / "bionic"),
         ):
             repository_mapping = apt.RepositoryMapping()
         assert repository_mapping._repository_map
@@ -227,7 +191,7 @@ class TestRepositoryMappingDeb822Behaviour(unittest.TestCase):
         with patch.object(
             apt.RepositoryMapping,
             "_apt_dir",
-            str(UNIT_TEST_DIR / "data/fake_apt_dir_noble_no_sources"),
+            str(FAKE_APT_DIRS / "noble-no-sources"),
         ):
             with self.assertRaises(apt.InvalidSourceError):
                 apt.RepositoryMapping()
@@ -236,7 +200,7 @@ class TestRepositoryMappingDeb822Behaviour(unittest.TestCase):
         with patch.object(
             apt.RepositoryMapping,
             "_apt_dir",
-            str(UNIT_TEST_DIR / "data/fake_apt_dir_noble"),
+            str(FAKE_APT_DIRS / "noble"),
         ):
             repository_mapping = apt.RepositoryMapping()
         assert repository_mapping._repository_map
@@ -245,7 +209,7 @@ class TestRepositoryMappingDeb822Behaviour(unittest.TestCase):
         with patch.object(
             apt.RepositoryMapping,
             "_apt_dir",
-            str(UNIT_TEST_DIR / "data/fake_apt_dir_noble_empty_sources"),
+            str(FAKE_APT_DIRS / "noble-empty-sources"),
         ):
             with self.assertRaises(apt.InvalidSourceError):
                 apt.RepositoryMapping()
@@ -254,7 +218,7 @@ class TestRepositoryMappingDeb822Behaviour(unittest.TestCase):
         with patch.object(
             apt.RepositoryMapping,
             "_apt_dir",
-            str(UNIT_TEST_DIR / "data/fake_apt_dir_noble_with_inkscape"),
+            str(FAKE_APT_DIRS / "noble-with-inkscape"),
         ):
             repository_mapping = apt.RepositoryMapping()
         assert repository_mapping._repository_map
@@ -263,7 +227,7 @@ class TestRepositoryMappingDeb822Behaviour(unittest.TestCase):
         with patch.object(
             apt.RepositoryMapping,
             "_apt_dir",
-            str(UNIT_TEST_DIR / "data/fake_apt_dir_empty"),
+            str(FAKE_APT_DIRS / "empty"),
         ):
             repository_mapping = apt.RepositoryMapping()
         assert not repository_mapping._repository_map
@@ -310,37 +274,27 @@ class TestRepositoryMappingDeb822Behaviour(unittest.TestCase):
 
         They should be equivalent with the sample data being used.
         """
+        with patch.object(
+            apt.RepositoryMapping,
+            "_apt_dir",
+            str(FAKE_APT_DIRS / "noble"),
+        ):
+            repos_deb822 = apt.RepositoryMapping()
 
-        def isnt_file(f: str) -> bool:
-            return False
+        with patch.object(
+            apt.RepositoryMapping,
+            "_apt_dir",
+            str(FAKE_APT_DIRS / "noble-in-one-per-line-format"),
+        ):
+            repos_one_per_line = apt.RepositoryMapping()
 
-        def iglob_list(s: str) -> typing.Iterable[str]:
-            if s.endswith(".list"):
-                return ["FILENAME"]
-            return []
-
-        def iglob_sources(s: str) -> typing.Iterable[str]:
-            if s.endswith(".sources"):
-                return ["FILENAME"]
-            return []
-
-        with patch("builtins.open", new_callable=mock_open, read_data=ubuntu_sources_one_line):
-            with patch("os.path.isfile", new=isnt_file):
-                with patch("glob.iglob", new=iglob_list):
-                    repository_mapping_list = apt.RepositoryMapping()
-
-        with patch("builtins.open", new_callable=mock_open, read_data=ubuntu_sources_deb822):
-            with patch("os.path.isfile", new=isnt_file):
-                with patch("glob.iglob", new=iglob_sources):
-                    repository_mapping_sources = apt.RepositoryMapping()
-
-        list_keys = sorted(repository_mapping_list._repository_map.keys())
-        sources_keys = sorted(repository_mapping_sources._repository_map.keys())
+        list_keys = sorted(repos_one_per_line._repository_map.keys())
+        sources_keys = sorted(repos_deb822._repository_map.keys())
         assert sources_keys == list_keys
 
         for list_key, sources_key in zip(list_keys, sources_keys):
-            list_repo = repository_mapping_list[list_key]
-            sources_repo = repository_mapping_sources[sources_key]
+            list_repo = repos_one_per_line[list_key]
+            sources_repo = repos_deb822[sources_key]
             assert list_repo.enabled == sources_repo.enabled
             assert list_repo.repotype == sources_repo.repotype
             assert list_repo.uri == sources_repo.uri
