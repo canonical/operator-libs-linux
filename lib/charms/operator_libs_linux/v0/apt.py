@@ -1017,6 +1017,7 @@ class DebianRepository:
         """Construct a filename from uri and release.
 
         For internal use when a filename isn't set.
+        Should match the filename written to by add-apt-repository.
         """
         return "{}-{}.list".format(
             DebianRepository.prefix_from_uri(self.uri),
@@ -1068,23 +1069,17 @@ class DebianRepository:
 
         Args:
             repo_line: a string representing a repository entry
-            write_file: boolean to enable writing the new repo to disk
+            write_file: boolean to enable writing the new repo to disk. True by default.
+                Results in calling `add-apt-repository --no-update --sourceslist $repo_line`
         """
         repo = RepositoryMapping._parse(  # pyright: ignore[reportPrivateUsage]
-            repo_line, "UserInput"
+            repo_line, filename="UserInput"  # temp filename
         )
         repo.filename = repo._make_filename()
-        repo_str = repo._to_line() + "\n"
         if write_file:
-            logger.info(
-                "DebianRepository.from_repo_line('%s', write_file=True)\nWriting to '%s':\n%s",
-                repo_line,
-                repo.filename,
-                repo_str,
+            RepositoryMapping._add_apt_repository(  # pyright: ignore[reportPrivateUsage])
+                repo, update_cache=False
             )
-            with open(repo.filename, "wb") as f:
-                f.write(repo_str.encode("utf-8"))
-
         return repo
 
     def disable(self) -> None:
@@ -1501,8 +1496,8 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         self._repository_map.pop(identifier, None)
         return self
 
+    @staticmethod
     def _add_apt_repository(
-        self,
         repo: DebianRepository,
         update_cache: bool = False,
         remove: bool = False,
