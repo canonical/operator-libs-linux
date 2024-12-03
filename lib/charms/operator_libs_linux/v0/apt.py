@@ -1274,10 +1274,12 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         """Return number of repositories in map."""
         return len(self._repository_map)
 
-    def __iter__(self) -> Iterable[DebianRepository]:
+    def __iter__(self) -> Iterator[DebianRepository]:
         """Return iterator for RepositoryMapping.
 
         Iterates over the DebianRepository values rather than the string names.
+        FIXME: this breaks the expectations of the Mapping abstract base class
+            for example when it provides methods like keys and items
         """
         return iter(self._repository_map.values())
 
