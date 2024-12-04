@@ -1289,7 +1289,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         """Load a deb822 format repository source file into the cache.
 
         In contrast to one-line-style, the deb822 format specifies a repository
-        using a multi-line paragraph. Paragraphs are separated by whitespace,
+        using a multi-line stanza. Stanzas are separated by whitespace,
         and each definition consists of lines that are either key: value pairs,
         or continuations of the previous value.
 
@@ -1327,7 +1327,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
             `_parse_deb822_lines` strips out comments entirely when parsing a file into stanzas,
                 instead only reading the 'Enabled' key to determine if an entry is enabled
         """
-        repositories: List[DebianRepository] = []
+        repos: List[DebianRepository] = []
         errors: List[InvalidSourceError] = []
         for numbered_lines in _iter_deb822_stanzas(lines):
             try:
@@ -1335,8 +1335,8 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
             except InvalidSourceError as e:
                 errors.append(e)
             else:
-                repositories.extend(stanza.repositories)
-        return repositories, errors
+                repos.extend(stanza.repos)
+        return repos, errors
 
     def load(self, filename: str):
         """Load a one-line-style format repository source file into the cache.
@@ -1506,7 +1506,7 @@ class _Deb822Stanza:
         self._filename = filename
         self._numbered_lines = numbered_lines
         if not numbered_lines:
-            self._repositories = ()
+            self._repos = ()
             self._gpg_key_filename = ""
             self._gpg_key_from_stanza = None
             return
@@ -1516,13 +1516,13 @@ class _Deb822Stanza:
         )
         for repo in repos:
             repo._deb822_stanza = self  # pyright: ignore[reportPrivateUsage]
-        self._repositories = repos
+        self._repos = repos
         self._gpg_key_filename, self._gpg_key_from_stanza = gpg_key_info
 
     @property
-    def repositories(self) -> Tuple[DebianRepository, ...]:
+    def repos(self) -> Tuple[DebianRepository, ...]:
         """The repositories defined by this deb822 stanza."""
-        return self._repositories
+        return self._repos
 
     def get_gpg_key_filename(self) -> str:
         """Return the path to the GPG key for this stanza.
@@ -1579,18 +1579,18 @@ def _iter_deb822_stanzas(lines: Iterable[str]) -> Iterator[List[Tuple[int, str]]
         lists of numbered lines (a tuple of line number and line) that make up
         a deb822 stanza, with comments stripped out (but accounted for in line numbering)
     """
-    current_paragraph: List[Tuple[int, str]] = []
+    current_stanza: List[Tuple[int, str]] = []
     for n, line in enumerate(lines, start=1):  # 1 indexed line numbers
-        if not line.strip():  # blank lines separate paragraphs
-            if current_paragraph:
-                yield current_paragraph
-                current_paragraph = []
+        if not line.strip():  # blank lines separate stanzas
+            if current_stanza:
+                yield current_stanza
+                current_stanza = []
             continue
         content, _delim, _comment = line.partition("#")
         if content.strip():  # skip (potentially indented) comment line
-            current_paragraph.append((n, content.rstrip()))  # preserve indent
-    if current_paragraph:
-        yield current_paragraph
+            current_stanza.append((n, content.rstrip()))  # preserve indent
+    if current_stanza:
+        yield current_stanza
 
 
 def _deb822_stanza_to_options(
@@ -1700,7 +1700,7 @@ def _deb822_options_to_repos(
             msg = (
                 "Since 'Suites' (line {suites_line}) does not specify"
                 " a path relative to  'URIs' (line {uris_line}),"
-                " 'Components' must be  present in this paragraph."
+                " 'Components' must be  present in this stanza."
             ).format(
                 suites_line=line_numbers.get("Suites"),
                 uris_line=line_numbers.get("URIs"),
