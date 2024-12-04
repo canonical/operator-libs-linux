@@ -159,9 +159,7 @@ def test_load_deb822_components_with_exact_path(repo_mapping: apt.RepositoryMapp
 
 def test_load_deb822_bad_enabled_value(repo_mapping: apt.RepositoryMapping):
     with pytest.raises(apt.InvalidSourceError):
-        repo_mapping.load_deb822(
-            str(SOURCES_DIR / "bad-stanza-enabled-bad.sources")
-        )
+        repo_mapping.load_deb822(str(SOURCES_DIR / "bad-stanza-enabled-bad.sources"))
     assert len(repo_mapping._last_errors) == 1
     [error] = repo_mapping._last_errors
     assert isinstance(error, apt.BadValueError)
@@ -170,9 +168,7 @@ def test_load_deb822_bad_enabled_value(repo_mapping: apt.RepositoryMapping):
 
 def test_load_deb822_missing_required_keys(repo_mapping: apt.RepositoryMapping):
     with pytest.raises(apt.InvalidSourceError):
-        repo_mapping.load_deb822(
-            str(SOURCES_DIR / "bad-stanza-missing-required-keys.sources")
-        )
+        repo_mapping.load_deb822(str(SOURCES_DIR / "bad-stanza-missing-required-keys.sources"))
     assert len(repo_mapping._last_errors) == 1
     [error] = repo_mapping._last_errors
     assert isinstance(error, apt.MissingRequiredKeyError)
@@ -358,8 +354,8 @@ def test_add_with_deb822(repo_mapping: apt.RepositoryMapping):
         capture_output=True,
     )
     # we re-raise CalledProcessError after logging
-    error = apt.CalledProcessError(1, 'cmd')
-    error.stdout = error.stderr = b''
+    error = apt.CalledProcessError(1, "cmd")
+    error.stdout = error.stderr = b""
     with patch.object(apt.logger, "error") as mock_logging_error:
         with patch.object(apt.subprocess, "run", side_effect=error):
             with pytest.raises(apt.CalledProcessError):

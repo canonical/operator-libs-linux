@@ -927,9 +927,8 @@ class InvalidSourceError(Error):
 
 class MissingRequiredKeyError(InvalidSourceError):
     """Missing a required value in a source file."""
-    def __init__(
-        self, message: str = "", *, file: str, line: Optional[int], key: str
-    ) -> None:
+
+    def __init__(self, message: str = "", *, file: str, line: Optional[int], key: str) -> None:
         super().__init__(message, file, line, key)
         self.file = file
         self.line = line
@@ -938,6 +937,7 @@ class MissingRequiredKeyError(InvalidSourceError):
 
 class BadValueError(InvalidSourceError):
     """Bad value for an entry in a source file."""
+
     def __init__(
         self,
         message: str = "",
