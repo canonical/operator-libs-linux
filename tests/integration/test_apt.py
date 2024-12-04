@@ -91,37 +91,40 @@ def test_install_package_from_external_repository():
 
 
 def test_install_higher_version_package_from_external_repository():
-    repo_id = "deb-https://ppa.launchpadcontent.net/inkscape.dev/stable/ubuntu/-jammy"
+    repo_id = "deb-https://ppa.launchpadcontent.net/mattrose/terminator/ubuntu/-jammy"
     repos = apt.RepositoryMapping()
+    for r_id in repos._repository_map.keys():
+        logger.info(r_id)
     assert repo_id not in repos
     ## version before
-    if not get_command_path("inkscape"):
-        apt.add_package("inkscape")
+    if not get_command_path("terminator"):
+        apt.add_package("terminator")
+    assert get_command_path("terminator")
     version_before = subprocess.run(
-        ["inkscape", "--version"],
+        ["terminator", "--version"],
         capture_output=True,
         check=True,
         text=True,
     ).stdout
-    apt.remove_package("inkscape")
-    assert not get_command_path("inkscape")
+    apt.remove_package("terminator")
+    assert not get_command_path("terminator")
     ## steps
     repo = apt.DebianRepository(
         enabled=True,
         repotype="deb",
-        uri="https://ppa.launchpadcontent.net/inkscape.dev/stable/ubuntu/",
+        uri="https://ppa.launchpadcontent.net/mattrose/terminator/ubuntu/",
         release="jammy",
         groups=["main"],
     )
     repos.add(repo)  # update_cache=False by default
     assert repo_id in repos
     assert repo_id in apt.RepositoryMapping()
-    key_file = apt.import_key((KEY_DIR / "INKSCAPE_KEY.asc").read_text())
+    key_file = apt.import_key((KEY_DIR / "TERMINATOR_KEY.asc").read_text())
     apt.update()
-    apt.add_package("inkscape")
-    assert get_command_path("inkscape")
+    apt.add_package("terminator")
+    assert get_command_path("terminator")
     version_after = subprocess.run(
-        ["inkscape", "--version"],
+        ["terminator", "--version"],
         capture_output=True,
         check=True,
         text=True,
@@ -132,8 +135,8 @@ def test_install_higher_version_package_from_external_repository():
     apt._add_repository(repo, remove=True)  # pyright: ignore[reportPrivateUsage]
     assert repo_id not in apt.RepositoryMapping()
     apt.update()
-    apt.remove_package("inkscape")
-    assert not get_command_path("inkscape")
+    apt.remove_package("terminator")
+    assert not get_command_path("terminator")
 
 
 def test_install_hardware_observer_ssacli():
