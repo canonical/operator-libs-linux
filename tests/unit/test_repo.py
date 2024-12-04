@@ -106,7 +106,7 @@ class TestRepositoryMapping(TestCase):
             open(d.filename).readlines(),
         )
 
-    def test_can_add_repositories_from_string(self):
+    def test_can_create_repo_from_repo_line(self):
         d = apt.DebianRepository.from_repo_line(
             "deb https://example.com/foo focal bar baz",
             write_file=False,
@@ -117,8 +117,6 @@ class TestRepositoryMapping(TestCase):
         self.assertEqual(d.release, "focal")
         self.assertEqual(d.groups, ["bar", "baz"])
         self.assertEqual(d.filename, "/etc/apt/sources.list.d/foo-focal.list")
-        ## FIXME: need integration test for write_file=True
-        # self.assertIn("deb https://example.com/foo focal bar baz\n", open(d.filename).readlines())
 
     @pytest.mark.skip("RepositoryMapping.add now calls apt-add-repository")
     def test_valid_list_file(self):
@@ -150,8 +148,3 @@ class TestRepositoryMapping(TestCase):
         self.assertEqual(d.filename, "/etc/apt/sources.list.d/foo-focal.list")
         self.assertEqual(d.gpg_key, "/foo/gpg.key")
         self.assertEqual(d.options["arch"], "amd64")
-        ## FIXME: need integration test for write_file=True
-        # self.assertIn(
-        #     "deb [arch=amd64 signed-by=/foo/gpg.key] https://example.com/foo focal bar baz\n",
-        #     open(d.filename).readlines(),
-        # )

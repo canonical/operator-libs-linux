@@ -51,6 +51,88 @@ def test_remove_package():
     assert not get_command_path("cfssl")
 
 
+def test_install_package_from_external_repository():
+    repo_id = "deb-https://repo.mongodb.org/apt/ubuntu-jammy/mongodb-org/8.0"
+    repos = apt.RepositoryMapping()
+    assert repo_id not in repos
+    assert not get_command_path("mongod")
+    ## steps
+    key = urlopen("https://www.mongodb.org/static/pgp/server-8.0.asc").read().decode()
+    key_file = apt.import_key(key)
+    line = (
+        "deb [ arch=amd64,arm64 signed-by={} ]"
+        " https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse"
+    ).format(key_file)
+    ## if: use implicit write_file
+    repo = apt.DebianRepository.from_repo_line(line)  # write_file=True by default
+    assert repo_id not in repos
+    ## if: don't use implicit write_file
+    # repo = apt.DebianRepository.from_repo_line(line, write_file=False)
+    # repos.add(repo)
+    # assert repo_id in repos
+    ## fi
+    assert repo_id in apt.RepositoryMapping()
+    apt.update()
+    apt.add_package("mongodb-org")
+    assert get_command_path("mongod")
+    subprocess.run(["mongod", "--version"], check=True)
+    ## cleanup
+    os.remove(key_file)
+    apt._add_repository(repo, remove=True)  # pyright: ignore[reportPrivateUsage]
+    assert repo_id not in apt.RepositoryMapping()
+    apt.update()
+    apt.remove_package("mongodb-org")
+    assert get_command_path("mongod")  # mongodb-org is a metapackage
+    subprocess.run(["apt", "autoremove"], check=True)
+    assert not get_command_path("mongod")
+
+
+def test_install_higher_version_package_from_external_repository():
+    repo_id = "deb-https://ppa.launchpadcontent.net/inkscape.dev/stable/ubuntu/-jammy"
+    repos = apt.RepositoryMapping()
+    assert repo_id not in repos
+    ## version before
+    if not get_command_path("inkscape"):
+        apt.add_package("inkscape")
+    version_before = subprocess.run(
+        ["inkscape", "--version"],
+        capture_output=True,
+        check=True,
+        text=True,
+    ).stdout
+    apt.remove_package("inkscape")
+    assert not get_command_path("inkscape")
+    ## steps
+    repo = apt.DebianRepository(
+        enabled=True,
+        repotype="deb",
+        uri="https://ppa.launchpadcontent.net/inkscape.dev/stable/ubuntu/",
+        release="jammy",
+        groups=["main"],
+    )
+    repos.add(repo)  # update_cache=False by default
+    assert repo_id in repos
+    assert repo_id in apt.RepositoryMapping()
+    key_file = apt.import_key(INKSCAPE_KEY)
+    apt.update()
+    apt.add_package("inkscape")
+    assert get_command_path("inkscape")
+    version_after = subprocess.run(
+        ["inkscape", "--version"],
+        capture_output=True,
+        check=True,
+        text=True,
+    ).stdout
+    assert version_after > version_before  # lexical comparison :(
+    ## cleanup
+    os.remove(key_file)
+    apt._add_repository(repo, remove=True)  # pyright: ignore[reportPrivateUsage]
+    assert repo_id not in apt.RepositoryMapping()
+    apt.update()
+    apt.remove_package("inkscape")
+    assert not get_command_path("inkscape")
+
+
 def test_install_hardware_observer_ssacli():
     """Test the ability to install a package used by the hardware-observer charm.
 
@@ -65,133 +147,36 @@ def test_install_hardware_observer_ssacli():
         apt.add_package(self.pkg, update_cache=True)
     """
     line = "deb http://downloads.linux.hpe.com/SDR/repo/mcp stretch/current non-free"
-    repo_id = apt.DebianRepository.from_repo_line(
-        line, write_file=False
-    )._get_identifier()  # pyright: ignore[reportPrivateUsage]
-    repos_before = apt.RepositoryMapping()
-    assert repo_id not in repos_before
+    repo_id = apt._repo_to_identifier(  # pyright: ignore[reportPrivateUsage]
+        apt.DebianRepository.from_repo_line(line, write_file=False)
+    )
+    assert repo_id not in apt.RepositoryMapping()
     assert not get_command_path("ssacli")
-
     key_files: List[str] = []  # just for cleanup
-    ## begin steps
+    ## steps
     for key in HP_KEYS:
         key_file = apt.import_key(key)
         key_files.append(key_file)
-    repositories = apt.RepositoryMapping()
+    repos = apt.RepositoryMapping()
     repo = apt.DebianRepository.from_repo_line(line)  # write_file=True by default
-    # repo added to system but repositories doesn't know about it yet
-    assert repo_id not in repositories
-    repositories.add(repo)  # update_cache=False by default
+    assert repo_id in apt.RepositoryMapping()
+    # repo added to system but repos doesn't know about it yet
+    assert repo_id not in repos
+    repos.add(repo)
+    assert repo_id in repos
     # `add` call is redundant with `from_repo_line` from system pov
-    # but it does add an entry to the RepositoryMapping
-    assert repo_id in repositories
+    # but adds an entry to the RepositoryMapping
     apt.add_package("ssacli", update_cache=True)
+    # apt.update not required since update_cache=True
     assert get_command_path("ssacli")
-    # install succeed here as update_cache=True
-    ## end steps
-
     ## cleanup
     for key_file in key_files:
         os.remove(key_file)
-    repos_clean = repositories._remove(  # pyright: ignore[reportPrivateUsage]
-        repo, update_cache=True
-    )
-    assert repo_id not in repos_clean
+    apt._add_repository(repo, remove=True)  # pyright: ignore[reportPrivateUsage]
+    assert repo_id not in apt.RepositoryMapping()
+    apt.update()
     apt.remove_package("ssacli")
     assert not get_command_path("ssacli")
-
-
-def test_install_package_from_external_repository():
-    repo_id = "deb-https://repo.mongodb.org/apt/ubuntu-jammy/mongodb-org/8.0"
-    repos_before = apt.RepositoryMapping()
-    assert repo_id not in repos_before
-    assert not get_command_path("mongod")
-
-    key = urlopen("https://www.mongodb.org/static/pgp/server-8.0.asc").read().decode()
-    line = "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse"
-    ## this is one valid order of operations:
-    ## apt.import_key(...)  # before add
-    ## apt.RepositoryMapping.add(repo, update_cache=True)
-    ## apt.add_package(...)
-    key_file = apt.import_key(key)
-    ## if: use implicit write_file
-    repo = apt.DebianRepository.from_repo_line(line)  # write_file=True by default
-    apt.update()
-    repos_after = apt.RepositoryMapping()
-    ## if: don't use implicit write_file
-    # repo = apt.DebianRepository.from_repo_line(line, write_file=False)
-    # repos_after = repos_before.add(repo, update_cache=True)
-    ## fi
-    assert repo_id in repos_after
-    apt.add_package("mongodb-org")
-    assert get_command_path("mongod")
-    subprocess.run(["mongod", "--version"], check=True)
-
-    ## cleanup
-    os.remove(key_file)
-    repos_after._remove(repo, update_cache=False)  # pyright: ignore[reportPrivateUsage]
-    assert repo_id not in repos_after
-    repos_before_update = apt.RepositoryMapping()
-    assert repo_id not in repos_before_update
-    # ^ although apt update hasn't been called yet, we've already modified files on disk
-    apt.update()
-    repos_clean = apt.RepositoryMapping()
-    assert repo_id not in repos_clean
-    apt.remove_package("mongodb-org", autoremove=True)  # mongodb-org is a metapackage
-    assert not get_command_path("mongod")
-
-
-def test_install_higher_version_package_from_external_repository():
-    repo_id = "deb-https://ppa.launchpadcontent.net/inkscape.dev/stable/ubuntu/-jammy"
-    repos_before = apt.RepositoryMapping()
-    assert repo_id not in repos_before
-
-    # version before
-    if not get_command_path("inkscape"):
-        apt.add_package("inkscape")
-    version_before = subprocess.run(
-        ["inkscape", "--version"],
-        capture_output=True,
-        check=True,
-        text=True,
-    ).stdout
-    apt.remove_package("inkscape")
-    assert not get_command_path("inkscape")
-
-    repo = apt.DebianRepository(
-        enabled=True,
-        repotype="deb",
-        uri="https://ppa.launchpadcontent.net/inkscape.dev/stable/ubuntu/",
-        release="jammy",
-        groups=["main"],
-    )
-    ## this is a different, valid order of operations:
-    ## apt.RepositoryMapping.add(..., update_cache=False)
-    ## apt.import_key(...)  # before update but after add
-    ## apt.update()
-    ## apt.add_package(...)
-    repos_after = repos_before.add(repo)  # update_cache=False by default
-    assert repo_id in repos_after
-    key_file = apt.import_key(INKSCAPE_KEY)
-    apt.update()
-    apt.add_package("inkscape")
-    assert get_command_path("inkscape")
-    version_after = subprocess.run(
-        ["inkscape", "--version"],
-        capture_output=True,
-        check=True,
-        text=True,
-    ).stdout
-    assert version_after > version_before  # lexical comparison :(
-
-    ## cleanup
-    os.remove(key_file)
-    repos_clean = repos_after._remove(  # pyright: ignore[reportPrivateUsage]
-        repo, update_cache=True
-    )
-    assert repo_id not in repos_clean
-    apt.remove_package("inkscape")
-    assert not get_command_path("inkscape")
 
 
 def test_from_apt_cache_error():
@@ -232,7 +217,6 @@ INKSCAPE_KEY = """
  =VF33
  -----END PGP PUBLIC KEY BLOCK-----
 """
-"""Static parameters for keys."""
 
 HPPUBLICKEY1024 = """
 -----BEGIN PGP PUBLIC KEY BLOCK-----

@@ -209,7 +209,7 @@ def test_load_deb822_exact_path(repo_mapping: apt.RepositoryMapping):
     [repo] = repo_mapping
     assert isinstance(repo, apt.DebianRepository)
     assert repo.uri
-    assert "/" in repo.release
+    assert repo.release.endswith("/")
     assert not repo.groups
 
 
@@ -317,33 +317,11 @@ def test_add_with_deb822(repo_mapping: apt.RepositoryMapping):
     assert len(repos) == 1
     assert not errors
     [repo] = repos
-    identifier = repo._get_identifier()
-    # call add with update_cache=True
+    identifier = apt._repo_to_identifier(repo)
     with patch.object(apt.subprocess, "run") as mock_run_1:
-        with patch.object(
-            apt.RepositoryMapping,
-            "_apt_dir",
-            str(FAKE_APT_DIRS / "empty"),
-        ):
-            r1 = repo_mapping.add(repo, update_cache=True)
-    assert r1 is not repo_mapping
-    assert identifier not in repo_mapping  # because it's the old mapping
-    assert identifier not in r1  # because we mocked out the subprocess call
-    mock_run_1.assert_called_once_with(
-        [
-            "add-apt-repository",
-            "--yes",
-            "--sourceslist=deb http://nz.archive.ubuntu.com/ubuntu/ an/exact/path/ ",
-        ],
-        check=True,
-        capture_output=True,
-    )
-    # call add with update_cache=False
-    with patch.object(apt.subprocess, "run") as mock_run_2:
-        r2 = repo_mapping.add(repo)  # update_cache=False by default
-    assert r2 is repo_mapping
+        repo_mapping.add(repo)
     assert identifier in repo_mapping
-    mock_run_2.assert_called_once_with(
+    mock_run_1.assert_called_once_with(
         [
             "add-apt-repository",
             "--yes",

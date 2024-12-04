@@ -102,7 +102,6 @@ if "deb-us.archive.ubuntu.com-xenial" not in repositories:
 
 import fileinput
 import glob
-import itertools
 import logging
 import os
 import re
@@ -807,22 +806,17 @@ def _add(
 
 
 def remove_package(
-    package_names: Union[str, List[str]],
-    autoremove: bool = False,
+    package_names: Union[str, List[str]]
 ) -> Union[DebianPackage, List[DebianPackage]]:
     """Remove package(s) from the system.
 
     Args:
         package_names: the name of a package
-        autoremove: run `apt autoremove` after uninstalling packages.
-            You probably want to do this if you're removing a metapackage,
-            otherwise the concrete packages will still be there.
-            False by default for backwards compatibility.
 
     Raises:
-        PackageNotFoundError if the package is not found.
+        TypeError: if no packages are provided
     """
-    packages = []
+    packages: List[DebianPackage] = []
 
     package_names = [package_names] if isinstance(package_names, str) else package_names
     if not package_names:
@@ -835,9 +829,6 @@ def remove_package(
             packages.append(pkg)
         except PackageNotFoundError:
             logger.info("package '%s' was requested for removal, but it was not installed.", p)
-
-    if autoremove:
-        subprocess.run(["apt", "autoremove"], check=True)
 
     # the list of packages will be empty when no package is removed
     logger.debug("packages: '%s'", packages)
@@ -925,35 +916,6 @@ class InvalidSourceError(Error):
     """Exceptions for invalid source entries."""
 
 
-class MissingRequiredKeyError(InvalidSourceError):
-    """Missing a required value in a source file."""
-
-    def __init__(self, message: str = "", *, file: str, line: Optional[int], key: str) -> None:
-        super().__init__(message, file, line, key)
-        self.file = file
-        self.line = line
-        self.key = key
-
-
-class BadValueError(InvalidSourceError):
-    """Bad value for an entry in a source file."""
-
-    def __init__(
-        self,
-        message: str = "",
-        *,
-        file: str,
-        line: Optional[int],
-        key: str,
-        value: str,
-    ) -> None:
-        super().__init__(message, file, line, key, value)
-        self.file = file
-        self.line = line
-        self.key = key
-        self.value = value
-
-
 class GPGKeyError(Error):
     """Exceptions for GPG keys."""
 
@@ -983,24 +945,6 @@ class DebianRepository:
         self._filename = filename
         self._gpg_key_filename = gpg_key_filename
         self._options = options
-
-    def _get_identifier(self) -> str:
-        """Return str identifier derived from repotype, uri, and release.
-
-        Private method used to produce the identifiers used by RepositoryMapping.
-        """
-        return "{}-{}-{}".format(self.repotype, self.uri, self.release)
-
-    def _to_line(self) -> str:
-        """Return the one-per-line format repository definition."""
-        return "{prefix}{repotype} {options}{uri} {release} {groups}".format(
-            prefix="" if self.enabled else "#",
-            repotype=self.repotype,
-            options=self.make_options_string(),
-            uri=self.uri,
-            release=self.release,
-            groups=" ".join(self.groups),
-        )
 
     @property
     def enabled(self):
@@ -1043,17 +987,6 @@ class DebianRepository:
             raise InvalidSourceError("apt source filenames should end in .list or .sources!")
         self._filename = fname
 
-    def _make_filename(self) -> str:
-        """Construct a filename from uri and release.
-
-        For internal use when a filename isn't set.
-        Should match the filename written to by add-apt-repository.
-        """
-        return "{}-{}.list".format(
-            DebianRepository.prefix_from_uri(self.uri),
-            self.release.replace("/", "-"),
-        )
-
     @property
     def gpg_key(self):
         """Returns the path to the GPG key for this repository."""
@@ -1066,21 +999,17 @@ class DebianRepository:
         """Returns any additional repo options which are set."""
         return self._options
 
-    def make_options_string(self) -> str:
+    def make_options_string(self, include_signed_by: bool = True) -> str:
         """Generate the complete one-line-style options string for a repository.
 
-        Combining `gpg_key`, if set, and the rest of the options to find
-        a complex repo string.
+        Combining `gpg_key`, if set (and include_signed_by is True), with any other
+        provided options to form the options section of a one-line-style definition.
         """
         options = self._options if self._options else {}
-
-        gpg_key_filename = self.gpg_key  # ensure getter logic is run
-        if gpg_key_filename:
-            options["signed-by"] = gpg_key_filename
-
+        if include_signed_by and self.gpg_key:
+            options["signed-by"] = self.gpg_key
         if not options:
             return ""
-
         pairs = ("{}={}".format(k, v) for k, v in sorted(options.items()))
         return "[{}] ".format(" ".join(pairs))
 
@@ -1100,17 +1029,27 @@ class DebianRepository:
         Args:
             repo_line: a string representing a repository entry
             write_file: boolean to enable writing the new repo to disk. True by default.
-                Results in calling `add-apt-repository --no-update --sourceslist $repo_line`
+                Expect it to result in an add-apt-repository call under the hood, like:
+                    add-apt-repository --no-update --sourceslist="$repo_line"
         """
         repo = RepositoryMapping._parse(  # pyright: ignore[reportPrivateUsage]
             repo_line, filename="UserInput"  # temp filename
         )
         repo.filename = repo._make_filename()
         if write_file:
-            RepositoryMapping._add_apt_repository(  # pyright: ignore[reportPrivateUsage])
-                repo, update_cache=False
-            )
+            _add_repository(repo)
         return repo
+
+    def _make_filename(self) -> str:
+        """Construct a filename from uri and release.
+
+        For internal use when a filename isn't set.
+        Should match the filename written to by add-apt-repository.
+        """
+        return "{}-{}.list".format(
+            DebianRepository.prefix_from_uri(self.uri),
+            self.release.replace("/", "-"),
+        )
 
     def disable(self) -> None:
         """Remove this repository by disabling it in the source file.
@@ -1253,6 +1192,26 @@ class DebianRepository:
             keyf.write(key_material)
 
 
+def _repo_to_identifier(repo: DebianRepository) -> str:
+    """Return str identifier derived from repotype, uri, and release.
+
+    Private method used to produce the identifiers used by RepositoryMapping.
+    """
+    return "{}-{}-{}".format(repo.repotype, repo.uri, repo.release)
+
+
+def _repo_to_line(repo: DebianRepository, include_signed_by: bool = True) -> str:
+    """Return the one-per-line format repository definition."""
+    return "{prefix}{repotype} {options}{uri} {release} {groups}".format(
+        prefix="" if repo.enabled else "#",
+        repotype=repo.repotype,
+        options=repo.make_options_string(include_signed_by=include_signed_by),
+        uri=repo.uri,
+        release=repo.release,
+        groups=" ".join(repo.groups),
+    )
+
+
 class RepositoryMapping(Mapping[str, DebianRepository]):
     """An representation of known repositories.
 
@@ -1341,19 +1300,15 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         """
         with open(filename, "r") as f:
             repos, errors = self._parse_deb822_lines(f, filename=filename)
-
         for repo in repos:
-            identifier = repo._get_identifier()  # pyright: ignore[reportPrivateUsage]
-            self._repository_map[identifier] = repo
-
+            self._repository_map[_repo_to_identifier(repo)] = repo
         if errors:
-            self._last_errors = errors
+            self._last_errors = tuple(errors)
             logger.debug(
                 "the following %d error(s) were encountered when reading deb822 sources:\n%s",
                 len(errors),
                 "\n".join(str(e) for e in errors),
             )
-
         if repos:
             logger.info("parsed %d apt package repositories from %s", len(repos), filename)
         else:
@@ -1468,95 +1423,29 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
             raise InvalidSourceError("An invalid sources line was found in %s!", filename)
 
     def add(  # noqa: D417  # undocumented-param: default_filename intentionally undocumented
-        self,
-        repo: DebianRepository,
-        default_filename: Optional[bool] = False,
-        update_cache: bool = False,
-    ) -> "RepositoryMapping":
+        self, repo: DebianRepository, default_filename: Optional[bool] = False
+    ) -> None:
         """Add a new repository to the system using add-apt-repository.
 
         Args:
             repo: a DebianRepository object where repo.enabled is True
-            update_cache: if True, apt-add-repository will update the package cache
-                and then a new RepositoryMapping object will be returned.
-                If False, then apt-add-repository is run with the --no-update option.
-                An entry for the repo is added to this RepositoryMapping before returning it.
-                Don't forget to call `apt.update` manually before installing any packages!
-
-        Returns:
-            self, or a new RepositoryMapping object if update_cache is True
-
         raises:
             ValueError: if repo.enabled is False
             CalledProcessError: if there's an error running apt-add-repository
 
         WARNING: Does not associate the repository with a signing key.
-        Use the `import_key` method to add a signing key globally.
+        Use `import_key` to add a signing key globally.
+
+        WARNING: Don't forget to call `apt.update` before installing any packages!
+        Or call `apt.add_package` with `update_cache=True`.
 
         WARNING: the default_filename keyword argument is provided for backwards compatibility
         only. It is not used, and was not used in the previous revision of this library.
         """
-        self._add_apt_repository(repo, update_cache=update_cache, remove=False)
-        if update_cache:
-            return RepositoryMapping()
-        identifier = repo._get_identifier()  # pyright: ignore[reportPrivateUsage]
-        self._repository_map[identifier] = repo
-        return self
-
-    def _remove(self, repo: DebianRepository, update_cache: bool = False) -> "RepositoryMapping":
-        """Use add-apt-repository to remove a repository.
-
-        Args:
-            repo: a DebianRepository object where repo.enabled is True
-            update_cache: if True, apt-add-repository will update the package cache
-                and then a new RepositoryMapping object will be returned.
-                If False, then apt-add-repository is run with the --no-update option.
-                Any entry for the repo is removed from this RepositoryMapping before returning it.
-                Don't forget to call `apt.update` manually before installing any packages!
-
-        Returns:
-            self, or a new RepositoryMapping object if update_cache is True
-
-        raises:
-            ValueError: if repo.enabled is False
-            CalledProcessError: if there's an error running apt-add-repository
-        """
-        self._add_apt_repository(repo, update_cache=update_cache, remove=True)
-        if update_cache:
-            return RepositoryMapping()
-        identifier = repo._get_identifier()  # pyright: ignore[reportPrivateUsage]
-        self._repository_map.pop(identifier, None)
-        return self
-
-    @staticmethod
-    def _add_apt_repository(
-        repo: DebianRepository,
-        update_cache: bool = False,
-        remove: bool = False,
-    ) -> None:
         if not repo.enabled:
             raise ValueError("{repo}.enabled is {value}".format(repo=repo, value=repo.enabled))
-        line = repo._to_line()  # pyright: ignore[reportPrivateUsage]
-        cmd = [
-            "add-apt-repository",
-            "--yes",
-            "--sourceslist=" + line,
-        ]
-        if remove:
-            cmd.append("--remove")
-        if not update_cache:
-            cmd.append("--no-update")
-        logger.info("%s", cmd)
-        try:
-            subprocess.run(cmd, check=True, capture_output=True)
-        except CalledProcessError as e:
-            logger.error(
-                "subprocess.run(%s):\nstdout:\n%s\nstderr:\n%s",
-                cmd,
-                e.stdout.decode(),
-                e.stderr.decode(),
-            )
-            raise
+        _add_repository(repo)
+        self._repository_map[_repo_to_identifier(repo)] = repo
 
     def disable(self, repo: DebianRepository) -> None:
         """Remove a repository by disabling it in the source file.
@@ -1567,6 +1456,44 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         WARNING: This method does NOT alter the `.enabled` flag on the DebianRepository.
         """
         repo.disable()
+        self._repository_map[_repo_to_identifier(repo)] = repo
+        # ^ adding to map on disable seems like a bug, but this is the previous behaviour
+
+
+def _add_repository(
+    repo: DebianRepository,
+    remove: bool = False,
+    update_cache: bool = False,
+) -> None:
+    line = _repo_to_line(repo, include_signed_by=False)
+    key_file = repo.gpg_key
+    if key_file and not os.path.exists(key_file):
+        msg = (
+            "Adding repository '{line}' with add-apt-repository."
+            " Key file '{key_file}' does not exist."
+            " Ensure it is imported correctly to use this repository."
+        ).format(line=line, key_file=key_file)
+        logger.warning(msg)
+    cmd = [
+        "add-apt-repository",
+        "--yes",
+        "--sourceslist=" + line,
+    ]
+    if remove:
+        cmd.append("--remove")
+    if not update_cache:
+        cmd.append("--no-update")
+    logger.info("%s", cmd)
+    try:
+        subprocess.run(cmd, check=True, capture_output=True)
+    except CalledProcessError as e:
+        logger.error(
+            "subprocess.run(%s):\nstdout:\n%s\nstderr:\n%s",
+            cmd,
+            e.stdout.decode(),
+            e.stderr.decode(),
+        )
+        raise
 
 
 class _Deb822Stanza:
@@ -1611,6 +1538,35 @@ class _Deb822Stanza:
         # and we haven't already imported it
         self._gpg_key_filename = import_key(self._gpg_key_from_stanza)
         return self._gpg_key_filename
+
+
+class MissingRequiredKeyError(InvalidSourceError):
+    """Missing a required value in a source file."""
+
+    def __init__(self, message: str = "", *, file: str, line: Optional[int], key: str) -> None:
+        super().__init__(message, file, line, key)
+        self.file = file
+        self.line = line
+        self.key = key
+
+
+class BadValueError(InvalidSourceError):
+    """Bad value for an entry in a source file."""
+
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        file: str,
+        line: Optional[int],
+        key: str,
+        value: str,
+    ) -> None:
+        super().__init__(message, file, line, key, value)
+        self.file = file
+        self.line = line
+        self.key = key
+        self.value = value
 
 
 def _iter_deb822_stanzas(lines: Iterable[str]) -> Iterator[List[Tuple[int, str]]]:
@@ -1767,6 +1723,8 @@ def _deb822_options_to_repos(
             gpg_key_filename=gpg_key_file,
             options=options,
         )
-        for repotype, uri, suite in itertools.product(repotypes, uris, suites)
+        for repotype in repotypes
+        for uri in uris
+        for suite in suites
     )
     return repos, (gpg_key_file, gpg_key_from_stanza)
