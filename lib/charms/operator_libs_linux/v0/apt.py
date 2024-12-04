@@ -983,7 +983,7 @@ class DebianRepository:
         Args:
             fname: a filename to write the repository information to.
         """
-        if not fname.endswith(".list") or fname.endswith(".sources"):
+        if not fname.endswith((".list", ".sources")):
             raise InvalidSourceError("apt source filenames should end in .list or .sources!")
         self._filename = fname
 
