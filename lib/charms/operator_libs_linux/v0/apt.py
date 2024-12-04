@@ -1467,7 +1467,7 @@ def _add_repository(
 ) -> None:
     line = _repo_to_line(repo, include_signed_by=False)
     key_file = repo.gpg_key
-    if key_file and not os.path.exists(key_file):
+    if key_file and not remove and not os.path.exists(key_file):
         msg = (
             "Adding repository '{line}' with add-apt-repository."
             " Key file '{key_file}' does not exist."
