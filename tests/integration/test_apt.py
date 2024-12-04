@@ -132,7 +132,8 @@ def test_install_package_from_external_repository():
     repos_after._remove(repo, update_cache=False)  # pyright: ignore[reportPrivateUsage]
     assert repo_id not in repos_after
     repos_before_update = apt.RepositoryMapping()
-    assert repo_id in repos_before_update  # update hasn't been called yet!
+    assert repo_id not in repos_before_update
+    # ^ although apt update hasn't been called yet, we've already modified files on disk
     apt.update()
     repos_clean = apt.RepositoryMapping()
     assert repo_id not in repos_clean
