@@ -91,40 +91,38 @@ def test_install_package_from_external_repository():
 
 
 def test_install_higher_version_package_from_external_repository():
-    repo_id = "deb-https://ppa.launchpadcontent.net/mattrose/terminator/ubuntu/-jammy"
+    repo_id = "deb-https://ppa.launchpadcontent.net/fish-shell/release-3/ubuntu/-jammy"
     repos = apt.RepositoryMapping()
-    for r_id in repos._repository_map.keys():
-        logger.info(r_id)
     assert repo_id not in repos
     ## version before
-    if not get_command_path("terminator"):
-        apt.add_package("terminator")
-    assert get_command_path("terminator")
+    if not get_command_path("fish"):
+        apt.add_package("fish")
+    assert get_command_path("fish")
     version_before = subprocess.run(
-        ["terminator", "--version"],
+        ["fish", "--version"],
         capture_output=True,
         check=True,
         text=True,
     ).stdout
-    apt.remove_package("terminator")
-    assert not get_command_path("terminator")
+    apt.remove_package("fish")
+    assert not get_command_path("fish")
     ## steps
     repo = apt.DebianRepository(
         enabled=True,
         repotype="deb",
-        uri="https://ppa.launchpadcontent.net/mattrose/terminator/ubuntu/",
+        uri="https://ppa.launchpadcontent.net/fish-shell/release-3/ubuntu/",
         release="jammy",
         groups=["main"],
     )
     repos.add(repo)  # update_cache=False by default
     assert repo_id in repos
     assert repo_id in apt.RepositoryMapping()
-    key_file = apt.import_key((KEY_DIR / "TERMINATOR_KEY.asc").read_text())
+    key_file = apt.import_key((KEY_DIR / "FISH_KEY.asc").read_text())
     apt.update()
-    apt.add_package("terminator")
-    assert get_command_path("terminator")
+    apt.add_package("fish")
+    assert get_command_path("fish")
     version_after = subprocess.run(
-        ["terminator", "--version"],
+        ["fish", "--version"],
         capture_output=True,
         check=True,
         text=True,
@@ -135,8 +133,8 @@ def test_install_higher_version_package_from_external_repository():
     apt._add_repository(repo, remove=True)  # pyright: ignore[reportPrivateUsage]
     assert repo_id not in apt.RepositoryMapping()
     apt.update()
-    apt.remove_package("terminator")
-    assert not get_command_path("terminator")
+    apt.remove_package("fish")
+    assert not get_command_path("fish")
 
 
 def test_install_hardware_observer_ssacli():
