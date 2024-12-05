@@ -1,0 +1,13 @@
+#a fully commented out stanza
+#Types: deb  # with an inline comment too
+#URIs: http://security.ubuntu.com/ubuntu
+#Suites: noble-security
+#Components: main restricted universe multiverse
+#Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+#another fully commented out stanza
+#Types: deb-src  # with an inline comment too
+#URIs: http://security.ubuntu.com/ubuntu
+#Suites: noble-security
+#Components: main restricted universe multiverse
+#Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg

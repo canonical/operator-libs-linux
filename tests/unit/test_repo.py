@@ -1,8 +1,6 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import os
-
 from charms.operator_libs_linux.v0 import apt
 from pyfakefs.fake_filesystem_unittest import TestCase
 
@@ -88,51 +86,22 @@ class TestRepositoryMapping(TestCase):
             open(other.filename).readlines(),
         )
 
-    def test_can_add_repositories(self):
-        r = apt.RepositoryMapping()
-        d = apt.DebianRepository(
-            True,
-            "deb",
-            "http://example.com",
-            "test",
-            ["group"],
-            "/etc/apt/sources.list.d/example-test.list",
+    def test_can_create_repo_from_repo_line(self):
+        d = apt.DebianRepository.from_repo_line(
+            "deb https://example.com/foo focal bar baz",
+            write_file=False,
         )
-        r.add(d, default_filename=False)
-        self.assertIn(
-            "{} {} {} {}\n".format(d.repotype, d.uri, d.release, " ".join(d.groups)),
-            open(d.filename).readlines(),
-        )
-
-    def test_can_add_repositories_from_string(self):
-        d = apt.DebianRepository.from_repo_line("deb https://example.com/foo focal bar baz")
         self.assertEqual(d.enabled, True)
         self.assertEqual(d.repotype, "deb")
         self.assertEqual(d.uri, "https://example.com/foo")
         self.assertEqual(d.release, "focal")
         self.assertEqual(d.groups, ["bar", "baz"])
         self.assertEqual(d.filename, "/etc/apt/sources.list.d/foo-focal.list")
-        self.assertIn("deb https://example.com/foo focal bar baz\n", open(d.filename).readlines())
-
-    def test_valid_list_file(self):
-        line = "deb https://repo.example.org/fiz/baz focal/foo-bar/5.0 multiverse"
-        d = apt.DebianRepository.from_repo_line(line)
-        self.assertEqual(d.filename, "/etc/apt/sources.list.d/fiz-baz-focal-foo-bar-5.0.list")
-
-        r = apt.RepositoryMapping()
-        d = apt.DebianRepository(
-            True,
-            "deb",
-            "https://repo.example.org/fiz/baz",
-            "focal/foo-bar/5.0",
-            ["multiverse"],
-        )
-        r.add(d, default_filename=False)
-        assert os.path.exists("/etc/apt/sources.list.d/fiz-baz-focal-foo-bar-5.0.list")
 
     def test_can_add_repositories_from_string_with_options(self):
         d = apt.DebianRepository.from_repo_line(
-            "deb [signed-by=/foo/gpg.key arch=amd64] https://example.com/foo focal bar baz"
+            "deb [signed-by=/foo/gpg.key arch=amd64] https://example.com/foo focal bar baz",
+            write_file=False,
         )
         self.assertEqual(d.enabled, True)
         self.assertEqual(d.repotype, "deb")
@@ -142,7 +111,3 @@ class TestRepositoryMapping(TestCase):
         self.assertEqual(d.filename, "/etc/apt/sources.list.d/foo-focal.list")
         self.assertEqual(d.gpg_key, "/foo/gpg.key")
         self.assertEqual(d.options["arch"], "amd64")
-        self.assertIn(
-            "deb [arch=amd64 signed-by=/foo/gpg.key] https://example.com/foo focal bar baz\n",
-            open(d.filename).readlines(),
-        )

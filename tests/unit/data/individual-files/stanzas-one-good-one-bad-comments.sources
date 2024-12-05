@@ -1,0 +1,15 @@
+# a good entry that defines one repository
+Types: deb
+URIs: http://nz.archive.ubuntu.com/ubuntu/
+Suites: noble
+Components: main
+
+Foo: Bar  # this is a separate (malformed) entry
+
+# this is fully commented out and will be skipped entirely
+#Types: deb
+#URIs: http://security.ubuntu.com/ubuntu
+#Suites: noble-security
+#Components: main restricted universe multiverse
+#Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+## disable security updates while we're at it
