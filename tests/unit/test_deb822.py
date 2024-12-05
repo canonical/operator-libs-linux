@@ -334,12 +334,15 @@ def test_add_with_deb822(repo_mapping: apt.RepositoryMapping):
     # we re-raise CalledProcessError after logging
     error = apt.CalledProcessError(1, "cmd")
     error.stdout = error.stderr = b""
-    with patch.object(apt.logger, "error") as mock_logging_error:
-        with patch.object(apt.subprocess, "run", side_effect=error):
+    with patch.object(apt.subprocess, "run", side_effect=error):
+        with patch.object(apt.logger, "error") as mock_error:
             with pytest.raises(apt.CalledProcessError):
                 repo_mapping.add(repo)
-    mock_logging_error.assert_called_once()
+    mock_error.assert_called_once()
     # call add with a disabled repository
     repo._enabled = False
-    with pytest.raises(ValueError):
-        repo_mapping.add(repo)
+    with patch.object(apt, "_add_repository") as mock_add:
+        with patch.object(apt.logger, "warning") as mock_warning:
+            repo_mapping.add(repo)
+    mock_add.assert_not_called()
+    mock_warning.assert_called_once()

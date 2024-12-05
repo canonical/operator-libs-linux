@@ -1428,13 +1428,15 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         """Add a new repository to the system using add-apt-repository.
 
         Args:
-            repo: a DebianRepository object where repo.enabled is True
-        raises:
-            ValueError: if repo.enabled is False
+            repo: a DebianRepository object
+                if repo.enabled is falsey, will return without adding the repository
+        Raises:
             CalledProcessError: if there's an error running apt-add-repository
 
         WARNING: Does not associate the repository with a signing key.
         Use `import_key` to add a signing key globally.
+
+        WARNING: if repo.enabled is falsey, will return without adding the repository
 
         WARNING: Don't forget to call `apt.update` before installing any packages!
         Or call `apt.add_package` with `update_cache=True`.
@@ -1443,7 +1445,15 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         only. It is not used, and was not used in the previous revision of this library.
         """
         if not repo.enabled:
-            raise ValueError("{repo}.enabled is {value}".format(repo=repo, value=repo.enabled))
+            logger.warning(
+                (
+                    "Returning from RepositoryMapping.add(repo=%s) without adding the repo"
+                    " because repo.enabled is %s"
+                ),
+                repo,
+                repo.enabled,
+            )
+            return
         _add_repository(repo)
         self._repository_map[_repo_to_identifier(repo)] = repo
 
