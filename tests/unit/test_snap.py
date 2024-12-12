@@ -701,6 +701,7 @@ class TestSocketClient(unittest.TestCase):
             shutdown()
 
     def test_wait_changes(self):
+        change_started = False
         change_finished = False
 
         def _request_raw(
@@ -711,6 +712,7 @@ class TestSocketClient(unittest.TestCase):
             data: bytes = None,
         ) -> typing.IO[bytes]:
             nonlocal change_finished
+            nonlocal change_started
             if method == "PUT" and path == "snaps/test/conf":
                 return io.BytesIO(
                     json.dumps(
@@ -720,6 +722,36 @@ class TestSocketClient(unittest.TestCase):
                             "status": "Accepted",
                             "result": None,
                             "change": "97",
+                        }
+                    ).encode("utf-8")
+                )
+            if method == "GET" and path == "changes/97" and not change_started:
+                change_started = True
+                return io.BytesIO(
+                    json.dumps(
+                        {
+                            "type": "sync",
+                            "status-code": 200,
+                            "status": "OK",
+                            "result": {
+                                "id": "97",
+                                "kind": "configure-snap",
+                                "summary": 'Change configuration of "test" snap',
+                                "status": "Do",
+                                "tasks": [
+                                    {
+                                        "id": "1028",
+                                        "kind": "run-hook",
+                                        "summary": 'Run configure hook of "test" snap',
+                                        "status": "Do",
+                                        "progress": {"label": "", "done": 0, "total": 1},
+                                        "spawn-time": "2024-11-28T20:02:47.498399651+00:00",
+                                        "data": {"affected-snaps": ["test"]},
+                                    }
+                                ],
+                                "ready": False,
+                                "spawn-time": "2024-11-28T20:02:47.49842583+00:00",
+                            },
                         }
                     ).encode("utf-8")
                 )

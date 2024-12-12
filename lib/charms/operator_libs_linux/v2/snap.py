@@ -787,7 +787,7 @@ class SnapClient:
             status = response["status"]
             if status == "Done":
                 return response.get("data")
-            if status == "Doing":
+            if status == "Doing" or status == "Do":
                 time.sleep(0.1)
                 continue
             if status == "Wait":
