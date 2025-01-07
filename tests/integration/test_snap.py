@@ -66,11 +66,18 @@ def test_snap_refresh():
 def test_snap_set_and_get_with_typed():
     cache = snap.SnapCache()
     lxd = cache["lxd"]
-    try:
-        lxd.ensure(snap.SnapState.Latest, channel="latest")
-    except snap.SnapError:
-        time.sleep(60)
-        lxd.ensure(snap.SnapState.Latest, channel="latest")
+
+    def try_ensure_snap(retries: int) -> None:
+        try:
+            lxd.ensure(snap.SnapState.Latest, channel="latest")
+        except snap.SnapError:
+            if retries <= 0:
+                raise
+            time.sleep(20)
+            try_ensure_snap(retries=retries - 1)
+
+    try_ensure_snap(retries=10)
+
     configs = {
         "true": True,
         "false": False,
