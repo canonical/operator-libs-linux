@@ -1,6 +1,7 @@
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
+dynamic_context = "test_function"
 
 [tool.coverage.report]
 show_missing = true
@@ -32,12 +33,12 @@ extend-ignore = [
     "D413",
 ]
 ignore = ["E501", "D107"]
-extend-exclude = ["__pycache__", "*.egg_info"]
+extend-exclude = ["__pycache__", "*.egg_info", "htmlcov"]
 per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104"]}
 
 [tool.ruff.mccabe]
 max-complexity = 14
 
 [tool.codespell]
-skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.vscode,.coverage"
+skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.vscode,.coverage,htmlcov"
 ignore-words-list = "assertIn"
