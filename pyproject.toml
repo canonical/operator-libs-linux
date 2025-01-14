@@ -31,8 +31,7 @@ select = [
     # conventional names
     "C",
     # flake8-copyright
-    # FIXME: enable when we switch to --preview for format
-    # "CPY",
+    "CPY",
     # Pycodestyle (error)
     "E",
     # Pyflakes
