@@ -1032,7 +1032,7 @@ class DebianRepository:
                 Expect it to result in an add-apt-repository call under the hood, like:
                     add-apt-repository --no-update --sourceslist="$repo_line"
         """
-        repo = RepositoryMapping._parse(  # pyright: ignore[reportPrivateUsage]
+        repo = RepositoryMapping._parse(
             repo_line,
             filename="UserInput",  # temp filename
         )
@@ -1526,7 +1526,7 @@ class _Deb822Stanza:
             options, line_numbers=line_numbers, filename=filename
         )
         for repo in repos:
-            repo._deb822_stanza = self  # pyright: ignore[reportPrivateUsage]
+            repo._deb822_stanza = self
         self._repos = repos
         self._gpg_key_filename, self._gpg_key_from_stanza = gpg_key_info
 

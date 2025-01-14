@@ -198,6 +198,21 @@ keep-runtime-typing = true
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.pyright]
+include = ["lib/charms/operator_libs_linux/v*/*.py", "tests/*/*.py"]
+pythonVersion = "3.8"  # check no python > 3.8 features are used
+pythonPlatform = "All"
+typeCheckingMode = "strict"
+reportIncompatibleMethodOverride = false
+reportImportCycles = false
+reportMissingModuleSource = false
+reportPrivateUsage = false
+reportUnnecessaryIsInstance = false
+reportUnnecessaryComparison = false
+reportUnnecessaryTypeIgnoreComment = "error"
+disableBytesTypePromotions = false
+stubPath = ""
+
 [tool.codespell]
 skip = [
     ".git",
