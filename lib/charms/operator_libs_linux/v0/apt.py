@@ -806,7 +806,7 @@ def _add(
 
 
 def remove_package(
-    package_names: Union[str, List[str]]
+    package_names: Union[str, List[str]],
 ) -> Union[DebianPackage, List[DebianPackage]]:
     """Remove package(s) from the system.
 
@@ -1033,7 +1033,8 @@ class DebianRepository:
                     add-apt-repository --no-update --sourceslist="$repo_line"
         """
         repo = RepositoryMapping._parse(  # pyright: ignore[reportPrivateUsage]
-            repo_line, filename="UserInput"  # temp filename
+            repo_line,
+            filename="UserInput",  # temp filename
         )
         repo.filename = repo._make_filename()
         if write_file:
