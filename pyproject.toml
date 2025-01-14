@@ -213,5 +213,6 @@ skip = [
 ]
 ignore-words-list = [
     "assertIn",
+    "fpr",
 ]
 quiet-level = 3  # disable warnings about (1) wrong encoding + (2) binary files

@@ -52,7 +52,7 @@ class MyCharm(CharmBase):
         self.framework.observe(self.on.remove, self._on_remove)
 
     def _on_install(self, _):
-        # Altenatively, read the values from a template
+        # Alternatively, read the values from a template
         sysctl_data = {"net.ipv4.tcp_max_syn_backlog": "4096"}}
 
         try:

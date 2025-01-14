@@ -238,7 +238,7 @@ class DebianPackage:
         Args:
           command: the command given to `apt-get`
           package_names: a package name or list of package names to operate on
-          optargs: an (Optional) list of additioanl arguments
+          optargs: an (Optional) list of additional arguments
 
         Raises:
           PackageError if an error is encountered
@@ -1143,7 +1143,7 @@ class DebianRepository:
           keyid: An 8, 16 or 40 hex digit keyid to find a key for
 
         Returns:
-          A string contining key material for the specified GPG key id
+          A string containing key material for the specified GPG key id
 
 
         Raises:
@@ -1693,7 +1693,7 @@ def _deb822_options_to_repos(
             msg = (
                 "Since 'Suites' (line {suites_line}) specifies"
                 " a path relative to  'URIs' (line {uris_line}),"
-                " 'Components' must be  ommitted."
+                " 'Components' must be  omitted."
             ).format(
                 suites_line=line_numbers.get("Suites"),
                 uris_line=line_numbers.get("URIs"),

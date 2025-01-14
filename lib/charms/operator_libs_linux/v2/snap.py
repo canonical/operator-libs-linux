@@ -893,7 +893,7 @@ class SnapCache(Mapping):
 
     @property
     def snapd_installed(self) -> bool:
-        """Check whether snapd has been installled on the system."""
+        """Check whether snapd has been installed on the system."""
         return os.path.isfile("/usr/bin/snap")
 
     def _load_available_snaps(self) -> None:
