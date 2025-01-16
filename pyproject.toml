@@ -56,13 +56,26 @@ select = [
     "YTT",
 ]
 ignore = [
-    # Use from err or from None explicitly
-    # FIXME
-    "B904",
+    # mccabe
+    "C90",
     # Missing docstring in magic method
     "D105",
     # Missing docstring in `__init__`
     "D107",
+    # Use of `assert` detected
+    "S101",
+    # `subprocess` module is possibly insecure
+    "S404",
+    # Return condition directly, prefer readability.
+    "SIM103",
+    # Use contextlib.suppress() instead of try/except: pass
+    "SIM105",
+    # Use a single `with` statement with multiple contexts instead of nested `with` statements
+    "SIM117",
+
+    # Use from err or from None explicitly
+    # FIXME
+    "B904",
     # too many leading # before block comment
     # FIXME
     "E266",
@@ -81,22 +94,12 @@ ignore = [
     # implicit Optional in typing
     # FIXME: typing
     "RUF013",
-    # Use of `assert` detected
-    "S101",
-    # `subprocess` module is possibly insecure
-    "S404",
     # subprocess: check for execution of untrusted input
     # FIXME: individually validate or noqa these
     "S603",
     # subprocess: starting process with a partial executable path
     # FIXME: individually validate or noqa these
     "S607",
-    # Return condition directly, prefer readability.
-    "SIM103",
-    # Use contextlib.suppress() instead of try/except: pass
-    "SIM105",
-    # Use a single `with` statement with multiple contexts instead of nested `with` statements
-    "SIM117",
     # Unnecessary open mode parameters
     # FIXME
     "UP015",
@@ -195,9 +198,6 @@ keep-runtime-typing = true
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[tool.ruff.lint.mccabe]
-max-complexity = 14
-
 [tool.codespell]
 skip = [
     ".git",
@@ -213,6 +213,6 @@ skip = [
 ]
 ignore-words-list = [
     "assertIn",
-    "fpr",
+    "fpr",  # gnupg2 fingerprint regex in apt lib
 ]
 quiet-level = 3  # disable warnings about (1) wrong encoding + (2) binary files
