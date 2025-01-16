@@ -127,23 +127,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return json.loads(body)
 
     def get_sections(self, match, query, data):
-        self.respond(
-            {
-                "type": "sync",
-                "status-code": 200,
-                "status": "OK",
-                "result": {
-                    [
-                        "featured",
-                        "database",
-                        "ops",
-                        "messaging",
-                        "media",
-                        "internet-of-things",
-                    ]
-                },
-            }
-        )
+        self.respond({
+            "type": "sync",
+            "status-code": 200,
+            "status": "OK",
+            "result": {
+                [
+                    "featured",
+                    "database",
+                    "ops",
+                    "messaging",
+                    "media",
+                    "internet-of-things",
+                ]
+            },
+        })
 
 
 def start_server():

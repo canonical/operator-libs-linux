@@ -159,12 +159,10 @@ class TestSystemD(unittest.TestCase):
         # We can't reload, so we restart
         mockp, kw = make_mock([1, 0], check=True)
         systemd.service_reload("mysql", restart_on_failure=True)
-        mockp.assert_has_calls(
-            [
-                call(["systemctl", "reload", "mysql"], **kw),
-                call(["systemctl", "restart", "mysql"], **kw),
-            ]
-        )
+        mockp.assert_has_calls([
+            call(["systemctl", "reload", "mysql"], **kw),
+            call(["systemctl", "restart", "mysql"], **kw),
+        ])
 
         # We should only restart if requested.
         mockp, kw = make_mock([1, 0], check=True)
@@ -176,12 +174,10 @@ class TestSystemD(unittest.TestCase):
         self.assertRaises(
             systemd.SystemdError, systemd.service_reload, "mysql", restart_on_failure=True
         )
-        mockp.assert_has_calls(
-            [
-                call(["systemctl", "reload", "mysql"], **kw),
-                call(["systemctl", "restart", "mysql"], **kw),
-            ]
-        )
+        mockp.assert_has_calls([
+            call(["systemctl", "reload", "mysql"], **kw),
+            call(["systemctl", "restart", "mysql"], **kw),
+        ])
 
     @with_mock_subp
     def test_service_pause(self, make_mock):
@@ -189,59 +185,49 @@ class TestSystemD(unittest.TestCase):
         mockp, kw = make_mock([0, 0, 3])
 
         systemd.service_pause("mysql")
-        mockp.assert_has_calls(
-            [
-                call(["systemctl", "disable", "--now", "mysql"], **kw),
-                call(["systemctl", "mask", "mysql"], **kw),
-                call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
-            ]
-        )
+        mockp.assert_has_calls([
+            call(["systemctl", "disable", "--now", "mysql"], **kw),
+            call(["systemctl", "mask", "mysql"], **kw),
+            call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
+        ])
 
         # Could not stop service!
         mockp, kw = make_mock([0, 0, 0])
         self.assertRaises(systemd.SystemdError, systemd.service_pause, "mysql")
-        mockp.assert_has_calls(
-            [
-                call(["systemctl", "disable", "--now", "mysql"], **kw),
-                call(["systemctl", "mask", "mysql"], **kw),
-                call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
-            ]
-        )
+        mockp.assert_has_calls([
+            call(["systemctl", "disable", "--now", "mysql"], **kw),
+            call(["systemctl", "mask", "mysql"], **kw),
+            call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
+        ])
 
     @with_mock_subp
     def test_service_resume(self, make_mock):
         # Service is already running
         mockp, kw = make_mock([0, 0, 0])
         systemd.service_resume("mysql")
-        mockp.assert_has_calls(
-            [
-                call(["systemctl", "unmask", "mysql"], **kw),
-                call(["systemctl", "enable", "--now", "mysql"], **kw),
-                call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
-            ]
-        )
+        mockp.assert_has_calls([
+            call(["systemctl", "unmask", "mysql"], **kw),
+            call(["systemctl", "enable", "--now", "mysql"], **kw),
+            call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
+        ])
 
         # Service was stopped
         mockp, kw = make_mock([0, 0, 0])
         systemd.service_resume("mysql")
-        mockp.assert_has_calls(
-            [
-                call(["systemctl", "unmask", "mysql"], **kw),
-                call(["systemctl", "enable", "--now", "mysql"], **kw),
-                call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
-            ]
-        )
+        mockp.assert_has_calls([
+            call(["systemctl", "unmask", "mysql"], **kw),
+            call(["systemctl", "enable", "--now", "mysql"], **kw),
+            call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
+        ])
 
         # Could not start service!
         mockp, kw = make_mock([0, 0, 3])
         self.assertRaises(systemd.SystemdError, systemd.service_resume, "mysql")
-        mockp.assert_has_calls(
-            [
-                call(["systemctl", "unmask", "mysql"], **kw),
-                call(["systemctl", "enable", "--now", "mysql"], **kw),
-                call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
-            ]
-        )
+        mockp.assert_has_calls([
+            call(["systemctl", "unmask", "mysql"], **kw),
+            call(["systemctl", "enable", "--now", "mysql"], **kw),
+            call(["systemctl", "--quiet", "is-active", "mysql"], **kw),
+        ])
 
     @with_mock_subp
     def test_daemon_reload(self, make_mock):

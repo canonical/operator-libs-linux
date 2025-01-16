@@ -29,9 +29,11 @@ def test_multiple_configure():
 
     test_file_2 = Path("/etc/sysctl.d/90-juju-test2")
     merged_file = Path("/etc/sysctl.d/95-juju-sysctl.conf")
-    result = check_output(
-        ["sysctl", "net.ipv4.tcp_max_syn_backlog", "net.ipv4.tcp_window_scaling"]
-    )
+    result = check_output([
+        "sysctl",
+        "net.ipv4.tcp_max_syn_backlog",
+        "net.ipv4.tcp_window_scaling",
+    ])
     assert (
         "net.ipv4.tcp_max_syn_backlog = 4096\nnet.ipv4.tcp_window_scaling = 2\n" in result.decode()
     )

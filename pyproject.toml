@@ -1,6 +1,7 @@
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
+dynamic_context = "test_function"
 
 [tool.coverage.report]
 show_missing = true
@@ -9,35 +10,209 @@ show_missing = true
 minversion = "6.0"
 log_cli_level = "INFO"
 
-# Formatting tools configuration
-[tool.black]
-line-length = 99
-target-version = ["py38"]
-
 # Linting tools configuration
 [tool.ruff]
 line-length = 99
-select = ["E", "W", "F", "C", "N", "D", "I001"]
-extend-ignore = [
-    "D203",
-    "D204",
-    "D213",
-    "D215",
-    "D400",
-    "D404",
-    "D406",
-    "D407",
-    "D408",
-    "D409",
-    "D413",
-]
-ignore = ["E501", "D107"]
-extend-exclude = ["__pycache__", "*.egg_info"]
-per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104"]}
+target-version = "py38"
+extend-exclude = ["__pycache__", "*.egg_info", "htmlcov"]
 
-[tool.ruff.mccabe]
-max-complexity = 14
+# Ruff formatter configuration
+[tool.ruff.format]
+quote-style = "preserve"  # FIXME: use double for consistency with current codebase convention
+
+[tool.ruff.lint]
+select = [
+    # flake8-builtins
+    "A",
+    # flake8-bugbear
+    "B",
+    # pyflakes-docstrings
+    "D",
+    # conventional names
+    "C",
+    # flake8-copyright
+    "CPY",
+    # Pycodestyle (error)
+    "E",
+    # Pyflakes
+    "F",
+    # isort
+    "I001",
+    # pep8-naming
+    "N",
+    # Perflint
+    "PERF",
+    # Ruff specific
+    "RUF",
+    # flake8-bandit
+    "S",
+    # flake8-simplify
+    "SIM",
+    # pyupgrade
+    "UP",
+    # Pycodestyle (warning)
+    "W",
+    # flake8-2020
+    "YTT",
+]
+ignore = [
+    # mccabe
+    "C90",
+    # Missing docstring in magic method
+    "D105",
+    # Missing docstring in `__init__`
+    "D107",
+    # Use of `assert` detected
+    "S101",
+    # `subprocess` module is possibly insecure
+    "S404",
+    # Return condition directly, prefer readability.
+    "SIM103",
+    # Use contextlib.suppress() instead of try/except: pass
+    "SIM105",
+    # Use a single `with` statement with multiple contexts instead of nested `with` statements
+    "SIM117",
+
+    # Use from err or from None explicitly
+    # FIXME
+    "B904",
+    # too many leading # before block comment
+    # FIXME
+    "E266",
+    # Line too long
+    # FIXME
+    "E501",
+    # try/except inside loop
+    # FIXME: lift or noqa individually as appropriate
+    "PERF203",
+    # Unused noqa
+    # FIXME
+    "RUF100",
+    # use unpacking instead of concatenation with lists
+    # FIXME
+    "RUF005",
+    # implicit Optional in typing
+    # FIXME: typing
+    "RUF013",
+    # subprocess: check for execution of untrusted input
+    # FIXME: individually validate or noqa these
+    "S603",
+    # subprocess: starting process with a partial executable path
+    # FIXME: individually validate or noqa these
+    "S607",
+    # Unnecessary open mode parameters
+    # FIXME
+    "UP015",
+    # prefer capture_output over using stdout+stderr with PIPE
+    # FIXME
+    "UP022",
+    # use {} {} instead if {0} {1} if they're in order
+    # FIXME: migrate to fstrings
+    "UP030",
+    # Use fstrings instead of `format`
+    # FIXME: migrate to fstrings
+    "UP032",
+]
+
+[tool.ruff.lint.pyupgrade]
+# Preserve types, even if a file imports `from __future__ import annotations`.
+# Since we target py 3.8, we want to keep using List[str] and Optional[str]
+keep-runtime-typing = true
+
+[tool.ruff.lint.per-file-ignores]
+"lib/charms/operator_libs_linux/v0/apt.py" = [
+    # Use a context manager for opening files
+    # FIXME: false positive, noqa it
+    "SIM115",
+]
+"lib/charms/operator_libs_linux/v0/grub.py" = [
+    # Probably insecure usage of temporary file or directory under /tmp
+    # FIXME: use stdlib tempfile
+    "S108",
+]
+"lib/charms/operator_libs_linux/v0/juju_systemd_notices.py" = [
+    # unqualified noqa
+    # FIXME
+    "RUF100",
+    # Store a reference to the return value of `asyncio.create_task`
+    # FIXME: investigate
+    "RUF006",
+]
+"lib/charms/operator_libs_linux/v2/snap.py" = [
+    # mutable default argument
+    # FIXME
+    "B006",
+    # audit url open for permitted schemes
+    # FIXME: probably noqa manually
+    "S310",
+    # using None explicitly with get
+    # FIXME
+    "SIM910",
+    # inheriting from object
+    # FIXME
+    "UP004",
+    # use text instead of universal_newlines with subprocess.run
+    # FIXME
+    "UP021",
+    # catch OSError instead of alias IOError
+    # FIXME
+    "UP024",
+]
+"tests/*" = [
+    # All documentation linting.
+    "D",
+    # "Useless" expression.
+    "B018",
+    # Line too long (lots of raw data for comparisons)
+    "E501",
+    # Use of `assert` detected
+    "S101",
+    # Hard-coded password string.
+    "S105",
+    # Hard-coded password function argument.
+    "S106",
+    # Probably insecure usage of temporary file or directory (e.g. /tmp/bad.list)
+    "S108",
+]
+"tests/integration/test_passwd.py" = [
+    # function call with 'truthy' `shell` parameter
+    # FIXME
+    "S604",
+]
+"tests/integration/test_grub.py" = [
+    # detected, some yoda conditionals were
+    # FIXME
+    "SIM300",
+]
+"tests/unit/test_repo.py" = [
+    # use context manager for opening files
+    # FIXME
+    "SIM115",
+]
+"tests/unit/test_sysctl.py" = [
+    # combine if branches using logical or
+    # FIXME
+    "SIM114",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.codespell]
-skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.vscode,.coverage"
-ignore-words-list = "assertIn"
+skip = [
+    ".git",
+    ".tox",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".vscode",
+    "build",
+    "htmlcov",
+    "venv",
+    "icon.svg",
+]
+ignore-words-list = [
+    "assertIn",
+    "fpr",  # gnupg2 fingerprint regex in apt lib
+]
+quiet-level = 3  # disable warnings about (1) wrong encoding + (2) binary files
