@@ -71,11 +71,10 @@ import typing
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from subprocess import CalledProcessError, CompletedProcess
-from typing import Dict, Sequence, Union
+from typing import Dict, Mapping, Sequence, Union
 
 if typing.TYPE_CHECKING:
     from typing import (
