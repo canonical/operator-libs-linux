@@ -83,7 +83,6 @@ if typing.TYPE_CHECKING:
         List,
         Literal,
         NoReturn,
-        Optional,
         Sequence,
         TypedDict,
         TypeVar,
@@ -157,7 +156,7 @@ class SnapService:
         enabled: bool = False,
         active: bool = False,
         activators: list[str] | None = None,
-        **kwargs: Optional[str],
+        **kwargs: str | None,
     ):
         self.daemon = daemon
         self.daemon_scope = kwargs.get("daemon-scope") or daemon_scope
