@@ -74,48 +74,23 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from subprocess import CalledProcessError, CompletedProcess
-from typing import Mapping, Sequence, Union
+from typing import (
+    Callable,
+    Iterable,
+    Literal,
+    Mapping,
+    NoReturn,
+    Sequence,
+    TypedDict,
+    TypeVar,
+)
 
 if typing.TYPE_CHECKING:
-    from typing import (
-        Callable,
-        Iterable,
-        Literal,
-        NoReturn,
-        Sequence,
-        TypedDict,
-        TypeVar,
-    )
-
-    from typing_extensions import NotRequired, ParamSpec
+    # avoid typing_extensions import at runtime
+    from typing_extensions import NotRequired, ParamSpec, TypeAlias
 
     _P = ParamSpec("_P")
     _T = TypeVar("_T")
-
-    class _AsyncChangeDict(TypedDict, total=True):
-        status: str
-        data: JSONType
-
-    class SnapDict(TypedDict, total=True):
-        """The subset of the json returned by snap that we use internally.
-
-        The actual object returned will likely have more keys.
-        """
-
-        name: str
-        channel: str
-        revision: str
-        confinement: str
-        apps: NotRequired[list[JSONObject] | None]
-
-    class SnapServiceDict(TypedDict, total=True):
-        """Dict representation returned by SnapService.as_dict."""
-
-        daemon: str | None
-        daemon_scope: str | None
-        enabled: bool
-        active: bool
-        activators: list[str]
 
 
 logger = logging.getLogger(__name__)
@@ -147,14 +122,42 @@ def _cache_init(func: Callable[_P, _T]) -> Callable[_P, _T]:
 # we use a non-null json type
 # because setting snap config values to null removes the key
 # so a null value can never be returned
-JSONObject = Mapping[str, 'JSONType']
-JSONType = Union['JSONObject', Sequence['JSONType'], str, int, float, bool]
+JSONObject: TypeAlias = "Mapping[str, JSONType]"
+JSONType: TypeAlias = "JSONObject | Sequence[JSONType] | str | int | float | bool"
 # we also need a nullable json type
 # because users can set snap config values to null
-NullableJSONObject = Mapping[str, 'NullableJSONType']
-NullableJSONType = Union[
-    'NullableJSONObject', Sequence['NullableJSONType'], str, int, float, bool, None
-]
+NullableJSONObject: TypeAlias = "Mapping[str, NullableJSONType]"
+NullableJSONType: TypeAlias = (
+    "NullableJSONObject | Sequence['NullableJSONType'] | str | int | float | bool | None"
+)
+
+
+class _AsyncChangeDict(TypedDict, total=True):
+    status: str
+    data: JSONType
+
+
+class SnapDict(TypedDict, total=True):
+    """The subset of the json returned by snap that we use internally.
+
+    The actual object returned will likely have more keys.
+    """
+
+    name: str
+    channel: str
+    revision: str
+    confinement: str
+    apps: NotRequired[list[JSONObject] | None]
+
+
+class SnapServiceDict(TypedDict, total=True):
+    """Dict representation returned by SnapService.as_dict."""
+
+    daemon: str | None
+    daemon_scope: str | None
+    enabled: bool
+    active: bool
+    activators: list[str]
 
 
 class SnapService:
@@ -849,9 +852,8 @@ class SnapClient:
         while True:
             if time.time() > deadline:
                 raise TimeoutError(f"timeout waiting for snap change {change_id}")
-            response = typing.cast(
-                '_AsyncChangeDict', self._request("GET", f"changes/{change_id}")
-            )
+            response = self._request("GET", f"changes/{change_id}")
+            response = typing.cast('_AsyncChangeDict', response)
             status = response["status"]
             if status == "Done":
                 return response.get("data")
