@@ -74,13 +74,12 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from subprocess import CalledProcessError, CompletedProcess
-from typing import Dict, Mapping, Sequence, Union
+from typing import Mapping, Sequence, Union
 
 if typing.TYPE_CHECKING:
     from typing import (
         Callable,
         Iterable,
-        List,
         Literal,
         NoReturn,
         Sequence,
@@ -98,7 +97,10 @@ if typing.TYPE_CHECKING:
         data: JSONType
 
     class SnapDict(TypedDict, total=True):
-        """The subset of the json returned by snap that we use internally."""
+        """The subset of the json returned by snap that we use internally.
+
+        The actual object returned will likely have more keys.
+        """
 
         name: str
         channel: str
@@ -106,7 +108,14 @@ if typing.TYPE_CHECKING:
         confinement: str
         apps: NotRequired[list[JSONObject] | None]
 
-    SnapServiceDict = Dict[str, Union[str, bool, List[str], None]]
+    class SnapServiceDict(TypedDict, total=True):
+        """Dict representation returned by SnapService.as_dict."""
+
+        daemon: str | None
+        daemon_scope: str | None
+        enabled: bool
+        active: bool
+        activators: list[str]
 
 
 logger = logging.getLogger(__name__)
@@ -711,7 +720,7 @@ class Snap(object):
     def services(self) -> dict[str, SnapServiceDict]:
         """Returns (if any) the installed services of the snap."""
         self._update_snap_apps()
-        services: dict[str, dict[str, str | bool | list[str] | None]] = {}
+        services: dict[str, SnapServiceDict] = {}
         for app in self._apps:
             if "daemon" in app:
                 name = typing.cast(str, app["name"])
