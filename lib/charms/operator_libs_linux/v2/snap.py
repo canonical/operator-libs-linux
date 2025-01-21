@@ -97,7 +97,9 @@ if typing.TYPE_CHECKING:
         status: str
         data: JSONType
 
-    class SnapDict(TypedDict, total=True):  # noqa: D101
+    class SnapDict(TypedDict, total=True):
+        """The subset of the json returned by snap that we use internally."""
+
         name: str
         channel: str
         revision: str
@@ -841,7 +843,7 @@ class SnapClient:
         path: str,
         query: dict[str, str] | None = None,
         body: NullableJSONObject | None = None,
-    ) -> JSONType | list[SnapDict] | SnapDict:
+    ) -> list[SnapDict] | JSONType:
         """Make a JSON request to the Snapd server with the given HTTP method and path.
 
         If query dict is provided, it is encoded and appended as a query string
