@@ -814,45 +814,13 @@ class SnapClient:
         opener.add_handler(urllib.request.HTTPErrorProcessor())
         return opener
 
-    @typing.overload
-    def _request(  # pyright: ignore[reportOverlappingOverload]
-        self,
-        method: Literal["GET"],
-        path: Literal["apps"],
-        query: dict[str, str],
-        body: None = None,
-    ) -> list[JSONObject]: ...
-    @typing.overload
-    def _request(
-        self,
-        method: Literal["GET"],
-        path: Literal["find"],
-        query: dict[str, str],
-        body: None = None,
-    ) -> list[SnapDict]: ...
-    @typing.overload
-    def _request(
-        self,
-        method: Literal["GET"],
-        path: Literal["snaps"],
-        query: None = None,
-        body: None = None,
-    ) -> list[SnapDict]: ...
-    @typing.overload
     def _request(
         self,
         method: str,
         path: str,
         query: dict[str, str] | None = None,
         body: NullableJSONObject | None = None,
-    ) -> JSONObject: ...
-    def _request(
-        self,
-        method: str,
-        path: str,
-        query: dict[str, str] | None = None,
-        body: NullableJSONObject | None = None,
-    ) -> list[SnapDict] | JSONType:
+    ) -> NullableJSONType:
         """Make a JSON request to the Snapd server with the given HTTP method and path.
 
         If query dict is provided, it is encoded and appended as a query string
@@ -872,7 +840,7 @@ class SnapClient:
             return self._wait(response["change"])
         return response["result"]
 
-    def _wait(self, change_id: str, timeout: float = 300) -> JSONType:
+    def _wait(self, change_id: str, timeout: float = 300) -> NullableJSONType:
         """Wait for an async change to complete.
 
         The poll time is 100 milliseconds, the same as in snap clients.
@@ -934,15 +902,15 @@ class SnapClient:
 
     def get_installed_snaps(self) -> list[SnapDict]:
         """Get information about currently installed snaps."""
-        return self._request("GET", "snaps")
+        return self._request("GET", "snaps")  # type: ignore
 
     def get_snap_information(self, name: str) -> SnapDict:
         """Query the snap server for information about single snap."""
-        return self._request("GET", "find", {"name": name})[0]
+        return self._request("GET", "find", {"name": name})[0]  # type: ignore
 
     def get_installed_snap_apps(self, name: str) -> list[JSONObject]:
         """Query the snap server for apps belonging to a named, currently installed snap."""
-        return self._request("GET", "apps", {"names": name, "select": "service"})
+        return self._request("GET", "apps", {"names": name, "select": "service"})  # type: ignore
 
     def _put_snap_conf(self, name: str, conf: NullableJSONObject) -> None:
         """Set the configuration details for an installed snap."""
