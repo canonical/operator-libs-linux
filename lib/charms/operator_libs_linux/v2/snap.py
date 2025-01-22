@@ -516,9 +516,9 @@ class Snap(object):
 
     def _install(
         self,
-        channel: str | None = "",
-        cohort: str | None = "",
-        revision: str | None = None,
+        channel: str = "",
+        cohort: str = "",
+        revision: str = "",
     ) -> None:
         """Add a snap to the system.
 
@@ -545,9 +545,9 @@ class Snap(object):
 
     def _refresh(
         self,
-        channel: str | None = "",
-        cohort: str | None = "",
-        revision: str | None = None,
+        channel: str = "",
+        cohort: str = "",
+        revision: str = "",
         devmode: bool = False,
         leave_cohort: bool = False,
     ) -> None:
@@ -595,8 +595,8 @@ class Snap(object):
         state: SnapState,
         classic: bool = False,
         devmode: bool = False,
-        channel: str | None = "",
-        cohort: str | None = "",
+        channel: str | None = None,
+        cohort: str | None = None,
         revision: str | None = None,
     ):
         """Ensure that a snap is in a given state.
@@ -615,6 +615,10 @@ class Snap(object):
         Raises:
           SnapError if an error is encountered
         """
+        channel = channel or ""
+        cohort = cohort or ""
+        revision = revision or ""
+
         if classic and devmode:
             raise ValueError("Cannot set both classic and devmode confinement")
 
@@ -1036,10 +1040,10 @@ def add(  # may return a single Snap or a list depending if one or more snap nam
 def add(
     snap_names: str | list[str],
     state: str | SnapState = SnapState.Latest,
-    channel: str | None = "",
+    channel: str | None = None,
     classic: bool = False,
     devmode: bool = False,
-    cohort: str | None = "",
+    cohort: str | None = None,
     revision: str | None = None,
 ) -> Snap | list[Snap]:
     """Add a snap to the system.
@@ -1072,11 +1076,11 @@ def add(
     return _wrap_snap_operations(
         snap_names=snap_names,
         state=state,
-        channel=channel if channel is not None else "",
-        classic=classic if classic is not None else False,
+        channel=channel or "",
+        classic=classic,
         devmode=devmode,
-        cohort=cohort,
-        revision=revision,
+        cohort=cohort or "",
+        revision=revision or "",
     )
 
 
@@ -1112,30 +1116,30 @@ def remove(snap_names: str | list[str]) -> Snap | list[Snap]:
 def ensure(  # return a single Snap if snap name is given as a string
     snap_names: str,
     state: str,
-    channel: str | None = "",
+    channel: str | None = None,
     classic: bool = False,
     devmode: bool = False,
-    cohort: str | None = "",
+    cohort: str | None = None,
     revision: int | None = None,
 ) -> Snap: ...
 @typing.overload
 def ensure(  # may return a single Snap or a list depending if one or more snap names were given
     snap_names: list[str],
     state: str,
-    channel: str | None = "",
+    channel: str | None = None,
     classic: bool = False,
     devmode: bool = False,
-    cohort: str | None = "",
+    cohort: str | None = None,
     revision: int | None = None,
 ) -> Snap | list[Snap]: ...
 @_cache_init
 def ensure(
     snap_names: str | list[str],
     state: str,
-    channel: str | None = "",
+    channel: str | None = None,
     classic: bool = False,
     devmode: bool = False,
-    cohort: str | None = "",
+    cohort: str | None = None,
     revision: int | None = None,
 ) -> Snap | list[Snap]:
     """Ensure specified snaps are in a given state on the system.
@@ -1180,8 +1184,8 @@ def _wrap_snap_operations(
     channel: str,
     classic: bool,
     devmode: bool,
-    cohort: str | None = "",
-    revision: str | None = None,
+    cohort: str = "",
+    revision: str = "",
 ) -> Snap | list[Snap]:
     """Wrap common operations for bare commands."""
     snaps: list[Snap] = []
