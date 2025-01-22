@@ -87,10 +87,28 @@ from typing import (
 
 if typing.TYPE_CHECKING:
     # avoid typing_extensions import at runtime
-    from typing_extensions import NotRequired, ParamSpec, TypeAlias
+    from typing_extensions import NotRequired, ParamSpec, Required, TypeAlias, Unpack
 
     _P = ParamSpec("_P")
     _T = TypeVar("_T")
+
+    # TypedDicts with hyphenated keys
+    _SnapServiceAppDict = TypedDict(
+        "_SnapServiceAppDict",
+        {
+            "name": Required[str],
+            "daemon": str,
+            "daemon_scope": str,
+            "daemon-scope": str,
+            "enabled": bool,
+            "active": bool,
+            "activators": list[str],
+        },
+        total=False,
+    )
+    _SnapServiceKwargsDict = TypedDict(
+        "_SnapServiceKwargsDict", {"daemon-scope": str}, total=False
+    )
 
 
 logger = logging.getLogger(__name__)
@@ -164,7 +182,7 @@ class SnapService:
         enabled: bool = False,
         active: bool = False,
         activators: list[str] | None = None,
-        **kwargs: str | None,
+        **kwargs: Unpack[_SnapServiceKwargsDict],
     ):
         self.daemon = daemon
         self.daemon_scope = kwargs.get("daemon-scope") or daemon_scope
@@ -723,10 +741,8 @@ class Snap(object):
         services: dict[str, SnapServiceDict] = {}
         for app in self._apps:
             if "daemon" in app:
-                name = typing.cast(str, app["name"])
-                snap_service = SnapService(**app)  # pyright: ignore[reportArgumentType]
-                service_dict = snap_service.as_dict()
-                services[name] = service_dict
+                app = typing.cast("_SnapServiceAppDict", app)
+                services[app["name"]] = SnapService(**app).as_dict()
 
         return services
 
