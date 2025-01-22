@@ -990,7 +990,7 @@ class TestSnapBareMethods(unittest.TestCase):
             cache = None
 
             def __getitem__(self, name: str) -> snap.Snap:
-                raise snap.SnapNotFoundError("")
+                raise snap.SnapNotFoundError()
 
         with patch.object(snap, "_Cache", new=NotFoundCache()):
             with self.assertRaises(snap.SnapError) as ctx:
@@ -1030,7 +1030,7 @@ class TestSnapBareMethods(unittest.TestCase):
                 key = optargs[0]
                 if key in keys_and_values:
                     return str(keys_and_values[key])
-                raise snap.SnapError("")
+                raise snap.SnapError()
             if len(optargs) == 2 and optargs[0] == "-d":  # ["-d", <some-key>]
                 key = optargs[1]
                 if key in keys_and_values:
