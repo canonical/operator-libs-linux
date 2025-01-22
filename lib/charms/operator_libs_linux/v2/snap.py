@@ -1035,20 +1035,20 @@ class SnapCache(Mapping[str, Snap]):
 def add(  # return a single Snap if snap name is given as a string
     snap_names: str,
     state: str | SnapState = SnapState.Latest,
-    channel: str | None = "",
+    channel: str | None = None,
     classic: bool = False,
     devmode: bool = False,
-    cohort: str | None = "",
+    cohort: str | None = None,
     revision: str | None = None,
 ) -> Snap: ...
 @typing.overload
 def add(  # may return a single Snap or a list depending if one or more snap names were given
     snap_names: list[str],
     state: str | SnapState = SnapState.Latest,
-    channel: str | None = "",
+    channel: str | None = None,
     classic: bool = False,
     devmode: bool = False,
-    cohort: str | None = "",
+    cohort: str | None = None,
     revision: str | None = None,
 ) -> Snap | list[Snap]: ...
 @_cache_init
