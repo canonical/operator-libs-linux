@@ -119,17 +119,12 @@ def _cache_init(func: Callable[_P, _T]) -> Callable[_P, _T]:
     return inner
 
 
-# we use a non-null json type
-# because setting snap config values to null removes the key
-# so a null value can never be returned
-JSONObject: TypeAlias = "Mapping[str, JSONType]"
-JSONType: TypeAlias = "JSONObject | Sequence[JSONType] | str | int | float | bool"
-# we also need a nullable json type
-# because users can set snap config values to null
-NullableJSONObject: TypeAlias = "Mapping[str, NullableJSONType]"
-NullableJSONType: TypeAlias = (
-    "NullableJSONObject | Sequence['NullableJSONType'] | str | int | float | bool | None"
-)
+# this is used for return types so it (a) uses concrete types and (b) does not contain None
+# because setting snap config values to null removes the key so a null value can't be returned
+_JSONLeaf: TypeAlias = 'str | int | float | bool'
+JSONType: TypeAlias = "dict[str, JSONType] | list[JSONType] | _JSONLeaf"
+# we also need a jsonable type for arguments which (a) uses abstract types and (b) may contain None
+JSONAble: TypeAlias = "Mapping[str, JSONAble] | Sequence[JSONAble] | _JSONLeaf | None"
 
 
 class _AsyncChangeDict(TypedDict, total=True):
@@ -147,7 +142,7 @@ class SnapDict(TypedDict, total=True):
     channel: str
     revision: str
     confinement: str
-    apps: NotRequired[list[JSONObject] | None]
+    apps: NotRequired[list[dict[str, JSONType]] | None]
 
 
 class SnapServiceDict(TypedDict, total=True):
@@ -281,7 +276,7 @@ class Snap(object):
         channel: str,
         revision: str,
         confinement: str,
-        apps: list[JSONObject] | None = None,
+        apps: list[dict[str, JSONType]] | None = None,
         cohort: str | None = "",
     ) -> None:
         self._name = name
@@ -372,7 +367,7 @@ class Snap(object):
     @typing.overload
     def get(self, key: str, *, typed: Literal[False] = False) -> str: ...
     @typing.overload
-    def get(self, key: None | Literal[""], *, typed: Literal[True]) -> JSONObject: ...
+    def get(self, key: None | Literal[""], *, typed: Literal[True]) -> dict[str, JSONType]: ...
     @typing.overload
     def get(self, key: str, *, typed: Literal[True]) -> JSONType: ...
     def get(self, key: str | None, *, typed: bool = False) -> JSONType | str:
@@ -398,7 +393,7 @@ class Snap(object):
         # return a string
         return self._snap("get", [key]).strip()
 
-    def set(self, config: dict[str, NullableJSONType], *, typed: bool = False) -> None:
+    def set(self, config: dict[str, JSONAble], *, typed: bool = False) -> None:
         """Set a snap configuration value.
 
         Args:
@@ -714,7 +709,7 @@ class Snap(object):
         return self._confinement
 
     @property
-    def apps(self) -> list[JSONObject]:
+    def apps(self) -> list[dict[str, JSONType]]:
         """Returns (if any) the installed apps of the snap."""
         self._update_snap_apps()
         return self._apps
@@ -822,8 +817,8 @@ class SnapClient:
         method: str,
         path: str,
         query: dict[str, str] | None = None,
-        body: NullableJSONObject | None = None,
-    ) -> NullableJSONType:
+        body: dict[str, JSONAble] | None = None,
+    ) -> JSONType | None:
         """Make a JSON request to the Snapd server with the given HTTP method and path.
 
         If query dict is provided, it is encoded and appended as a query string
@@ -843,7 +838,7 @@ class SnapClient:
             return self._wait(response["change"])
         return response["result"]
 
-    def _wait(self, change_id: str, timeout: float = 300) -> NullableJSONType:
+    def _wait(self, change_id: str, timeout: float = 300) -> JSONType | None:
         """Wait for an async change to complete.
 
         The poll time is 100 milliseconds, the same as in snap clients.
@@ -910,11 +905,11 @@ class SnapClient:
         """Query the snap server for information about single snap."""
         return self._request("GET", "find", {"name": name})[0]  # type: ignore
 
-    def get_installed_snap_apps(self, name: str) -> list[JSONObject]:
+    def get_installed_snap_apps(self, name: str) -> list[dict[str, JSONType]]:
         """Query the snap server for apps belonging to a named, currently installed snap."""
         return self._request("GET", "apps", {"names": name, "select": "service"})  # type: ignore
 
-    def _put_snap_conf(self, name: str, conf: NullableJSONObject) -> None:
+    def _put_snap_conf(self, name: str, conf: dict[str, JSONAble]) -> None:
         """Set the configuration details for an installed snap."""
         self._request("PUT", f"snaps/{name}/conf", body=conf)
 
