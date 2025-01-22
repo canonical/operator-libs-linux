@@ -1215,7 +1215,7 @@ def _wrap_snap_operations(
             logger.warning("Snap '{}' not found in cache!".format(snap_name))
             errors.append(snap_name)
 
-    if len(errors):
+    if errors:
         raise SnapError("Failed to install or refresh snap(s): {}".format(", ".join(errors)))
 
     return snaps if len(snaps) > 1 else snaps[0]
