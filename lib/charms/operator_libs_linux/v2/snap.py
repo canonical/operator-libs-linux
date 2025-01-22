@@ -227,7 +227,7 @@ class Error(Exception):
 class SnapAPIError(Error):
     """Raised when an HTTP API error occurs talking to the Snapd server."""
 
-    def __init__(self, body: dict[str, object], code: int, status: str, message: str):
+    def __init__(self, body: Mapping[str, JSONType], code: int, status: str, message: str):
         super().__init__(message)  # Makes str(e) return message
         self.body = body
         self.code = code
@@ -885,9 +885,9 @@ class SnapClient:
             code = e.code
             status = e.reason
             message = ""
-            body: dict[str, object]
+            body: dict[str, JSONType]
             try:
-                body = json.loads(e.read().decode())["result"]
+                body = json.loads(e.read().decode())["result"]  # json.loads -> Any
             except (IOError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
                 body = {}
