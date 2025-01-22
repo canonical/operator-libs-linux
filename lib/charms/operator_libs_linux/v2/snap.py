@@ -937,7 +937,7 @@ class SnapCache(Mapping[str, Snap]):
             self._load_available_snaps()
             self._load_installed_snaps()
 
-    def __contains__(self, key: str) -> bool:
+    def __contains__(self, key: object) -> bool:
         """Check if a given snap is in the cache."""
         return key in self._snap_map
 
@@ -945,7 +945,7 @@ class SnapCache(Mapping[str, Snap]):
         """Report number of items in the snap cache."""
         return len(self._snap_map)
 
-    def __iter__(self) -> Iterable[Snap | None]:
+    def __iter__(self) -> Iterable[Snap | None]:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Provide iterator for the snap cache."""
         return iter(self._snap_map.values())
 
