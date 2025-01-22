@@ -92,25 +92,6 @@ if typing.TYPE_CHECKING:
     _P = ParamSpec("_P")
     _T = TypeVar("_T")
 
-    # TypedDicts with hyphenated keys
-    _SnapServiceAppDict = TypedDict(
-        "_SnapServiceAppDict",
-        {
-            "name": Required[str],
-            "daemon": str,
-            "daemon_scope": str,
-            "daemon-scope": str,
-            "enabled": bool,
-            "active": bool,
-            "activators": list[str],
-        },
-        total=False,
-    )
-    _SnapServiceKwargsDict = TypedDict(
-        "_SnapServiceKwargsDict", {"daemon-scope": str}, total=False
-    )
-
-
 logger = logging.getLogger(__name__)
 
 # The unique Charmhub library identifier, never change it
@@ -170,6 +151,23 @@ class SnapServiceDict(TypedDict, total=True):
     enabled: bool
     active: bool
     activators: list[str]
+
+
+# TypedDicts with hyphenated keys
+_SnapServiceKwargsDict = TypedDict("_SnapServiceKwargsDict", {"daemon-scope": str}, total=False)
+_SnapServiceAppDict = TypedDict(
+    "_SnapServiceAppDict",
+    {
+        "name": "Required[str]",
+        "daemon": str,
+        "daemon_scope": str,
+        "daemon-scope": str,
+        "enabled": bool,
+        "active": bool,
+        "activators": "list[str]",
+    },
+    total=False,
+)
 
 
 class SnapService:
