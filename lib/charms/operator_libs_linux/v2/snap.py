@@ -1208,9 +1208,9 @@ def _wrap_snap_operations(
 
     op = "remove" if state is SnapState.Absent else "install or refresh"
 
-    for snap_name in snap_names:
+    for s in snap_names:
         try:
-            snap = _Cache[snap_name]
+            snap = _Cache[s]
             if state is SnapState.Absent:
                 snap.ensure(state=SnapState.Absent)
             else:
@@ -1224,11 +1224,11 @@ def _wrap_snap_operations(
                 )
             snaps.append(snap)
         except SnapError as e:
-            logger.warning("Failed to {} snap {}: {}!".format(op, snap_name, e.message))
-            errors.append(snap_name)
+            logger.warning("Failed to {} snap {}: {}!".format(op, s, e.message))
+            errors.append(s)
         except SnapNotFoundError:
-            logger.warning("Snap '{}' not found in cache!".format(snap_name))
-            errors.append(snap_name)
+            logger.warning("Snap '{}' not found in cache!".format(s))
+            errors.append(s)
 
     if errors:
         raise SnapError("Failed to install or refresh snap(s): {}".format(", ".join(errors)))
