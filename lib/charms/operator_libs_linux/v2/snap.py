@@ -208,6 +208,10 @@ class _Cache(object, metaclass=MetaCache):
 class Error(Exception):
     """Base class of most errors raised by this library."""
 
+    def __init__(self, message: str = "", *args: object):
+        super().__init__(message, *args)
+        self.message = message
+
     def __repr__(self) -> str:
         """Represent the Error class."""
         return "<{}.{} {}>".format(type(self).__module__, type(self).__name__, self.args)
@@ -216,11 +220,6 @@ class Error(Exception):
     def name(self) -> str:
         """Return a string representation of the model plus class."""
         return "<{}.{}>".format(type(self).__module__, type(self).__name__)
-
-    @property
-    def message(self) -> str:
-        """Return the message passed as an argument."""
-        return self.args[0]
 
 
 class SnapAPIError(Error):
