@@ -118,11 +118,11 @@ def _cache_init(func: Callable[_P, _T]) -> Callable[_P, _T]:
     return inner
 
 
-# this is used for return types so it (a) uses concrete types and (b) does not contain None
+# this is used for return types, so it (a) uses concrete types and (b) does not contain None
 # because setting snap config values to null removes the key so a null value can't be returned
 _JSONLeaf: TypeAlias = 'str | int | float | bool'
 JSONType: TypeAlias = "dict[str, JSONType] | list[JSONType] | _JSONLeaf"
-# we also need a jsonable type for arguments which (a) uses abstract types and (b) may contain None
+# we also need a jsonable type for arguments, which (a) uses abstract types and (b) may contain None
 JSONAble: TypeAlias = "Mapping[str, JSONAble] | Sequence[JSONAble] | _JSONLeaf | None"
 
 
@@ -155,7 +155,9 @@ class SnapServiceDict(TypedDict, total=True):
 
 # TypedDicts with hyphenated keys
 _SnapServiceKwargsDict = TypedDict("_SnapServiceKwargsDict", {"daemon-scope": str}, total=False)
+# the kwargs accepted by SnapService
 _SnapServiceAppDict = TypedDict(
+    # the data we expect a Snap._apps entry to contain for a daemon
     "_SnapServiceAppDict",
     {
         "name": "Required[str]",
@@ -241,7 +243,7 @@ class Error(Exception):
 class SnapAPIError(Error):
     """Raised when an HTTP API error occurs talking to the Snapd server."""
 
-    def __init__(self, body: Mapping[str, JSONType], code: int, status: str, message: str):
+    def __init__(self, body: Mapping[str, JSONAble], code: int, status: str, message: str):
         super().__init__(message)  # Makes str(e) return message
         self.body = body
         self.code = code
@@ -782,7 +784,7 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
     def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
         """Override http_open to use a Unix socket connection (instead of TCP)."""
         return self.do_open(
-            typing.cast('urllib.request._HTTPConnectionProtocol', _UnixSocketConnection),
+            typing.cast("urllib.request._HTTPConnectionProtocol", _UnixSocketConnection),
             req,
             socket_path=self.socket_path,
         )
@@ -851,7 +853,7 @@ class SnapClient:
         response = self._request_raw(method, path, query, headers, data)
         response = json.loads(response.read().decode())  # json.loads -> Any
         if response["type"] == "async":
-            return self._wait(response["change"])  # may be `None` due to `get``
+            return self._wait(response["change"])  # may be `None` due to `get`
         return response["result"]
 
     def _wait(self, change_id: str, timeout: float = 300) -> JSONType | None:
@@ -864,7 +866,7 @@ class SnapClient:
             if time.time() > deadline:
                 raise TimeoutError(f"timeout waiting for snap change {change_id}")
             response = self._request("GET", f"changes/{change_id}")
-            response = typing.cast('_AsyncChangeDict', response)
+            response = typing.cast("_AsyncChangeDict", response)
             status = response["status"]
             if status == "Done":
                 return response.get("data")
@@ -962,9 +964,9 @@ class SnapCache(Mapping[str, Snap]):
 
     def __getitem__(self, snap_name: str) -> Snap:
         """Return either the installed version or latest version for a given snap."""
-        maybe_snap = self._snap_map.get(snap_name)
-        if maybe_snap is not None:
-            return maybe_snap
+        snap = self._snap_map.get(snap_name)
+        if snap is not None:
+            return snap
         # The snapd cache file may not have existed when _snap_map was
         # populated.  This is normal.
         try:
@@ -999,7 +1001,7 @@ class SnapCache(Mapping[str, Snap]):
         installed = self._snap_client.get_installed_snaps()
 
         for i in installed:
-            i = typing.cast(_SnapDict, i)
+            i = typing.cast("_SnapDict", i)
             snap = Snap(
                 name=i["name"],
                 state=SnapState.Latest,
@@ -1017,7 +1019,7 @@ class SnapCache(Mapping[str, Snap]):
             name: a string representing the name of the snap
         """
         info = self._snap_client.get_snap_information(name)
-        info = typing.cast(_SnapDict, info)
+        info = typing.cast("_SnapDict", info)
 
         return Snap(
             name=info["name"],
