@@ -128,15 +128,14 @@ JSONAble: TypeAlias = "Mapping[str, JSONAble] | Sequence[JSONAble] | _JSONLeaf |
 
 
 class _AsyncChangeDict(TypedDict, total=True):
+    """The subset of the json returned by GET changes that we care about internally."""
+
     status: str
     data: JSONType
 
 
-class SnapDict(TypedDict, total=True):
-    """The subset of the json returned by snap that we use internally.
-
-    The actual object returned will likely have more keys.
-    """
+class _SnapDict(TypedDict, total=True):
+    """The subset of the json returned by GET snap/find that we care about internally."""
 
     name: str
     channel: str
@@ -146,7 +145,7 @@ class SnapDict(TypedDict, total=True):
 
 
 class SnapServiceDict(TypedDict, total=True):
-    """Dict representation returned by SnapService.as_dict."""
+    """Dictionary representation returned by SnapService.as_dict."""
 
     daemon: str | None
     daemon_scope: str | None
@@ -277,7 +276,7 @@ class Snap(object):
         revision: str,
         confinement: str,
         apps: list[dict[str, JSONType]] | None = None,
-        cohort: str | None = "",
+        cohort: str | None = None,
     ) -> None:
         self._name = name
         self._state = state
@@ -835,7 +834,7 @@ class SnapClient:
         response = self._request_raw(method, path, query, headers, data)
         response = json.loads(response.read().decode())  # json.loads -> Any
         if response["type"] == "async":
-            return self._wait(response["change"])
+            return self._wait(response["change"])  # may be `None` due to `get``
         return response["result"]
 
     def _wait(self, change_id: str, timeout: float = 300) -> JSONType | None:
@@ -897,11 +896,11 @@ class SnapClient:
             raise SnapAPIError({}, 500, "Not found", str(e.reason))
         return response
 
-    def get_installed_snaps(self) -> list[SnapDict]:
+    def get_installed_snaps(self) -> list[dict[str, JSONType]]:
         """Get information about currently installed snaps."""
         return self._request("GET", "snaps")  # type: ignore
 
-    def get_snap_information(self, name: str) -> SnapDict:
+    def get_snap_information(self, name: str) -> dict[str, JSONType]:
         """Query the snap server for information about single snap."""
         return self._request("GET", "find", {"name": name})[0]  # type: ignore
 
@@ -983,6 +982,7 @@ class SnapCache(Mapping[str, Snap]):
         installed = self._snap_client.get_installed_snaps()
 
         for i in installed:
+            i = typing.cast(_SnapDict, i)
             snap = Snap(
                 name=i["name"],
                 state=SnapState.Latest,
@@ -1000,6 +1000,7 @@ class SnapCache(Mapping[str, Snap]):
             name: a string representing the name of the snap
         """
         info = self._snap_client.get_snap_information(name)
+        info = typing.cast(_SnapDict, info)
 
         return Snap(
             name=info["name"],
