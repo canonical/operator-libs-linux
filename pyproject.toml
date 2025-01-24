@@ -198,6 +198,17 @@ keep-runtime-typing = true
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.pyright]
+include = ["lib/charms/operator_libs_linux/v*/*.py", "tests/*/*.py"]
+pythonVersion = "3.8"  # check no python > 3.8 features are used
+pythonPlatform = "All"
+typeCheckingMode = "strict"
+reportPrivateUsage = false  # library classes may use each other's private attributes
+reportUnnecessaryIsInstance = false  # types aren't perfect
+reportUnnecessaryComparison = false  # types aren't perfect
+reportUnnecessaryTypeIgnoreComment = "error"  # unnecessary ignores should be removed
+stubPath = ""  # silence warning: https://github.com/microsoft/pyright/issues/777
+
 [tool.codespell]
 skip = [
     ".git",

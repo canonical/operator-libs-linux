@@ -71,15 +71,26 @@ import typing
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from subprocess import CalledProcessError, CompletedProcess
-from typing import Any, Iterable
+from typing import (
+    Callable,
+    Iterable,
+    Literal,
+    Mapping,
+    NoReturn,
+    Sequence,
+    TypedDict,
+    TypeVar,
+)
 
 if typing.TYPE_CHECKING:
     # avoid typing_extensions import at runtime
-    from typing_extensions import TypeAlias
+    from typing_extensions import NotRequired, ParamSpec, Required, TypeAlias, Unpack
+
+    _P = ParamSpec("_P")
+    _T = TypeVar("_T")
 
 logger = logging.getLogger(__name__)
 
@@ -98,8 +109,8 @@ LIBPATCH = 9
 ansi_filter = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
 
-def _cache_init(func):
-    def inner(*args, **kwargs):
+def _cache_init(func: Callable[_P, _T]) -> Callable[_P, _T]:
+    def inner(*args: _P.args, **kwargs: _P.kwargs) -> _T:
         if _Cache.cache is None:
             _Cache.cache = SnapCache()
         return func(*args, **kwargs)
@@ -107,8 +118,58 @@ def _cache_init(func):
     return inner
 
 
-# recursive hints seems to error out pytest
-JSONType: TypeAlias = "dict[str, Any] | list[Any] | str | int | float"
+# this is used for return types, so it (a) uses concrete types and (b) does not contain None
+# because setting snap config values to null removes the key so a null value can't be returned
+_JSONLeaf: TypeAlias = 'str | int | float | bool'
+JSONType: TypeAlias = "dict[str, JSONType] | list[JSONType] | _JSONLeaf"
+# we also need a jsonable type for arguments, which (a) uses abstract types and (b) may contain None
+JSONAble: TypeAlias = "Mapping[str, JSONAble] | Sequence[JSONAble] | _JSONLeaf | None"
+
+
+class _AsyncChangeDict(TypedDict, total=True):
+    """The subset of the json returned by GET changes that we care about internally."""
+
+    status: str
+    data: JSONType
+
+
+class _SnapDict(TypedDict, total=True):
+    """The subset of the json returned by GET snap/find that we care about internally."""
+
+    name: str
+    channel: str
+    revision: str
+    confinement: str
+    apps: NotRequired[list[dict[str, JSONType]] | None]
+
+
+class SnapServiceDict(TypedDict, total=True):
+    """Dictionary representation returned by SnapService.as_dict."""
+
+    daemon: str | None
+    daemon_scope: str | None
+    enabled: bool
+    active: bool
+    activators: list[str]
+
+
+# TypedDicts with hyphenated keys
+_SnapServiceKwargsDict = TypedDict("_SnapServiceKwargsDict", {"daemon-scope": str}, total=False)
+# the kwargs accepted by SnapService
+_SnapServiceAppDict = TypedDict(
+    # the data we expect a Snap._apps entry to contain for a daemon
+    "_SnapServiceAppDict",
+    {
+        "name": "Required[str]",
+        "daemon": str,
+        "daemon_scope": str,
+        "daemon-scope": str,
+        "enabled": bool,
+        "active": bool,
+        "activators": "list[str]",
+    },
+    total=False,
+)
 
 
 class SnapService:
@@ -120,16 +181,16 @@ class SnapService:
         daemon_scope: str | None = None,
         enabled: bool = False,
         active: bool = False,
-        activators: list[str] = [],
-        **kwargs,
+        activators: list[str] | None = None,
+        **kwargs: Unpack[_SnapServiceKwargsDict],
     ):
         self.daemon = daemon
-        self.daemon_scope = kwargs.get("daemon-scope", None) or daemon_scope
+        self.daemon_scope = kwargs.get("daemon-scope") or daemon_scope
         self.enabled = enabled
         self.active = active
-        self.activators = activators
+        self.activators = activators if activators is not None else []
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> SnapServiceDict:
         """Return instance representation as dict."""
         return {
             "daemon": self.daemon,
@@ -153,7 +214,7 @@ class MetaCache(type):
         """Setter for the snap cache."""
         cls._cache = cache
 
-    def __getitem__(cls, name) -> Snap:
+    def __getitem__(cls, name: str) -> Snap:
         """Snap cache getter."""
         return cls._cache[name]
 
@@ -165,32 +226,31 @@ class _Cache(object, metaclass=MetaCache):
 class Error(Exception):
     """Base class of most errors raised by this library."""
 
-    def __repr__(self):
+    def __init__(self, message: str = "", *args: object):
+        super().__init__(message, *args)
+        self.message = message
+
+    def __repr__(self) -> str:
         """Represent the Error class."""
         return "<{}.{} {}>".format(type(self).__module__, type(self).__name__, self.args)
 
     @property
-    def name(self):
+    def name(self) -> str:
         """Return a string representation of the model plus class."""
         return "<{}.{}>".format(type(self).__module__, type(self).__name__)
-
-    @property
-    def message(self):
-        """Return the message passed as an argument."""
-        return self.args[0]
 
 
 class SnapAPIError(Error):
     """Raised when an HTTP API error occurs talking to the Snapd server."""
 
-    def __init__(self, body: dict, code: int, status: str, message: str):
+    def __init__(self, body: Mapping[str, JSONAble], code: int, status: str, message: str):
         super().__init__(message)  # Makes str(e) return message
         self.body = body
         self.code = code
         self.status = status
         self._message = message
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Represent the SnapAPIError class."""
         return "APIError({!r}, {!r}, {!r}, {!r})".format(
             self.body, self.code, self.status, self._message
@@ -227,39 +287,39 @@ class Snap(object):
 
     def __init__(
         self,
-        name,
+        name: str,
         state: SnapState,
         channel: str,
         revision: str,
         confinement: str,
-        apps: list[dict[str, str]] | None = None,
-        cohort: str | None = "",
+        apps: list[dict[str, JSONType]] | None = None,
+        cohort: str | None = None,
     ) -> None:
         self._name = name
         self._state = state
         self._channel = channel
         self._revision = revision
         self._confinement = confinement
-        self._cohort = cohort
+        self._cohort = cohort or ""
         self._apps = apps or []
         self._snap_client = SnapClient()
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Equality for comparison."""
         return isinstance(other, self.__class__) and (
             self._name,
             self._revision,
         ) == (other._name, other._revision)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         """Calculate a hash for this snap."""
         return hash((self._name, self._revision))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Represent the object such that it can be reconstructed."""
         return "<{}.{}: {}>".format(self.__module__, self.__class__.__name__, self.__dict__)
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Represent the snap object as a string."""
         return "<{}: {}-{}.{} -- {}>".format(
             self.__class__.__name__,
@@ -295,7 +355,7 @@ class Snap(object):
         self,
         command: list[str],
         services: list[str] | None = None,
-    ) -> CompletedProcess:
+    ) -> CompletedProcess[str]:
         """Perform snap app commands.
 
         Args:
@@ -318,7 +378,15 @@ class Snap(object):
         except CalledProcessError as e:
             raise SnapError("Could not {} for snap [{}]: {}".format(args, self._name, e.stderr))
 
-    def get(self, key: str | None, *, typed: bool = False) -> Any:
+    @typing.overload
+    def get(self, key: None | Literal[""], *, typed: Literal[False] = False) -> NoReturn: ...
+    @typing.overload
+    def get(self, key: str, *, typed: Literal[False] = False) -> str: ...
+    @typing.overload
+    def get(self, key: None | Literal[""], *, typed: Literal[True]) -> dict[str, JSONType]: ...
+    @typing.overload
+    def get(self, key: str, *, typed: Literal[True]) -> JSONType: ...
+    def get(self, key: str | None, *, typed: bool = False) -> JSONType | str:
         """Fetch snap configuration values.
 
         Args:
@@ -330,7 +398,7 @@ class Snap(object):
             args = ["-d"]
             if key:
                 args.append(key)
-            config = json.loads(self._snap("get", args))
+            config = json.loads(self._snap("get", args))  # json.loads -> Any
             if key:
                 return config.get(key)
             return config
@@ -338,9 +406,10 @@ class Snap(object):
         if not key:
             raise TypeError("Key must be provided when typed=False")
 
+        # return a string
         return self._snap("get", [key]).strip()
 
-    def set(self, config: dict[str, Any], *, typed: bool = False) -> None:
+    def set(self, config: dict[str, JSONAble], *, typed: bool = False) -> None:
         """Set a snap configuration value.
 
         Args:
@@ -352,7 +421,7 @@ class Snap(object):
             config = {k: str(v) for k, v in config.items()}
         self._snap_client._put_snap_conf(self._name, config)
 
-    def unset(self, key) -> str:
+    def unset(self, key: str) -> str:
         """Unset a snap configuration value.
 
         Args:
@@ -360,7 +429,7 @@ class Snap(object):
         """
         return self._snap("unset", [key])
 
-    def start(self, services: list[str] | None = None, enable: bool | None = False) -> None:
+    def start(self, services: list[str] | None = None, enable: bool = False) -> None:
         """Start a snap's services.
 
         Args:
@@ -370,7 +439,7 @@ class Snap(object):
         args = ["start", "--enable"] if enable else ["start"]
         self._snap_daemons(args, services)
 
-    def stop(self, services: list[str] | None = None, disable: bool | None = False) -> None:
+    def stop(self, services: list[str] | None = None, disable: bool = False) -> None:
         """Stop a snap's services.
 
         Args:
@@ -380,7 +449,7 @@ class Snap(object):
         args = ["stop", "--disable"] if disable else ["stop"]
         self._snap_daemons(args, services)
 
-    def logs(self, services: list[str] | None = None, num_lines: int | None = 10) -> str:
+    def logs(self, services: list[str] | None = None, num_lines: int = 10) -> str:
         """Fetch a snap services' logs.
 
         Args:
@@ -450,7 +519,7 @@ class Snap(object):
                 )
             )
 
-    def restart(self, services: list[str] | None = None, reload: bool | None = False) -> None:
+    def restart(self, services: list[str] | None = None, reload: bool = False) -> None:
         """Restarts a snap's services.
 
         Args:
@@ -464,9 +533,9 @@ class Snap(object):
 
     def _install(
         self,
-        channel: str | None = "",
-        cohort: str | None = "",
-        revision: str | None = None,
+        channel: str = "",
+        cohort: str = "",
+        revision: str = "",
     ) -> None:
         """Add a snap to the system.
 
@@ -477,7 +546,7 @@ class Snap(object):
         """
         cohort = cohort or self._cohort
 
-        args = []
+        args: list[str] = []
         if self.confinement == "classic":
             args.append("--classic")
         if self.confinement == "devmode":
@@ -493,11 +562,11 @@ class Snap(object):
 
     def _refresh(
         self,
-        channel: str | None = "",
-        cohort: str | None = "",
-        revision: str | None = None,
+        channel: str = "",
+        cohort: str = "",
+        revision: str = "",
         devmode: bool = False,
-        leave_cohort: bool | None = False,
+        leave_cohort: bool = False,
     ) -> None:
         """Refresh a snap.
 
@@ -508,7 +577,7 @@ class Snap(object):
           devmode: optionally, specify devmode confinement
           leave_cohort: leave the current cohort.
         """
-        args = []
+        args: list[str] = []
         if channel:
             args.append('--channel="{}"'.format(channel))
 
@@ -541,10 +610,10 @@ class Snap(object):
     def ensure(
         self,
         state: SnapState,
-        classic: bool | None = False,
+        classic: bool = False,
         devmode: bool = False,
-        channel: str | None = "",
-        cohort: str | None = "",
+        channel: str | None = None,
+        cohort: str | None = None,
         revision: str | None = None,
     ):
         """Ensure that a snap is in a given state.
@@ -563,6 +632,10 @@ class Snap(object):
         Raises:
           SnapError if an error is encountered
         """
+        channel = channel or ""
+        cohort = cohort or ""
+        revision = revision or ""
+
         if classic and devmode:
             raise ValueError("Cannot set both classic and devmode confinement")
 
@@ -656,18 +729,19 @@ class Snap(object):
         return self._confinement
 
     @property
-    def apps(self) -> list:
+    def apps(self) -> list[dict[str, JSONType]]:
         """Returns (if any) the installed apps of the snap."""
         self._update_snap_apps()
         return self._apps
 
     @property
-    def services(self) -> dict:
+    def services(self) -> dict[str, SnapServiceDict]:
         """Returns (if any) the installed services of the snap."""
         self._update_snap_apps()
-        services = {}
+        services: dict[str, SnapServiceDict] = {}
         for app in self._apps:
             if "daemon" in app:
+                app = typing.cast("_SnapServiceAppDict", app)
                 services[app["name"]] = SnapService(**app).as_dict()
 
         return services
@@ -682,7 +756,7 @@ class Snap(object):
 class _UnixSocketConnection(http.client.HTTPConnection):
     """Implementation of HTTPConnection that connects to a named Unix socket."""
 
-    def __init__(self, host, timeout=None, socket_path=None):
+    def __init__(self, host: str, timeout: float | None = None, socket_path: str | None = None):
         if timeout is None:
             super().__init__(host)
         else:
@@ -693,6 +767,7 @@ class _UnixSocketConnection(http.client.HTTPConnection):
         """Override connect to use Unix socket (instead of TCP socket)."""
         if not hasattr(socket, "AF_UNIX"):
             raise NotImplementedError("Unix sockets not supported on {}".format(sys.platform))
+        assert self.socket_path is not None  # else TypeError on self.socket.connect
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(self.socket_path)
         if self.timeout is not None:
@@ -706,9 +781,13 @@ class _UnixSocketHandler(urllib.request.AbstractHTTPHandler):
         super().__init__()
         self.socket_path = socket_path
 
-    def http_open(self, req) -> http.client.HTTPResponse:
+    def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
         """Override http_open to use a Unix socket connection (instead of TCP)."""
-        return self.do_open(_UnixSocketConnection, req, socket_path=self.socket_path)
+        return self.do_open(
+            typing.cast("urllib.request._HTTPConnectionProtocol", _UnixSocketConnection),
+            req,
+            socket_path=self.socket_path,
+        )
 
 
 class SnapClient:
@@ -742,7 +821,7 @@ class SnapClient:
         self.timeout = timeout
 
     @classmethod
-    def _get_default_opener(cls, socket_path):
+    def _get_default_opener(cls, socket_path: str) -> urllib.request.OpenerDirector:
         """Build the default opener to use for requests (HTTP over Unix socket)."""
         opener = urllib.request.OpenerDirector()
         opener.add_handler(_UnixSocketHandler(socket_path))
@@ -755,9 +834,9 @@ class SnapClient:
         self,
         method: str,
         path: str,
-        query: dict = None,
-        body: dict = None,
-    ) -> JSONType:
+        query: dict[str, str] | None = None,
+        body: dict[str, JSONAble] | None = None,
+    ) -> JSONType | None:
         """Make a JSON request to the Snapd server with the given HTTP method and path.
 
         If query dict is provided, it is encoded and appended as a query string
@@ -772,12 +851,12 @@ class SnapClient:
             headers["Content-Type"] = "application/json"
 
         response = self._request_raw(method, path, query, headers, data)
-        response = json.loads(response.read().decode())
+        response = json.loads(response.read().decode())  # json.loads -> Any
         if response["type"] == "async":
-            return self._wait(response["change"])
+            return self._wait(response["change"])  # may be `None` due to `get`
         return response["result"]
 
-    def _wait(self, change_id: str, timeout=300) -> JSONType:
+    def _wait(self, change_id: str, timeout: float = 300) -> JSONType | None:
         """Wait for an async change to complete.
 
         The poll time is 100 milliseconds, the same as in snap clients.
@@ -787,6 +866,7 @@ class SnapClient:
             if time.time() > deadline:
                 raise TimeoutError(f"timeout waiting for snap change {change_id}")
             response = self._request("GET", f"changes/{change_id}")
+            response = typing.cast("_AsyncChangeDict", response)
             status = response["status"]
             if status == "Done":
                 return response.get("data")
@@ -804,9 +884,9 @@ class SnapClient:
         self,
         method: str,
         path: str,
-        query: dict = None,
-        headers: dict = None,
-        data: bytes = None,
+        query: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
+        data: bytes | None = None,
     ) -> http.client.HTTPResponse:
         """Make a request to the Snapd server; return the raw HTTPResponse object."""
         url = self.base_url + path
@@ -823,35 +903,36 @@ class SnapClient:
             code = e.code
             status = e.reason
             message = ""
+            body: dict[str, JSONType]
             try:
-                body = json.loads(e.read().decode())["result"]
+                body = json.loads(e.read().decode())["result"]  # json.loads -> Any
             except (IOError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
                 body = {}
                 message = "{} - {}".format(type(e2).__name__, e2)
             raise SnapAPIError(body, code, status, message)
         except urllib.error.URLError as e:
-            raise SnapAPIError({}, 500, "Not found", e.reason)
+            raise SnapAPIError({}, 500, "Not found", str(e.reason))
         return response
 
-    def get_installed_snaps(self) -> dict:
+    def get_installed_snaps(self) -> list[dict[str, JSONType]]:
         """Get information about currently installed snaps."""
-        return self._request("GET", "snaps")
+        return self._request("GET", "snaps")  # type: ignore
 
-    def get_snap_information(self, name: str) -> dict:
+    def get_snap_information(self, name: str) -> dict[str, JSONType]:
         """Query the snap server for information about single snap."""
-        return self._request("GET", "find", {"name": name})[0]
+        return self._request("GET", "find", {"name": name})[0]  # type: ignore
 
-    def get_installed_snap_apps(self, name: str) -> list:
+    def get_installed_snap_apps(self, name: str) -> list[dict[str, JSONType]]:
         """Query the snap server for apps belonging to a named, currently installed snap."""
-        return self._request("GET", "apps", {"names": name, "select": "service"})
+        return self._request("GET", "apps", {"names": name, "select": "service"})  # type: ignore
 
-    def _put_snap_conf(self, name: str, conf: dict[str, Any]):
+    def _put_snap_conf(self, name: str, conf: dict[str, JSONAble]) -> None:
         """Set the configuration details for an installed snap."""
-        return self._request("PUT", f"snaps/{name}/conf", body=conf)
+        self._request("PUT", f"snaps/{name}/conf", body=conf)
 
 
-class SnapCache(Mapping):
+class SnapCache(Mapping[str, Snap]):
     """An abstraction to represent installed/available packages.
 
     When instantiated, `SnapCache` iterates through the list of installed
@@ -864,12 +945,12 @@ class SnapCache(Mapping):
         if not self.snapd_installed:
             raise SnapError("snapd is not installed or not in /usr/bin") from None
         self._snap_client = SnapClient()
-        self._snap_map = {}
+        self._snap_map: dict[str, Snap | None] = {}
         if self.snapd_installed:
             self._load_available_snaps()
             self._load_installed_snaps()
 
-    def __contains__(self, key: str) -> bool:
+    def __contains__(self, key: object) -> bool:
         """Check if a given snap is in the cache."""
         return key in self._snap_map
 
@@ -877,22 +958,22 @@ class SnapCache(Mapping):
         """Report number of items in the snap cache."""
         return len(self._snap_map)
 
-    def __iter__(self) -> Iterable[Snap]:
+    def __iter__(self) -> Iterable[Snap | None]:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Provide iterator for the snap cache."""
         return iter(self._snap_map.values())
 
     def __getitem__(self, snap_name: str) -> Snap:
         """Return either the installed version or latest version for a given snap."""
-        snap = self._snap_map.get(snap_name, None)
-        if snap is None:
-            # The snapd cache file may not have existed when _snap_map was
-            # populated.  This is normal.
-            try:
-                self._snap_map[snap_name] = self._load_info(snap_name)
-            except SnapAPIError:
-                raise SnapNotFoundError("Snap '{}' not found!".format(snap_name))
-
-        return self._snap_map[snap_name]
+        snap = self._snap_map.get(snap_name)
+        if snap is not None:
+            return snap
+        # The snapd cache file may not have existed when _snap_map was
+        # populated.  This is normal.
+        try:
+            snap = self._snap_map[snap_name] = self._load_info(snap_name)
+        except SnapAPIError:
+            raise SnapNotFoundError("Snap '{}' not found!".format(snap_name))
+        return snap
 
     @property
     def snapd_installed(self) -> bool:
@@ -920,23 +1001,25 @@ class SnapCache(Mapping):
         installed = self._snap_client.get_installed_snaps()
 
         for i in installed:
+            i = typing.cast("_SnapDict", i)
             snap = Snap(
                 name=i["name"],
                 state=SnapState.Latest,
                 channel=i["channel"],
                 revision=i["revision"],
                 confinement=i["confinement"],
-                apps=i.get("apps", None),
+                apps=i.get("apps"),
             )
             self._snap_map[snap.name] = snap
 
-    def _load_info(self, name) -> Snap:
+    def _load_info(self, name: str) -> Snap:
         """Load info for snaps which are not installed if requested.
 
         Args:
             name: a string representing the name of the snap
         """
         info = self._snap_client.get_snap_information(name)
+        info = typing.cast("_SnapDict", info)
 
         return Snap(
             name=info["name"],
@@ -948,14 +1031,34 @@ class SnapCache(Mapping):
         )
 
 
+@typing.overload
+def add(  # return a single Snap if snap name is given as a string
+    snap_names: str,
+    state: str | SnapState = SnapState.Latest,
+    channel: str | None = None,
+    classic: bool = False,
+    devmode: bool = False,
+    cohort: str | None = None,
+    revision: str | None = None,
+) -> Snap: ...
+@typing.overload
+def add(  # may return a single Snap or a list depending if one or more snap names were given
+    snap_names: list[str],
+    state: str | SnapState = SnapState.Latest,
+    channel: str | None = None,
+    classic: bool = False,
+    devmode: bool = False,
+    cohort: str | None = None,
+    revision: str | None = None,
+) -> Snap | list[Snap]: ...
 @_cache_init
 def add(
     snap_names: str | list[str],
     state: str | SnapState = SnapState.Latest,
-    channel: str | None = "",
-    classic: bool | None = False,
+    channel: str | None = None,
+    classic: bool = False,
     devmode: bool = False,
-    cohort: str | None = "",
+    cohort: str | None = None,
     revision: str | None = None,
 ) -> Snap | list[Snap]:
     """Add a snap to the system.
@@ -985,9 +1088,23 @@ def add(
     if isinstance(state, str):
         state = SnapState(state)
 
-    return _wrap_snap_operations(snap_names, state, channel, classic, devmode, cohort, revision)
+    return _wrap_snap_operations(
+        snap_names=snap_names,
+        state=state,
+        channel=channel or "",
+        classic=classic,
+        devmode=devmode,
+        cohort=cohort or "",
+        revision=revision or "",
+    )
 
 
+@typing.overload
+def remove(snap_names: str) -> Snap: ...
+# return a single Snap if snap name is given as a string
+@typing.overload
+def remove(snap_names: list[str]) -> Snap | list[Snap]: ...
+# may return a single Snap or a list depending if one or more snap names were given
 @_cache_init
 def remove(snap_names: str | list[str]) -> Snap | list[Snap]:
     """Remove specified snap(s) from the system.
@@ -1010,14 +1127,34 @@ def remove(snap_names: str | list[str]) -> Snap | list[Snap]:
     )
 
 
+@typing.overload
+def ensure(  # return a single Snap if snap name is given as a string
+    snap_names: str,
+    state: str,
+    channel: str | None = None,
+    classic: bool = False,
+    devmode: bool = False,
+    cohort: str | None = None,
+    revision: int | None = None,
+) -> Snap: ...
+@typing.overload
+def ensure(  # may return a single Snap or a list depending if one or more snap names were given
+    snap_names: list[str],
+    state: str,
+    channel: str | None = None,
+    classic: bool = False,
+    devmode: bool = False,
+    cohort: str | None = None,
+    revision: int | None = None,
+) -> Snap | list[Snap]: ...
 @_cache_init
 def ensure(
     snap_names: str | list[str],
     state: str,
-    channel: str | None = "",
-    classic: bool | None = False,
+    channel: str | None = None,
+    classic: bool = False,
     devmode: bool = False,
-    cohort: str | None = "",
+    cohort: str | None = None,
     revision: int | None = None,
 ) -> Snap | list[Snap]:
     """Ensure specified snaps are in a given state on the system.
@@ -1050,7 +1187,7 @@ def ensure(
             classic=classic,
             devmode=devmode,
             cohort=cohort,
-            revision=revision,
+            revision=str(revision) if revision is not None else None,
         )
     else:
         return remove(snap_names)
@@ -1062,11 +1199,12 @@ def _wrap_snap_operations(
     channel: str,
     classic: bool,
     devmode: bool,
-    cohort: str | None = "",
-    revision: str | None = None,
+    cohort: str = "",
+    revision: str = "",
 ) -> Snap | list[Snap]:
     """Wrap common operations for bare commands."""
-    snaps = {"success": [], "failed": []}
+    snaps: list[Snap] = []
+    errors: list[str] = []
 
     op = "remove" if state is SnapState.Absent else "install or refresh"
 
@@ -1084,27 +1222,25 @@ def _wrap_snap_operations(
                     cohort=cohort,
                     revision=revision,
                 )
-            snaps["success"].append(snap)
+            snaps.append(snap)
         except SnapError as e:
             logger.warning("Failed to {} snap {}: {}!".format(op, s, e.message))
-            snaps["failed"].append(s)
+            errors.append(s)
         except SnapNotFoundError:
             logger.warning("Snap '{}' not found in cache!".format(s))
-            snaps["failed"].append(s)
+            errors.append(s)
 
-    if len(snaps["failed"]):
-        raise SnapError(
-            "Failed to install or refresh snap(s): {}".format(", ".join(list(snaps["failed"])))
-        )
+    if errors:
+        raise SnapError("Failed to install or refresh snap(s): {}".format(", ".join(errors)))
 
-    return snaps["success"] if len(snaps["success"]) > 1 else snaps["success"][0]
+    return snaps if len(snaps) > 1 else snaps[0]
 
 
 def install_local(
     filename: str,
-    classic: bool | None = False,
-    devmode: bool | None = False,
-    dangerous: bool | None = False,
+    classic: bool = False,
+    devmode: bool = False,
+    dangerous: bool = False,
 ) -> Snap:
     """Perform a snap operation.
 
@@ -1160,7 +1296,7 @@ def _system_set(config_item: str, value: str) -> None:
         raise SnapError("Failed setting system config '{}' to '{}'".format(config_item, value))
 
 
-def hold_refresh(days: int = 90, forever: bool = False) -> bool:
+def hold_refresh(days: int = 90, forever: bool = False) -> None:
     """Set the system-wide snap refresh hold.
 
     Args:
