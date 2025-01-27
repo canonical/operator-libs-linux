@@ -79,9 +79,6 @@ ignore = [
     # try/except inside loop
     # FIXME: lift or noqa individually as appropriate
     "PERF203",
-    # Unused noqa
-    # FIXME
-    "RUF100",
     # subprocess: check for execution of untrusted input
     # FIXME: individually validate or noqa these
     "S603",
@@ -104,6 +101,9 @@ keep-runtime-typing = true
     # Line too long
     # FIXME
     "E501",
+    # Unused noqa
+    # FIXME: remove unneeded noqas
+    "RUF100",
     # Use a context manager for opening files
     # FIXME: false positive, noqa it
     "SIM115",
