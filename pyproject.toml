@@ -82,12 +82,6 @@ ignore = [
     "SIM117",
 ]
 
-[tool.ruff.lint.pyupgrade]
-# Preserve types, even if a file imports `from __future__ import annotations`.
-# Since we target py 3.8, we want to keep using List[str] and Optional[str]
-# FIXME: do we need this?
-keep-runtime-typing = true
-
 [tool.ruff.lint.per-file-ignores]
 "lib/charms/operator_libs_linux/v0/apt.py" = [
     # Use from err or from None explicitly
