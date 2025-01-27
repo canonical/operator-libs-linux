@@ -219,7 +219,7 @@ class MetaCache(type):
         return cls._cache[name]
 
 
-class _Cache(object, metaclass=MetaCache):
+class _Cache(metaclass=MetaCache):
     _cache = None
 
 
@@ -274,7 +274,7 @@ class SnapNotFoundError(Error):
     """Raised when a requested snap is not known to the system."""
 
 
-class Snap(object):
+class Snap:
     """Represents a snap package and its properties.
 
     `Snap` exposes the following properties about a snap:

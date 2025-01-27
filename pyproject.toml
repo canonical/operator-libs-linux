@@ -148,9 +148,6 @@ keep-runtime-typing = true
     # using None explicitly with get
     # FIXME
     "SIM910",
-    # inheriting from object
-    # FIXME
-    "UP004",
 ]
 "tests/*" = [
     # All documentation linting.
