@@ -73,9 +73,6 @@ ignore = [
     # Use a single `with` statement with multiple contexts instead of nested `with` statements
     "SIM117",
 
-    # too many leading # before block comment
-    # FIXME
-    "E266",
     # try/except inside loop
     # FIXME: lift or noqa individually as appropriate
     "PERF203",
@@ -190,6 +187,9 @@ keep-runtime-typing = true
     "UP015",
 ]
 "tests/integration/test_apt.py" = [
+    # too many leading # before block comment
+    # FIXME
+    "E266",
     # Use fstrings instead of `format`
     # FIXME: migrate to fstrings
     "UP032",
