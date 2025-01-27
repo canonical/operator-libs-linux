@@ -122,7 +122,7 @@ def _cache_init(func: Callable[_P, _T]) -> Callable[_P, _T]:
 # because setting snap config values to null removes the key so a null value can't be returned
 _JSONLeaf: TypeAlias = 'str | int | float | bool'
 JSONType: TypeAlias = "dict[str, JSONType] | list[JSONType] | _JSONLeaf"
-# we also need a jsonable type for arguments
+# we also need a jsonable type for arguments,
 # which (a) uses abstract types and (b) may contain None
 JSONAble: TypeAlias = "Mapping[str, JSONAble] | Sequence[JSONAble] | _JSONLeaf | None"
 
@@ -803,14 +803,14 @@ class SnapClient:
         Args:
             socket_path: a path to the socket on the filesystem. Defaults to /run/snap/snapd.socket
             opener: specifies an opener for unix socket, if unspecified a default is used
-            base_url: base url for making requests to the snap client. Must be an http(s) url.
+            base_url: base URL for making requests to the snap client. Must be an HTTP(S) URL.
                 Defaults to http://localhost/v2/
             timeout: timeout in seconds to use when making requests to the API. Default is 30.0s.
         """
         if opener is None:
             opener = self._get_default_opener(socket_path)
         self.opener = opener
-        # address ruff's suspicious-url-open-usage (S310)
+        # Address ruff's suspicious-url-open-usage (S310)
         if not base_url.startswith(("http:", "https:")):
             raise ValueError("base_url must start with 'http:' or 'https:'")
         self.base_url = base_url
