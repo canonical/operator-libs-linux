@@ -85,9 +85,6 @@ ignore = [
     # Unused noqa
     # FIXME
     "RUF100",
-    # use unpacking instead of concatenation with lists
-    # FIXME
-    "RUF005",
     # subprocess: check for execution of untrusted input
     # FIXME: individually validate or noqa these
     "S603",
@@ -153,6 +150,9 @@ keep-runtime-typing = true
     "UP032",
 ]
 "lib/charms/operator_libs_linux/v0/sysctl.py" = [
+    # use unpacking instead of concatenation with lists
+    # FIXME
+    "RUF005",
     # Unnecessary open mode parameters
     # FIXME
     "UP015",
@@ -225,6 +225,9 @@ keep-runtime-typing = true
     "UP015",
 ]
 "tests/unit/test_snap.py" = [
+    # use unpacking instead of concatenation with lists
+    # FIXME
+    "RUF005",
     # implicit Optional in typing
     # FIXME: typing
     "RUF013",
