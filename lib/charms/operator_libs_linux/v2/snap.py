@@ -810,13 +810,16 @@ class SnapClient:
         Args:
             socket_path: a path to the socket on the filesystem. Defaults to /run/snap/snapd.socket
             opener: specifies an opener for unix socket, if unspecified a default is used
-            base_url: base url for making requests to the snap client. Defaults to
-                http://localhost/v2/
+            base_url: base url for making requests to the snap client. Must be an http(s) url.
+                Defaults to http://localhost/v2/
             timeout: timeout in seconds to use when making requests to the API. Default is 30.0s.
         """
         if opener is None:
             opener = self._get_default_opener(socket_path)
         self.opener = opener
+        # address ruff's suspicious-url-open-usage (S310)
+        if not base_url.startswith(("http:", "https:")):
+            raise ValueError("base_url must start with 'http:' or 'https:'")
         self.base_url = base_url
         self.timeout = timeout
 
@@ -895,7 +898,7 @@ class SnapClient:
 
         if headers is None:
             headers = {}
-        request = urllib.request.Request(url, method=method, data=data, headers=headers)
+        request = urllib.request.Request(url, method=method, data=data, headers=headers)  # noqa: S310
 
         try:
             response = self.opener.open(request, timeout=self.timeout)

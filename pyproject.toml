@@ -138,17 +138,6 @@ keep-runtime-typing = true
     # FIXME: investigate
     "RUF006",
 ]
-"lib/charms/operator_libs_linux/v2/snap.py" = [
-    # mutable default argument
-    # FIXME
-    "B006",
-    # audit url open for permitted schemes
-    # FIXME: probably noqa manually
-    "S310",
-    # using None explicitly with get
-    # FIXME
-    "SIM910",
-]
 "tests/*" = [
     # All documentation linting.
     "D",
