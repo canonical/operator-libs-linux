@@ -36,6 +36,8 @@ select = [
     "E",
     # Pyflakes
     "F",
+    # flake8-logging-format
+    "G",
     # isort
     "I001",
     # pep8-naming
@@ -159,6 +161,9 @@ ignore = [
     # Use from err or from None explicitly
     # FIXME
     "B904",
+    # don't use f-strings in logging
+    # FIXME: use %s for deferred evaluation
+    "G004",
 ]
 "tests/*" = [
     # All documentation linting.
@@ -198,6 +203,9 @@ ignore = [
     "UP032",
 ]
 "tests/integration/test_snap.py" = [
+    # don't use str.format in logging
+    # FIXME: use %s for deferred evaluation
+    "G001",
     # Use fstrings instead of `format`
     # FIXME: migrate to fstrings
     "UP032",
