@@ -151,9 +151,6 @@ keep-runtime-typing = true
     # inheriting from object
     # FIXME
     "UP004",
-    # use text instead of universal_newlines with subprocess.run
-    # FIXME
-    "UP021",
 ]
 "tests/*" = [
     # All documentation linting.

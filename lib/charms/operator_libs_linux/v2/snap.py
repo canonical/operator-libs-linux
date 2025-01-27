@@ -343,7 +343,7 @@ class Snap(object):
         optargs = optargs or []
         args = ["snap", command, self._name, *optargs]
         try:
-            return subprocess.check_output(args, universal_newlines=True)
+            return subprocess.check_output(args, text=True)
         except CalledProcessError as e:
             raise SnapError(
                 "Snap: {!r}; command {!r} failed with output = {!r}".format(
@@ -374,7 +374,7 @@ class Snap(object):
         args = ["snap", *command, *services]
 
         try:
-            return subprocess.run(args, universal_newlines=True, check=True, capture_output=True)
+            return subprocess.run(args, text=True, check=True, capture_output=True)
         except CalledProcessError as e:
             raise SnapError("Could not {} for snap [{}]: {}".format(args, self._name, e.stderr))
 
@@ -480,7 +480,7 @@ class Snap(object):
 
         args = ["snap", *command]
         try:
-            subprocess.run(args, universal_newlines=True, check=True, capture_output=True)
+            subprocess.run(args, text=True, check=True, capture_output=True)
         except CalledProcessError as e:
             raise SnapError("Could not {} for snap [{}]: {}".format(args, self._name, e.stderr))
 
@@ -511,7 +511,7 @@ class Snap(object):
             alias = application
         args = ["snap", "alias", f"{self.name}.{application}", alias]
         try:
-            subprocess.check_output(args, universal_newlines=True)
+            subprocess.check_output(args, text=True)
         except CalledProcessError as e:
             raise SnapError(
                 "Snap: {!r}; command {!r} failed with output = {!r}".format(
@@ -1265,7 +1265,7 @@ def install_local(
     if dangerous:
         args.append("--dangerous")
     try:
-        result = subprocess.check_output(args, universal_newlines=True).splitlines()[-1]
+        result = subprocess.check_output(args, text=True).splitlines()[-1]
         snap_name, _ = result.split(" ", 1)
         snap_name = ansi_filter.sub("", snap_name)
 
@@ -1291,7 +1291,7 @@ def _system_set(config_item: str, value: str) -> None:
     """
     args = ["snap", "set", "system", "{}={}".format(config_item, value)]
     try:
-        subprocess.check_call(args, universal_newlines=True)
+        subprocess.check_call(args, text=True)
     except CalledProcessError:
         raise SnapError("Failed setting system config '{}' to '{}'".format(config_item, value))
 
