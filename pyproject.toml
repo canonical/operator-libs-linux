@@ -106,17 +106,12 @@ ignore = [
     # prefer capture_output over using stdout+stderr with PIPE
     # FIXME
     "UP022",
-    # use {} {} instead if {0} {1} if they're in order
-    # FIXME: migrate to fstrings
-    "UP030",
-    # Use fstrings instead of `format`
-    # FIXME: migrate to fstrings
-    "UP032",
 ]
 
 [tool.ruff.lint.pyupgrade]
 # Preserve types, even if a file imports `from __future__ import annotations`.
 # Since we target py 3.8, we want to keep using List[str] and Optional[str]
+# FIXME: do we need this?
 keep-runtime-typing = true
 
 [tool.ruff.lint.per-file-ignores]
@@ -124,6 +119,9 @@ keep-runtime-typing = true
     # Use a context manager for opening files
     # FIXME: false positive, noqa it
     "SIM115",
+    # Use fstrings instead of `format`
+    # FIXME: migrate to fstrings
+    "UP032",
 ]
 "lib/charms/operator_libs_linux/v0/grub.py" = [
     # Probably insecure usage of temporary file or directory under /tmp
@@ -137,6 +135,11 @@ keep-runtime-typing = true
     # Store a reference to the return value of `asyncio.create_task`
     # FIXME: investigate
     "RUF006",
+]
+"lib/charms/operator_libs_linux/v0/passwd.py" = [
+    # Use fstrings instead of `format`
+    # FIXME: migrate to fstrings
+    "UP032",
 ]
 "tests/*" = [
     # All documentation linting.
@@ -154,15 +157,33 @@ keep-runtime-typing = true
     # Probably insecure usage of temporary file or directory (e.g. /tmp/bad.list)
     "S108",
 ]
+"tests/integration/test_apt.py" = [
+    # Use fstrings instead of `format`
+    # FIXME: migrate to fstrings
+    "UP032",
+]
 "tests/integration/test_passwd.py" = [
     # function call with 'truthy' `shell` parameter
     # FIXME
     "S604",
+    # Use fstrings instead of `format`
+    # FIXME: migrate to fstrings
+    "UP032",
+]
+"tests/integration/test_snap.py" = [
+    # Use fstrings instead of `format`
+    # FIXME: migrate to fstrings
+    "UP032",
 ]
 "tests/integration/test_grub.py" = [
     # detected, some yoda conditionals were
     # FIXME
     "SIM300",
+]
+"tests/unit/fake_snapd.py" = [
+    # Use fstrings instead of `format`
+    # FIXME: migrate to fstrings
+    "UP032",
 ]
 "tests/unit/test_repo.py" = [
     # use context manager for opening files
