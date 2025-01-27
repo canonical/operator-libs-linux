@@ -66,19 +66,20 @@ ignore = [
     "S101",
     # `subprocess` module is possibly insecure
     "S404",
+    # subprocess-without-shell-equals-true
+    # S602 complains if shell is True, which is considered worse due to potential shell exploits
+    # difficult to avoid without noqa, which then becomes meaningless boilerplate every time
+    "S603",
+    # start-process-with-partial-path
+    # wants an absolute path to the executable as the first argument
+    # seems impractical, so also results in noqa boilerplate
+    "S607",
     # Return condition directly, prefer readability.
     "SIM103",
     # Use contextlib.suppress() instead of try/except: pass
     "SIM105",
     # Use a single `with` statement with multiple contexts instead of nested `with` statements
     "SIM117",
-
-    # subprocess: check for execution of untrusted input
-    # FIXME: individually validate or noqa these
-    "S603",
-    # subprocess: starting process with a partial executable path
-    # FIXME: individually validate or noqa these
-    "S607",
 ]
 
 [tool.ruff.lint.pyupgrade]
