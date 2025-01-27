@@ -122,7 +122,8 @@ def _cache_init(func: Callable[_P, _T]) -> Callable[_P, _T]:
 # because setting snap config values to null removes the key so a null value can't be returned
 _JSONLeaf: TypeAlias = 'str | int | float | bool'
 JSONType: TypeAlias = "dict[str, JSONType] | list[JSONType] | _JSONLeaf"
-# we also need a jsonable type for arguments, which (a) uses abstract types and (b) may contain None
+# we also need a jsonable type for arguments
+# which (a) uses abstract types and (b) may contain None
 JSONAble: TypeAlias = "Mapping[str, JSONAble] | Sequence[JSONAble] | _JSONLeaf | None"
 
 
@@ -319,7 +320,11 @@ class Snap:
 
     def __str__(self) -> str:
         """Represent the snap object as a string."""
-        return f"<{type(self).__name__}: {self._name}-{self._revision}.{self._channel} -- {self._state}>"
+        return (
+            f"<{type(self).__name__}: "
+            f"{self._name}-{self._revision}.{self._channel}"
+            f" -- {self._state}>"
+        )
 
     def _snap(self, command: str, optargs: Iterable[str] | None = None) -> str:
         """Perform a snap operation.
