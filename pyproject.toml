@@ -97,9 +97,6 @@ ignore = [
     # Unnecessary open mode parameters
     # FIXME
     "UP015",
-    # prefer capture_output over using stdout+stderr with PIPE
-    # FIXME
-    "UP022",
 ]
 
 [tool.ruff.lint.pyupgrade]
@@ -116,9 +113,17 @@ keep-runtime-typing = true
     # Use a context manager for opening files
     # FIXME: false positive, noqa it
     "SIM115",
+    # prefer capture_output over using stdout+stderr with PIPE
+    # FIXME
+    "UP022",
     # Use fstrings instead of `format`
     # FIXME: migrate to fstrings
     "UP032",
+]
+"lib/charms/operator_libs_linux/v0/dnf.py" = [
+    # prefer capture_output over using stdout+stderr with PIPE
+    # FIXME
+    "UP022",
 ]
 "lib/charms/operator_libs_linux/v0/grub.py" = [
     # Probably insecure usage of temporary file or directory under /tmp
