@@ -91,9 +91,6 @@ ignore = [
     # use unpacking instead of concatenation with lists
     # FIXME
     "RUF005",
-    # implicit Optional in typing
-    # FIXME: typing
-    "RUF013",
     # subprocess: check for execution of untrusted input
     # FIXME: individually validate or noqa these
     "S603",
@@ -137,6 +134,9 @@ keep-runtime-typing = true
     "RUF006",
 ]
 "lib/charms/operator_libs_linux/v0/passwd.py" = [
+    # implicit Optional in typing
+    # FIXME: typing
+    "RUF013",
     # Use fstrings instead of `format`
     # FIXME: migrate to fstrings
     "UP032",
@@ -194,6 +194,11 @@ keep-runtime-typing = true
     # combine if branches using logical or
     # FIXME
     "SIM114",
+]
+"tests/unit/test_snap.py" = [
+    # implicit Optional in typing
+    # FIXME: typing
+    "RUF013",
 ]
 
 [tool.ruff.lint.pydocstyle]
