@@ -674,7 +674,7 @@ class Snap:
         try:
             self._apps = self._snap_client.get_installed_snap_apps(self._name)
         except SnapAPIError:
-            logger.debug(f"Unable to retrieve snap apps for {self._name}")
+            logger.debug("Unable to retrieve snap apps for %s", self._name)
             self._apps = []
 
     @property
@@ -1220,10 +1220,10 @@ def _wrap_snap_operations(
                 )
             snaps.append(snap)
         except SnapError as e:  # noqa: PERF203
-            logger.warning(f"Failed to {op} snap {s}: {e.message}!")
+            logger.warning("Failed to %s snap %s: %s!", op, s, e.message)
             errors.append(s)
         except SnapNotFoundError:
-            logger.warning(f"Snap '{s}' not found in cache!")
+            logger.warning("Snap '%s' not found in cache!", s)
             errors.append(s)
 
     if errors:
@@ -1270,7 +1270,11 @@ def install_local(
         try:
             return c[snap_name]
         except SnapAPIError as e:
-            logger.error(f"Could not find snap {snap_name} when querying Snapd socket: {e.body}")
+            logger.error(
+                "Could not find snap %s when querying Snapd socket: %s",
+                snap_name,
+                e.body,
+            )
             raise SnapError(f"Failed to find snap {snap_name} in Snap cache") from e
     except CalledProcessError as e:
         raise SnapError(f"Could not install snap {filename}: {e.output}") from e
