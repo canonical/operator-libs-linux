@@ -1219,7 +1219,7 @@ def _wrap_snap_operations(
                     revision=revision,
                 )
             snaps.append(snap)
-        except SnapError as e:
+        except SnapError as e:  # noqa: PERF203
             logger.warning(f"Failed to {op} snap {s}: {e.message}!")
             errors.append(s)
         except SnapNotFoundError:

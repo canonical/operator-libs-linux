@@ -73,9 +73,6 @@ ignore = [
     # Use a single `with` statement with multiple contexts instead of nested `with` statements
     "SIM117",
 
-    # try/except inside loop
-    # FIXME: lift or noqa individually as appropriate
-    "PERF203",
     # subprocess: check for execution of untrusted input
     # FIXME: individually validate or noqa these
     "S603",
@@ -98,6 +95,9 @@ keep-runtime-typing = true
     # Line too long
     # FIXME
     "E501",
+    # try/except inside loop
+    # FIXME: lift or noqa individually as appropriate
+    "PERF203",
     # Unused noqa
     # FIXME: remove unneeded noqas
     "RUF100",
