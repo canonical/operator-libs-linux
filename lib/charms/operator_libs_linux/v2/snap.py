@@ -344,7 +344,7 @@ class Snap:
         except CalledProcessError as e:
             raise SnapError(
                 f"Snap: {self._name!r}; command {args!r} failed with output = {e.output!r}"
-            )
+            ) from e
 
     def _snap_daemons(
         self,
@@ -371,7 +371,7 @@ class Snap:
         try:
             return subprocess.run(args, text=True, check=True, capture_output=True)
         except CalledProcessError as e:
-            raise SnapError(f"Could not {args} for snap [{self._name}]: {e.stderr}")
+            raise SnapError(f"Could not {args} for snap [{self._name}]: {e.stderr}") from e
 
     @typing.overload
     def get(self, key: None | Literal[""], *, typed: Literal[False] = False) -> NoReturn: ...
@@ -477,7 +477,7 @@ class Snap:
         try:
             subprocess.run(args, text=True, check=True, capture_output=True)
         except CalledProcessError as e:
-            raise SnapError(f"Could not {args} for snap [{self._name}]: {e.stderr}")
+            raise SnapError(f"Could not {args} for snap [{self._name}]: {e.stderr}") from e
 
     def hold(self, duration: timedelta | None = None) -> None:
         """Add a refresh hold to a snap.
@@ -510,7 +510,7 @@ class Snap:
         except CalledProcessError as e:
             raise SnapError(
                 f"Snap: {self._name!r}; command {args!r} failed with output = {e.output!r}"
-            )
+            ) from e
 
     def restart(self, services: list[str] | None = None, reload: bool = False) -> None:
         """Restarts a snap's services.
@@ -906,9 +906,9 @@ class SnapClient:
                 # Will only happen on read error or if Pebble sends invalid JSON.
                 body = {}
                 message = f"{type(e2).__name__} - {e2}"
-            raise SnapAPIError(body, code, status, message)
+            raise SnapAPIError(body, code, status, message) from e
         except urllib.error.URLError as e:
-            raise SnapAPIError({}, 500, "Not found", str(e.reason))
+            raise SnapAPIError({}, 500, "Not found", str(e.reason)) from e
         return response
 
     def get_installed_snaps(self) -> list[dict[str, JSONType]]:
@@ -967,8 +967,8 @@ class SnapCache(Mapping[str, Snap]):
         # populated.  This is normal.
         try:
             snap = self._snap_map[snap_name] = self._load_info(snap_name)
-        except SnapAPIError:
-            raise SnapNotFoundError(f"Snap '{snap_name}' not found!")
+        except SnapAPIError as e:
+            raise SnapNotFoundError(f"Snap '{snap_name}' not found!") from e
         return snap
 
     @property
@@ -1271,9 +1271,9 @@ def install_local(
             return c[snap_name]
         except SnapAPIError as e:
             logger.error(f"Could not find snap {snap_name} when querying Snapd socket: {e.body}")
-            raise SnapError(f"Failed to find snap {snap_name} in Snap cache")
+            raise SnapError(f"Failed to find snap {snap_name} in Snap cache") from e
     except CalledProcessError as e:
-        raise SnapError(f"Could not install snap {filename}: {e.output}")
+        raise SnapError(f"Could not install snap {filename}: {e.output}") from e
 
 
 def _system_set(config_item: str, value: str) -> None:
@@ -1286,8 +1286,8 @@ def _system_set(config_item: str, value: str) -> None:
     args = ["snap", "set", "system", f"{config_item}={value}"]
     try:
         subprocess.check_call(args, text=True)
-    except CalledProcessError:
-        raise SnapError(f"Failed setting system config '{config_item}' to '{value}'")
+    except CalledProcessError as e:
+        raise SnapError(f"Failed setting system config '{config_item}' to '{value}'") from e
 
 
 def hold_refresh(days: int = 90, forever: bool = False) -> None:

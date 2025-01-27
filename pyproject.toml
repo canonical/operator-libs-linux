@@ -73,9 +73,6 @@ ignore = [
     # Use a single `with` statement with multiple contexts instead of nested `with` statements
     "SIM117",
 
-    # Use from err or from None explicitly
-    # FIXME
-    "B904",
     # too many leading # before block comment
     # FIXME
     "E266",
@@ -101,6 +98,9 @@ keep-runtime-typing = true
 
 [tool.ruff.lint.per-file-ignores]
 "lib/charms/operator_libs_linux/v0/apt.py" = [
+    # Use from err or from None explicitly
+    # FIXME
+    "B904",
     # Line too long
     # FIXME
     "E501",
@@ -118,6 +118,9 @@ keep-runtime-typing = true
     "UP032",
 ]
 "lib/charms/operator_libs_linux/v0/dnf.py" = [
+    # Use from err or from None explicitly
+    # FIXME
+    "B904",
     # prefer capture_output over using stdout+stderr with PIPE
     # FIXME
     "UP022",
@@ -150,12 +153,20 @@ keep-runtime-typing = true
     "UP032",
 ]
 "lib/charms/operator_libs_linux/v0/sysctl.py" = [
+    # Use from err or from None explicitly
+    # FIXME
+    "B904",
     # use unpacking instead of concatenation with lists
     # FIXME
     "RUF005",
     # Unnecessary open mode parameters
     # FIXME
     "UP015",
+]
+"lib/charms/operator_libs_linux/v1/systemd.py" = [
+    # Use from err or from None explicitly
+    # FIXME
+    "B904",
 ]
 "tests/*" = [
     # All documentation linting.
