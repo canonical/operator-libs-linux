@@ -906,7 +906,7 @@ class SnapClient:
             body: dict[str, JSONType]
             try:
                 body = json.loads(e.read().decode())["result"]  # json.loads -> Any
-            except (IOError, ValueError, KeyError) as e2:
+            except (OSError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
                 body = {}
                 message = "{} - {}".format(type(e2).__name__, e2)

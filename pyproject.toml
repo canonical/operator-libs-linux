@@ -154,9 +154,6 @@ keep-runtime-typing = true
     # use text instead of universal_newlines with subprocess.run
     # FIXME
     "UP021",
-    # catch OSError instead of alias IOError
-    # FIXME
-    "UP024",
 ]
 "tests/*" = [
     # All documentation linting.
