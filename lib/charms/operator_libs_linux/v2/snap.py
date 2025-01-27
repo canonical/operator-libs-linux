@@ -987,7 +987,7 @@ class SnapCache(Mapping[str, Snap]):
             # currently exist.
             return
 
-        with open("/var/cache/snapd/names", "r") as f:
+        with open("/var/cache/snapd/names") as f:
             for line in f:
                 if line.strip():
                     self._snap_map[line.strip()] = None

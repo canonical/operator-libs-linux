@@ -94,9 +94,6 @@ ignore = [
     # subprocess: starting process with a partial executable path
     # FIXME: individually validate or noqa these
     "S607",
-    # Unnecessary open mode parameters
-    # FIXME
-    "UP015",
 ]
 
 [tool.ruff.lint.pyupgrade]
@@ -113,6 +110,9 @@ keep-runtime-typing = true
     # Use a context manager for opening files
     # FIXME: false positive, noqa it
     "SIM115",
+    # Unnecessary open mode parameters
+    # FIXME
+    "UP015",
     # prefer capture_output over using stdout+stderr with PIPE
     # FIXME
     "UP022",
@@ -129,6 +129,9 @@ keep-runtime-typing = true
     # Probably insecure usage of temporary file or directory under /tmp
     # FIXME: use stdlib tempfile
     "S108",
+    # Unnecessary open mode parameters
+    # FIXME
+    "UP015",
 ]
 "lib/charms/operator_libs_linux/v0/juju_systemd_notices.py" = [
     # Line too long
@@ -149,6 +152,11 @@ keep-runtime-typing = true
     # FIXME: migrate to fstrings
     "UP032",
 ]
+"lib/charms/operator_libs_linux/v0/sysctl.py" = [
+    # Unnecessary open mode parameters
+    # FIXME
+    "UP015",
+]
 "tests/*" = [
     # All documentation linting.
     "D",
@@ -164,6 +172,11 @@ keep-runtime-typing = true
     "S106",
     # Probably insecure usage of temporary file or directory (e.g. /tmp/bad.list)
     "S108",
+]
+"tests/integration/helpers.py" = [
+    # Unnecessary open mode parameters
+    # FIXME
+    "UP015",
 ]
 "tests/integration/test_apt.py" = [
     # Use fstrings instead of `format`
@@ -182,6 +195,11 @@ keep-runtime-typing = true
     # Use fstrings instead of `format`
     # FIXME: migrate to fstrings
     "UP032",
+]
+"tests/integration/test_sysctl.py" = [
+    # Unnecessary open mode parameters
+    # FIXME
+    "UP015",
 ]
 "tests/integration/test_grub.py" = [
     # detected, some yoda conditionals were
@@ -202,6 +220,9 @@ keep-runtime-typing = true
     # combine if branches using logical or
     # FIXME
     "SIM114",
+    # Unnecessary open mode parameters
+    # FIXME
+    "UP015",
 ]
 "tests/unit/test_snap.py" = [
     # implicit Optional in typing
