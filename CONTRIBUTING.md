@@ -29,9 +29,10 @@ source .tox/unit/bin/activate
 
 ```shell
 tox -e fmt       # update your code according to linting rules
-tox -e lint      # code style
+tox -e lint      # code style -- some linting currently disabled for certain files
+tox -e static    # static type checking -- currently enabled only for select libs
 tox -e unit      # unit tests
-tox              # runs 'lint' and 'unit' environments
+tox              # runs 'lint', 'static', and 'unit' environments
 ```
 
 ## Build charm
