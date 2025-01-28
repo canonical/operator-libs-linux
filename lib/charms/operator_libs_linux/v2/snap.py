@@ -122,7 +122,8 @@ def _cache_init(func: Callable[_P, _T]) -> Callable[_P, _T]:
 # because setting snap config values to null removes the key so a null value can't be returned
 _JSONLeaf: TypeAlias = 'str | int | float | bool'
 JSONType: TypeAlias = "dict[str, JSONType] | list[JSONType] | _JSONLeaf"
-# we also need a jsonable type for arguments, which (a) uses abstract types and (b) may contain None
+# we also need a jsonable type for arguments,
+# which (a) uses abstract types and (b) may contain None
 JSONAble: TypeAlias = "Mapping[str, JSONAble] | Sequence[JSONAble] | _JSONLeaf | None"
 
 
@@ -219,7 +220,7 @@ class MetaCache(type):
         return cls._cache[name]
 
 
-class _Cache(object, metaclass=MetaCache):
+class _Cache(metaclass=MetaCache):
     _cache = None
 
 
@@ -232,12 +233,12 @@ class Error(Exception):
 
     def __repr__(self) -> str:
         """Represent the Error class."""
-        return "<{}.{} {}>".format(type(self).__module__, type(self).__name__, self.args)
+        return f"<{type(self).__module__}.{type(self).__name__} {self.args}>"
 
     @property
     def name(self) -> str:
         """Return a string representation of the model plus class."""
-        return "<{}.{}>".format(type(self).__module__, type(self).__name__)
+        return f"<{type(self).__module__}.{type(self).__name__}>"
 
 
 class SnapAPIError(Error):
@@ -252,9 +253,7 @@ class SnapAPIError(Error):
 
     def __repr__(self) -> str:
         """Represent the SnapAPIError class."""
-        return "APIError({!r}, {!r}, {!r}, {!r})".format(
-            self.body, self.code, self.status, self._message
-        )
+        return f"APIError({self.body!r}, {self.code!r}, {self.status!r}, {self._message!r})"
 
 
 class SnapState(Enum):
@@ -274,7 +273,7 @@ class SnapNotFoundError(Error):
     """Raised when a requested snap is not known to the system."""
 
 
-class Snap(object):
+class Snap:
     """Represents a snap package and its properties.
 
     `Snap` exposes the following properties about a snap:
@@ -317,16 +316,14 @@ class Snap(object):
 
     def __repr__(self) -> str:
         """Represent the object such that it can be reconstructed."""
-        return "<{}.{}: {}>".format(self.__module__, self.__class__.__name__, self.__dict__)
+        return f"<{self.__module__}.{type(self).__name__}: {self.__dict__}>"
 
     def __str__(self) -> str:
         """Represent the snap object as a string."""
-        return "<{}: {}-{}.{} -- {}>".format(
-            self.__class__.__name__,
-            self._name,
-            self._revision,
-            self._channel,
-            str(self._state),
+        return (
+            f"<{type(self).__name__}: "
+            f"{self._name}-{self._revision}.{self._channel}"
+            f" -- {self._state}>"
         )
 
     def _snap(self, command: str, optargs: Iterable[str] | None = None) -> str:
@@ -343,13 +340,11 @@ class Snap(object):
         optargs = optargs or []
         args = ["snap", command, self._name, *optargs]
         try:
-            return subprocess.check_output(args, universal_newlines=True)
+            return subprocess.check_output(args, text=True)
         except CalledProcessError as e:
             raise SnapError(
-                "Snap: {!r}; command {!r} failed with output = {!r}".format(
-                    self._name, args, e.output
-                )
-            )
+                f"Snap: {self._name!r}; command {args!r} failed with output = {e.output!r}"
+            ) from e
 
     def _snap_daemons(
         self,
@@ -367,16 +362,16 @@ class Snap(object):
         """
         if services:
             # an attempt to keep the command constrained to the snap instance's services
-            services = ["{}.{}".format(self._name, service) for service in services]
+            services = [f"{self._name}.{service}" for service in services]
         else:
             services = [self._name]
 
         args = ["snap", *command, *services]
 
         try:
-            return subprocess.run(args, universal_newlines=True, check=True, capture_output=True)
+            return subprocess.run(args, text=True, check=True, capture_output=True)
         except CalledProcessError as e:
-            raise SnapError("Could not {} for snap [{}]: {}".format(args, self._name, e.stderr))
+            raise SnapError(f"Could not {args} for snap [{self._name}]: {e.stderr}") from e
 
     @typing.overload
     def get(self, key: None | Literal[""], *, typed: Literal[False] = False) -> NoReturn: ...
@@ -457,7 +452,7 @@ class Snap(object):
                 (otherwise all)
             num_lines (int): (optional) integer number of log lines to return. Default `10`
         """
-        args = ["logs", "-n={}".format(num_lines)] if num_lines else ["logs"]
+        args = ["logs", f"-n={num_lines}"] if num_lines else ["logs"]
         return self._snap_daemons(args, services).stdout
 
     def connect(self, plug: str, service: str | None = None, slot: str | None = None) -> None:
@@ -471,18 +466,18 @@ class Snap(object):
         Raises:
             SnapError if there is a problem encountered
         """
-        command = ["connect", "{}:{}".format(self._name, plug)]
+        command = ["connect", f"{self._name}:{plug}"]
 
         if service and slot:
-            command = command + ["{}:{}".format(service, slot)]
+            command.append(f"{service}:{slot}")
         elif slot:
-            command = command + [slot]
+            command.append(slot)
 
         args = ["snap", *command]
         try:
-            subprocess.run(args, universal_newlines=True, check=True, capture_output=True)
+            subprocess.run(args, text=True, check=True, capture_output=True)
         except CalledProcessError as e:
-            raise SnapError("Could not {} for snap [{}]: {}".format(args, self._name, e.stderr))
+            raise SnapError(f"Could not {args} for snap [{self._name}]: {e.stderr}") from e
 
     def hold(self, duration: timedelta | None = None) -> None:
         """Add a refresh hold to a snap.
@@ -511,13 +506,11 @@ class Snap(object):
             alias = application
         args = ["snap", "alias", f"{self.name}.{application}", alias]
         try:
-            subprocess.check_output(args, universal_newlines=True)
+            subprocess.check_output(args, text=True)
         except CalledProcessError as e:
             raise SnapError(
-                "Snap: {!r}; command {!r} failed with output = {!r}".format(
-                    self._name, args, e.output
-                )
-            )
+                f"Snap: {self._name!r}; command {args!r} failed with output = {e.output!r}"
+            ) from e
 
     def restart(self, services: list[str] | None = None, reload: bool = False) -> None:
         """Restarts a snap's services.
@@ -552,11 +545,11 @@ class Snap(object):
         if self.confinement == "devmode":
             args.append("--devmode")
         if channel:
-            args.append('--channel="{}"'.format(channel))
+            args.append(f'--channel="{channel}"')
         if revision:
-            args.append('--revision="{}"'.format(revision))
+            args.append(f'--revision="{revision}"')
         if cohort:
-            args.append('--cohort="{}"'.format(cohort))
+            args.append(f'--cohort="{cohort}"')
 
         self._snap("install", args)
 
@@ -579,10 +572,10 @@ class Snap(object):
         """
         args: list[str] = []
         if channel:
-            args.append('--channel="{}"'.format(channel))
+            args.append(f'--channel="{channel}"')
 
         if revision:
-            args.append('--revision="{}"'.format(revision))
+            args.append(f'--revision="{revision}"')
 
         if devmode:
             args.append("--devmode")
@@ -594,7 +587,7 @@ class Snap(object):
             self._cohort = ""
             args.append("--leave-cohort")
         elif cohort:
-            args.append('--cohort="{}"'.format(cohort))
+            args.append(f'--cohort="{cohort}"')
 
         self._snap("refresh", args)
 
@@ -681,7 +674,7 @@ class Snap(object):
         try:
             self._apps = self._snap_client.get_installed_snap_apps(self._name)
         except SnapAPIError:
-            logger.debug("Unable to retrieve snap apps for {}".format(self._name))
+            logger.debug("Unable to retrieve snap apps for %s", self._name)
             self._apps = []
 
     @property
@@ -766,7 +759,7 @@ class _UnixSocketConnection(http.client.HTTPConnection):
     def connect(self):
         """Override connect to use Unix socket (instead of TCP socket)."""
         if not hasattr(socket, "AF_UNIX"):
-            raise NotImplementedError("Unix sockets not supported on {}".format(sys.platform))
+            raise NotImplementedError(f"Unix sockets not supported on {sys.platform}")
         assert self.socket_path is not None  # else TypeError on self.socket.connect
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(self.socket_path)
@@ -810,13 +803,16 @@ class SnapClient:
         Args:
             socket_path: a path to the socket on the filesystem. Defaults to /run/snap/snapd.socket
             opener: specifies an opener for unix socket, if unspecified a default is used
-            base_url: base url for making requests to the snap client. Defaults to
-                http://localhost/v2/
+            base_url: base URL for making requests to the snap client. Must be an HTTP(S) URL.
+                Defaults to http://localhost/v2/
             timeout: timeout in seconds to use when making requests to the API. Default is 30.0s.
         """
         if opener is None:
             opener = self._get_default_opener(socket_path)
         self.opener = opener
+        # Address ruff's suspicious-url-open-usage (S310)
+        if not base_url.startswith(("http:", "https:")):
+            raise ValueError("base_url must start with 'http:' or 'https:'")
         self.base_url = base_url
         self.timeout = timeout
 
@@ -895,7 +891,7 @@ class SnapClient:
 
         if headers is None:
             headers = {}
-        request = urllib.request.Request(url, method=method, data=data, headers=headers)
+        request = urllib.request.Request(url, method=method, data=data, headers=headers)  # noqa: S310
 
         try:
             response = self.opener.open(request, timeout=self.timeout)
@@ -906,13 +902,13 @@ class SnapClient:
             body: dict[str, JSONType]
             try:
                 body = json.loads(e.read().decode())["result"]  # json.loads -> Any
-            except (IOError, ValueError, KeyError) as e2:
+            except (OSError, ValueError, KeyError) as e2:
                 # Will only happen on read error or if Pebble sends invalid JSON.
                 body = {}
-                message = "{} - {}".format(type(e2).__name__, e2)
-            raise SnapAPIError(body, code, status, message)
+                message = f"{type(e2).__name__} - {e2}"
+            raise SnapAPIError(body, code, status, message) from e
         except urllib.error.URLError as e:
-            raise SnapAPIError({}, 500, "Not found", str(e.reason))
+            raise SnapAPIError({}, 500, "Not found", str(e.reason)) from e
         return response
 
     def get_installed_snaps(self) -> list[dict[str, JSONType]]:
@@ -971,8 +967,8 @@ class SnapCache(Mapping[str, Snap]):
         # populated.  This is normal.
         try:
             snap = self._snap_map[snap_name] = self._load_info(snap_name)
-        except SnapAPIError:
-            raise SnapNotFoundError("Snap '{}' not found!".format(snap_name))
+        except SnapAPIError as e:
+            raise SnapNotFoundError(f"Snap '{snap_name}' not found!") from e
         return snap
 
     @property
@@ -991,7 +987,7 @@ class SnapCache(Mapping[str, Snap]):
             # currently exist.
             return
 
-        with open("/var/cache/snapd/names", "r") as f:
+        with open("/var/cache/snapd/names") as f:
             for line in f:
                 if line.strip():
                     self._snap_map[line.strip()] = None
@@ -1223,15 +1219,15 @@ def _wrap_snap_operations(
                     revision=revision,
                 )
             snaps.append(snap)
-        except SnapError as e:
-            logger.warning("Failed to {} snap {}: {}!".format(op, s, e.message))
+        except SnapError as e:  # noqa: PERF203
+            logger.warning("Failed to %s snap %s: %s!", op, s, e.message)
             errors.append(s)
         except SnapNotFoundError:
-            logger.warning("Snap '{}' not found in cache!".format(s))
+            logger.warning("Snap '%s' not found in cache!", s)
             errors.append(s)
 
     if errors:
-        raise SnapError("Failed to install or refresh snap(s): {}".format(", ".join(errors)))
+        raise SnapError(f"Failed to install or refresh snap(s): {', '.join(errors)}")
 
     return snaps if len(snaps) > 1 else snaps[0]
 
@@ -1265,7 +1261,7 @@ def install_local(
     if dangerous:
         args.append("--dangerous")
     try:
-        result = subprocess.check_output(args, universal_newlines=True).splitlines()[-1]
+        result = subprocess.check_output(args, text=True).splitlines()[-1]
         snap_name, _ = result.split(" ", 1)
         snap_name = ansi_filter.sub("", snap_name)
 
@@ -1275,11 +1271,13 @@ def install_local(
             return c[snap_name]
         except SnapAPIError as e:
             logger.error(
-                "Could not find snap {} when querying Snapd socket: {}".format(snap_name, e.body)
+                "Could not find snap %s when querying Snapd socket: %s",
+                snap_name,
+                e.body,
             )
-            raise SnapError("Failed to find snap {} in Snap cache".format(snap_name))
+            raise SnapError(f"Failed to find snap {snap_name} in Snap cache") from e
     except CalledProcessError as e:
-        raise SnapError("Could not install snap {}: {}".format(filename, e.output))
+        raise SnapError(f"Could not install snap {filename}: {e.output}") from e
 
 
 def _system_set(config_item: str, value: str) -> None:
@@ -1289,11 +1287,11 @@ def _system_set(config_item: str, value: str) -> None:
         config_item: name of snap system setting. E.g. 'refresh.hold'
         value: value to assign
     """
-    args = ["snap", "set", "system", "{}={}".format(config_item, value)]
+    args = ["snap", "set", "system", f"{config_item}={value}"]
     try:
-        subprocess.check_call(args, universal_newlines=True)
-    except CalledProcessError:
-        raise SnapError("Failed setting system config '{}' to '{}'".format(config_item, value))
+        subprocess.check_call(args, text=True)
+    except CalledProcessError as e:
+        raise SnapError(f"Failed setting system config '{config_item}' to '{value}'") from e
 
 
 def hold_refresh(days: int = 90, forever: bool = False) -> None:
@@ -1322,7 +1320,7 @@ def hold_refresh(days: int = 90, forever: bool = False) -> None:
         # Format for the correct datetime format
         hold_date = target_date.strftime("%Y-%m-%dT%H:%M:%S%z")
         # Python dumps the offset in format '+0100', we need '+01:00'
-        hold_date = "{0}:{1}".format(hold_date[:-2], hold_date[-2:])
+        hold_date = f"{hold_date[:-2]}:{hold_date[-2:]}"
         # Actually set the hold date
         _system_set("refresh.hold", hold_date)
         logger.info("Set system-wide snap refresh hold to: %s", hold_date)
