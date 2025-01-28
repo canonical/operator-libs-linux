@@ -631,6 +631,8 @@ class Version:
                     return -1
         except IndexError:
             # a is longer than b but otherwise equal, greater unless there are tildes
+            # FIXME: type checker thinks "char" is possibly unbound -- I want to refactor this anyway
+            assert isinstance(char, str)  # pyright: ignore[reportPossiblyUnboundVariable]
             if char == "~":
                 return -1
             return 1
@@ -655,27 +657,34 @@ class Version:
                 # explicitly raise IndexError if we've fallen off the edge of list2
                 if i >= len(second_list):
                     raise IndexError
+                other = second_list[i]
                 # if the items are equal, next
-                if item == second_list[i]:
+                if item == other:
                     continue
                 # numeric comparison
                 if isinstance(item, int):
-                    if item > second_list[i]:
+                    assert isinstance(other, int)
+                    if item > other:
                         return 1
-                    if item < second_list[i]:
+                    if item < other:
                         return -1
                 else:
                     # string comparison
-                    return self._dstringcmp(item, second_list[i])
+                    assert isinstance(other, str)
+                    return self._dstringcmp(item, other)
         except IndexError:
             # rev1 is longer than rev2 but otherwise equal, hence greater
             # ...except for goddamn tildes
-            if first_list[len(second_list)][0][0] == "~":
+            # FIXME: bug?? we return 1 in both cases
+            # FIXME: first_list[len(second_list)] should be a string, why are we indexing to 0 twice?
+            if first_list[len(second_list)][0][0] == "~":  # type: ignore
                 return 1
             return 1
         # rev1 is shorter than rev2 but otherwise equal, hence lesser
         # ...except for goddamn tildes
-        if second_list[len(first_list)][0][0] == "~":
+        # FIXME: bug?? we return -1 in both cases
+        # FIXME: first_list[len(second_list)] should be a string, why are we indexing to 0 twice?
+        if second_list[len(first_list)][0][0] == "~":  # type: ignore
             return -1
         return -1
 
