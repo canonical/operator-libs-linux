@@ -108,9 +108,10 @@ import logging
 import os
 import re
 import subprocess
+import typing
 from enum import Enum
 from subprocess import PIPE, CalledProcessError, check_output
-from typing import Any, Iterable, Iterator, Mapping
+from typing import Any, Iterable, Iterator, Literal, Mapping
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -197,7 +198,7 @@ class DebianPackage:
         self._state = state
         self._version = Version(version, epoch)
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Equality for comparison.
 
         Args:
@@ -232,7 +233,7 @@ class DebianPackage:
     @staticmethod
     def _apt(
         command: str,
-        package_names: str | list,
+        package_names: str | list[str],
         optargs: list[str] | None = None,
     ) -> None:
         """Wrap package management commands for Debian/Ubuntu systems.
@@ -346,8 +347,10 @@ class DebianPackage:
     def _get_epoch_from_version(version: str) -> tuple[str, str]:
         """Pull the epoch, if any, out of a version string."""
         epoch_matcher = re.compile(r"^((?P<epoch>\d+):)?(?P<version>.*)")
-        matches = epoch_matcher.search(version).groupdict()
-        return matches.get("epoch", ""), matches.get("version")
+        result = epoch_matcher.search(version)
+        assert result is not None
+        matches = result.groupdict()
+        return matches.get("epoch", ""), matches["version"]
 
     @classmethod
     def from_system(
@@ -422,32 +425,33 @@ class DebianPackage:
         )
 
         for line in lines:
-            try:
-                matches = dpkg_matcher.search(line).groupdict()
-                package_status = matches["package_status"]
-
-                if not package_status.endswith("i"):
-                    logger.debug(
-                        "package '%s' in dpkg output but not installed, status: '%s'",
-                        package,
-                        package_status,
-                    )
-                    break
-
-                epoch, split_version = DebianPackage._get_epoch_from_version(matches["version"])
-                pkg = DebianPackage(
-                    matches["package_name"],
-                    split_version,
-                    epoch,
-                    matches["arch"],
-                    PackageState.Present,
-                )
-                if (pkg.arch == "all" or pkg.arch == arch) and (
-                    version == "" or str(pkg.version) == version
-                ):
-                    return pkg
-            except AttributeError:
+            result = dpkg_matcher.search(line)
+            if result is None:
                 logger.warning("dpkg matcher could not parse line: %s", line)
+                continue
+            matches = result.groupdict()
+            package_status = matches["package_status"]
+
+            if not package_status.endswith("i"):
+                logger.debug(
+                    "package '%s' in dpkg output but not installed, status: '%s'",
+                    package,
+                    package_status,
+                )
+                break
+
+            epoch, split_version = DebianPackage._get_epoch_from_version(matches["version"])
+            pkg = DebianPackage(
+                name=matches["package_name"],
+                version=split_version,
+                epoch=epoch,
+                arch=matches["arch"],
+                state=PackageState.Present,
+            )
+            if (pkg.arch == "all" or pkg.arch == arch) and (
+                version == "" or str(pkg.version) == version
+            ):
+                return pkg
 
         # If we didn't find it, fail through
         raise PackageNotFoundError("Package {}.{} is not installed!".format(package, arch))
@@ -486,7 +490,7 @@ class DebianPackage:
 
         for pkg_raw in pkg_groups:
             lines = str(pkg_raw).splitlines()
-            vals = {}
+            vals: dict[str, str] = {}
             for line in lines:
                 if line.startswith(keys):
                     items = line.split(":", 1)
@@ -496,11 +500,11 @@ class DebianPackage:
 
             epoch, split_version = DebianPackage._get_epoch_from_version(vals["Version"])
             pkg = DebianPackage(
-                vals["Package"],
-                split_version,
-                epoch,
-                vals["Architecture"],
-                PackageState.Available,
+                name=vals["Package"],
+                version=split_version,
+                epoch=epoch,
+                arch=vals["Architecture"],
+                state=PackageState.Available,
             )
 
             if (pkg.arch == "all" or pkg.arch == arch) and (
@@ -555,15 +559,15 @@ class Version:
         upstream, debian = version.rsplit("-", 1)
         return upstream, debian
 
-    def _listify(self, revision: str) -> list[str]:
-        """Split a revision string into a listself.
+    def _listify(self, revision: str) -> list[str | int]:
+        """Split a revision string into a list.
 
         This list is comprised of  alternating between strings and numbers,
         padded on either end to always be "str, int, str, int..." and
         always be of even length.  This allows us to trivially implement the
         comparison algorithm described.
         """
-        result = []
+        result: list[str | int] = []
         while revision:
             rev_1, remains = self._get_alphas(revision)
             rev_2, remains = self._get_digits(remains)
@@ -596,7 +600,7 @@ class Version:
         # string is entirely digits
         return int(revision), ""
 
-    def _dstringcmp(self, a, b):  # noqa: C901
+    def _dstringcmp(self, a: str, b: str) -> Literal[-1, 0, 1]:
         """Debian package version string section lexical sort algorithm.
 
         The lexical comparison is a comparison of ASCII values modified so
@@ -635,7 +639,7 @@ class Version:
             return 1
         return -1
 
-    def _compare_revision_strings(self, first: str, second: str):  # noqa: C901
+    def _compare_revision_strings(self, first: str, second: str) -> Literal[-1, 0, 1]:
         """Compare two debian revision strings."""
         if first == second:
             return 0
@@ -675,7 +679,7 @@ class Version:
             return -1
         return -1
 
-    def _compare_version(self, other) -> int:
+    def _compare_version(self, other: Version) -> Literal[-1, 0, 1]:
         if (self.number, self.epoch) == (other.number, other.epoch):
             return 0
 
@@ -698,36 +702,52 @@ class Version:
 
         return 0
 
-    def __lt__(self, other) -> bool:
+    def __lt__(self, other: Version) -> bool:
         """Less than magic method impl."""
         return self._compare_version(other) < 0
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Equality magic method impl."""
+        if not isinstance(other, Version):
+            return False
         return self._compare_version(other) == 0
 
-    def __gt__(self, other) -> bool:
+    def __gt__(self, other: Version) -> bool:
         """Greater than magic method impl."""
         return self._compare_version(other) > 0
 
-    def __le__(self, other) -> bool:
+    def __le__(self, other: Version) -> bool:
         """Less than or equal to magic method impl."""
         return self.__eq__(other) or self.__lt__(other)
 
-    def __ge__(self, other) -> bool:
+    def __ge__(self, other: Version) -> bool:
         """Greater than or equal to magic method impl."""
         return self.__gt__(other) or self.__eq__(other)
 
-    def __ne__(self, other) -> bool:
+    def __ne__(self, other: object) -> bool:
         """Not equal to magic method impl."""
         return not self.__eq__(other)
 
 
+@typing.overload
+def add_package(
+    package_names: str,
+    version: str | None = "",
+    arch: str | None = "",
+    update_cache: bool = False,
+) -> DebianPackage: ...
+@typing.overload
 def add_package(
     package_names: str | list[str],
     version: str | None = "",
     arch: str | None = "",
-    update_cache: bool | None = False,
+    update_cache: bool = False,
+) -> DebianPackage | list[DebianPackage]: ...
+def add_package(
+    package_names: str | list[str],
+    version: str | None = "",
+    arch: str | None = "",
+    update_cache: bool = False,
 ) -> DebianPackage | list[DebianPackage]:
     """Add a package or list of packages to the system.
 
@@ -748,8 +768,6 @@ def add_package(
         update()
         cache_refreshed = True
 
-    packages = {"success": [], "retry": [], "failed": []}
-
     package_names = [package_names] if isinstance(package_names, str) else package_names
     if not package_names:
         raise TypeError("Expected at least one package name to add, received zero!")
@@ -759,36 +777,40 @@ def add_package(
             "Explicit version should not be set if more than one package is being added!"
         )
 
+    succeeded: list[DebianPackage] = []
+    retry: list[str] = []
+    failed: list[str] = []
+
     for p in package_names:
-        pkg, success = _add(p, version, arch)
-        if success:
-            packages["success"].append(pkg)
+        pkg, _ = _add(p, version, arch)
+        if isinstance(pkg, DebianPackage):
+            succeeded.append(pkg)
         else:
             logger.warning("failed to locate and install/update '%s'", pkg)
-            packages["retry"].append(p)
+            retry.append(p)
 
-    if packages["retry"] and not cache_refreshed:
+    if retry and not cache_refreshed:
         logger.info("updating the apt-cache and retrying installation of failed packages.")
         update()
 
-        for p in packages["retry"]:
-            pkg, success = _add(p, version, arch)
-            if success:
-                packages["success"].append(pkg)
+        for p in retry:
+            pkg, _ = _add(p, version, arch)
+            if isinstance(pkg, DebianPackage):
+                succeeded.append(pkg)
             else:
-                packages["failed"].append(p)
+                failed.append(p)
 
-    if packages["failed"]:
-        raise PackageError("Failed to install packages: {}".format(", ".join(packages["failed"])))
+    if failed:
+        raise PackageError(f"Failed to install packages: {', '.join(failed)}")
 
-    return packages["success"] if len(packages["success"]) > 1 else packages["success"][0]
+    return succeeded if len(succeeded) > 1 else succeeded[0]
 
 
 def _add(
     name: str,
     version: str | None = "",
     arch: str | None = "",
-) -> tuple[DebianPackage | str, bool]:
+) -> tuple[DebianPackage, Literal[True]] | tuple[str, Literal[False]]:
     """Add a package to the system.
 
     Args:
@@ -807,6 +829,14 @@ def _add(
         return name, False
 
 
+@typing.overload
+def remove_package(
+    package_names: str,
+) -> DebianPackage: ...
+@typing.overload
+def remove_package(
+    package_names: list[str],
+) -> DebianPackage | list[DebianPackage]: ...
 def remove_package(
     package_names: str | list[str],
 ) -> DebianPackage | list[DebianPackage]:
@@ -1117,7 +1147,9 @@ class DebianRepository:
         if "gpg: no valid OpenPGP data found." in err:
             raise GPGKeyError("Invalid GPG key material provided")
         # from gnupg2 docs: fpr :: Fingerprint (fingerprint is in field 10)
-        return re.search(r"^fpr:{9}([0-9A-F]{40}):$", out, re.MULTILINE).group(1)
+        result = re.search(r"^fpr:{9}([0-9A-F]{40}):$", out, re.MULTILINE)
+        assert result is not None
+        return result.group(1)
 
     @staticmethod
     def _get_key_by_keyid(keyid: str) -> str:
@@ -1271,7 +1303,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         """Return number of repositories in map."""
         return len(self._repository_map)
 
-    def __iter__(self) -> Iterator[DebianRepository]:
+    def __iter__(self) -> Iterator[DebianRepository]:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Return iterator for RepositoryMapping.
 
         Iterates over the DebianRepository values rather than the string names.
