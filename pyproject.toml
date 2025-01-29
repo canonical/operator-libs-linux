@@ -95,9 +95,6 @@ ignore = [
     # try/except inside loop
     # FIXME: lift or noqa individually as appropriate
     "PERF203",
-    # Unused noqa
-    # FIXME: remove unneeded noqas
-    "RUF100",
     # prefer capture_output over using stdout+stderr with PIPE
     # FIXME
     "UP022",
