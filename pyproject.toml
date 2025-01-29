@@ -85,11 +85,6 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"lib/charms/operator_libs_linux/v0/apt.py" = [
-    # try/except inside loop
-    # FIXME: lift or noqa individually as appropriate
-    "PERF203",
-]
 "lib/charms/operator_libs_linux/v0/dnf.py" = [
     # Use from err or from None explicitly
     # FIXME

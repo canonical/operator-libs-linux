@@ -865,7 +865,7 @@ def remove_package(
             pkg = DebianPackage.from_installed_package(p)
             pkg.ensure(state=PackageState.Absent)
             packages.append(pkg)
-        except PackageNotFoundError:
+        except PackageNotFoundError:  # noqa: PERF203
             logger.info("package '%s' was requested for removal, but it was not installed.", p)
 
     # the list of packages will be empty when no package is removed
@@ -1367,7 +1367,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         for numbered_lines in _iter_deb822_stanzas(lines):
             try:
                 stanza = _Deb822Stanza(numbered_lines=numbered_lines, filename=filename)
-            except InvalidSourceError as e:
+            except InvalidSourceError as e:  # noqa: PERF203
                 errors.append(e)
             else:
                 repos.extend(stanza.repos)
@@ -1385,7 +1385,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
             for n, line in enumerate(f, start=1):  # 1 indexed line numbers
                 try:
                     repo = self._parse(line, filename)
-                except InvalidSourceError:
+                except InvalidSourceError:  # noqa: PERF203
                     skipped.append(n)
                 else:
                     repo_identifier = _repo_to_identifier(repo)
