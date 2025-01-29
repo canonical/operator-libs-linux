@@ -748,7 +748,7 @@ def add_package(
 ) -> DebianPackage: ...
 @typing.overload
 def add_package(
-    package_names: str | list[str],
+    package_names: list[str],
     version: str | None = "",
     arch: str | None = "",
     update_cache: bool = False,
