@@ -1102,11 +1102,12 @@ class DebianRepository:
                 " Please raise an issue if you require this feature."
             )
         searcher = f"{self.repotype} {self.make_options_string()}{self.uri} {self.release}"
-        for line in fileinput.input(self._filename, inplace=True):
-            if re.match(rf"^{re.escape(searcher)}\s", line):
-                print(f"# {line}", end="")
-            else:
-                print(line, end="")
+        with fileinput.input(self._filename, inplace=True) as lines:
+            for line in lines:
+                if re.match(rf"^{re.escape(searcher)}\s", line):
+                    print(f"# {line}", end="")
+                else:
+                    print(line, end="")
 
     def import_key(self, key: str) -> None:
         """Import an ASCII Armor key.

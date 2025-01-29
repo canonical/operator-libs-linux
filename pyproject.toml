@@ -98,9 +98,6 @@ ignore = [
     # Unused noqa
     # FIXME: remove unneeded noqas
     "RUF100",
-    # Use a context manager for opening files
-    # FIXME: false positive, noqa it
-    "SIM115",
     # prefer capture_output over using stdout+stderr with PIPE
     # FIXME
     "UP022",
