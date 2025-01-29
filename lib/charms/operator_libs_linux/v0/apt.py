@@ -100,6 +100,8 @@ if "deb-us.archive.ubuntu.com-xenial" not in repositories:
 ```
 """
 
+from __future__ import annotations
+
 import fileinput
 import glob
 import logging
@@ -108,7 +110,7 @@ import re
 import subprocess
 from enum import Enum
 from subprocess import PIPE, CalledProcessError, check_output
-from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple, Union
+from typing import Any, Iterable, Iterator, Mapping
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -230,8 +232,8 @@ class DebianPackage:
     @staticmethod
     def _apt(
         command: str,
-        package_names: Union[str, List],
-        optargs: Optional[List[str]] = None,
+        package_names: str | list,
+        optargs: list[str] | None = None,
     ) -> None:
         """Wrap package management commands for Debian/Ubuntu systems.
 
@@ -321,7 +323,7 @@ class DebianPackage:
         self._state = state
 
     @property
-    def version(self) -> "Version":
+    def version(self) -> Version:
         """Returns the version for a package."""
         return self._version
 
@@ -341,7 +343,7 @@ class DebianPackage:
         return "{}.{}".format(self._version, self._arch)
 
     @staticmethod
-    def _get_epoch_from_version(version: str) -> Tuple[str, str]:
+    def _get_epoch_from_version(version: str) -> tuple[str, str]:
         """Pull the epoch, if any, out of a version string."""
         epoch_matcher = re.compile(r"^((?P<epoch>\d+):)?(?P<version>.*)")
         matches = epoch_matcher.search(version).groupdict()
@@ -349,8 +351,8 @@ class DebianPackage:
 
     @classmethod
     def from_system(
-        cls, package: str, version: Optional[str] = "", arch: Optional[str] = ""
-    ) -> "DebianPackage":
+        cls, package: str, version: str | None = "", arch: str | None = ""
+    ) -> DebianPackage:
         """Locates a package, either on the system or known to apt, and serializes the information.
 
         Args:
@@ -382,8 +384,8 @@ class DebianPackage:
 
     @classmethod
     def from_installed_package(
-        cls, package: str, version: Optional[str] = "", arch: Optional[str] = ""
-    ) -> "DebianPackage":
+        cls, package: str, version: str | None = "", arch: str | None = ""
+    ) -> DebianPackage:
         """Check whether the package is already installed and return an instance.
 
         Args:
@@ -452,8 +454,8 @@ class DebianPackage:
 
     @classmethod
     def from_apt_cache(
-        cls, package: str, version: Optional[str] = "", arch: Optional[str] = ""
-    ) -> "DebianPackage":
+        cls, package: str, version: str | None = "", arch: str | None = ""
+    ) -> DebianPackage:
         """Check whether the package is already installed and return an instance.
 
         Args:
@@ -542,7 +544,7 @@ class Version:
         """Returns the version number for a package."""
         return self._version
 
-    def _get_parts(self, version: str) -> Tuple[str, str]:
+    def _get_parts(self, version: str) -> tuple[str, str]:
         """Separate the version into component upstream and Debian pieces."""
         try:
             version.rindex("-")
@@ -553,7 +555,7 @@ class Version:
         upstream, debian = version.rsplit("-", 1)
         return upstream, debian
 
-    def _listify(self, revision: str) -> List[str]:
+    def _listify(self, revision: str) -> list[str]:
         """Split a revision string into a listself.
 
         This list is comprised of  alternating between strings and numbers,
@@ -569,7 +571,7 @@ class Version:
             revision = remains
         return result
 
-    def _get_alphas(self, revision: str) -> Tuple[str, str]:
+    def _get_alphas(self, revision: str) -> tuple[str, str]:
         """Return a tuple of the first non-digit characters of a revision."""
         # get the index of the first digit
         for i, char in enumerate(revision):
@@ -580,7 +582,7 @@ class Version:
         # string is entirely alphas
         return revision, ""
 
-    def _get_digits(self, revision: str) -> Tuple[int, str]:
+    def _get_digits(self, revision: str) -> tuple[int, str]:
         """Return a tuple of the first integer characters of a revision."""
         # If the string is empty, return (0,'')
         if not revision:
@@ -722,11 +724,11 @@ class Version:
 
 
 def add_package(
-    package_names: Union[str, List[str]],
-    version: Optional[str] = "",
-    arch: Optional[str] = "",
-    update_cache: Optional[bool] = False,
-) -> Union[DebianPackage, List[DebianPackage]]:
+    package_names: str | list[str],
+    version: str | None = "",
+    arch: str | None = "",
+    update_cache: bool | None = False,
+) -> DebianPackage | list[DebianPackage]:
     """Add a package or list of packages to the system.
 
     Args:
@@ -784,9 +786,9 @@ def add_package(
 
 def _add(
     name: str,
-    version: Optional[str] = "",
-    arch: Optional[str] = "",
-) -> Tuple[Union[DebianPackage, str], bool]:
+    version: str | None = "",
+    arch: str | None = "",
+) -> tuple[DebianPackage | str, bool]:
     """Add a package to the system.
 
     Args:
@@ -806,8 +808,8 @@ def _add(
 
 
 def remove_package(
-    package_names: Union[str, List[str]],
-) -> Union[DebianPackage, List[DebianPackage]]:
+    package_names: str | list[str],
+) -> DebianPackage | list[DebianPackage]:
     """Remove package(s) from the system.
 
     Args:
@@ -816,7 +818,7 @@ def remove_package(
     Raises:
         TypeError: if no packages are provided
     """
-    packages: List[DebianPackage] = []
+    packages: list[DebianPackage] = []
 
     package_names = [package_names] if isinstance(package_names, str) else package_names
     if not package_names:
@@ -923,7 +925,7 @@ class GPGKeyError(Error):
 class DebianRepository:
     """An abstraction to represent a repository."""
 
-    _deb822_stanza: Optional["_Deb822Stanza"] = None
+    _deb822_stanza: _Deb822Stanza | None = None
     """set by Deb822Stanza after creating a DebianRepository"""
 
     def __init__(
@@ -932,10 +934,10 @@ class DebianRepository:
         repotype: str,
         uri: str,
         release: str,
-        groups: List[str],
+        groups: list[str],
         filename: str = "",
         gpg_key_filename: str = "",
-        options: Optional[Dict[str, str]] = None,
+        options: dict[str, str] | None = None,
     ):
         self._enabled = enabled
         self._repotype = repotype
@@ -1023,7 +1025,7 @@ class DebianRepository:
         return "/etc/apt/sources.list.d/{}".format(path)
 
     @staticmethod
-    def from_repo_line(repo_line: str, write_file: Optional[bool] = True) -> "DebianRepository":
+    def from_repo_line(repo_line: str, write_file: bool | None = True) -> DebianRepository:
         """Instantiate a new `DebianRepository` from a `sources.list` entry line.
 
         Args:
@@ -1233,10 +1235,10 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
     _sources_subdir = "sources.list.d"
     _default_list_name = "sources.list"
     _default_sources_name = "ubuntu.sources"
-    _last_errors: Tuple[Error, ...] = ()
+    _last_errors: tuple[Error, ...] = ()
 
     def __init__(self):
-        self._repository_map: Dict[str, DebianRepository] = {}
+        self._repository_map: dict[str, DebianRepository] = {}
         self.default_file = os.path.join(self._apt_dir, self._default_list_name)
         # ^ public attribute for backwards compatibility only
         sources_dir = os.path.join(self._apt_dir, self._sources_subdir)
@@ -1320,7 +1322,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         cls,
         lines: Iterable[str],
         filename: str = "",
-    ) -> Tuple[List[DebianRepository], List[InvalidSourceError]]:
+    ) -> tuple[list[DebianRepository], list[InvalidSourceError]]:
         """Parse lines from a deb822 file into a list of repos and a list of errors.
 
         The semantics of `_parse_deb822_lines` slightly different to `_parse`:
@@ -1328,8 +1330,8 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
             `_parse_deb822_lines` strips out comments entirely when parsing a file into stanzas,
                 instead only reading the 'Enabled' key to determine if an entry is enabled
         """
-        repos: List[DebianRepository] = []
-        errors: List[InvalidSourceError] = []
+        repos: list[DebianRepository] = []
+        errors: list[InvalidSourceError] = []
         for numbered_lines in _iter_deb822_stanzas(lines):
             try:
                 stanza = _Deb822Stanza(numbered_lines=numbered_lines, filename=filename)
@@ -1345,8 +1347,8 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         Args:
           filename: the path to the repository file
         """
-        parsed: List[int] = []
-        skipped: List[int] = []
+        parsed: list[int] = []
+        skipped: list[int] = []
         with open(filename, "r") as f:
             for n, line in enumerate(f, start=1):  # 1 indexed line numbers
                 try:
@@ -1424,7 +1426,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
             raise InvalidSourceError("An invalid sources line was found in %s!", filename)
 
     def add(  # noqa: D417  # undocumented-param: default_filename intentionally undocumented
-        self, repo: DebianRepository, default_filename: Optional[bool] = False
+        self, repo: DebianRepository, default_filename: bool | None = False
     ) -> None:
         """Add a new repository to the system using add-apt-repository.
 
@@ -1513,7 +1515,7 @@ class _Deb822Stanza:
     May define multiple DebianRepository objects.
     """
 
-    def __init__(self, numbered_lines: List[Tuple[int, str]], filename: str = ""):
+    def __init__(self, numbered_lines: list[tuple[int, str]], filename: str = ""):
         self._filename = filename
         self._numbered_lines = numbered_lines
         if not numbered_lines:
@@ -1531,7 +1533,7 @@ class _Deb822Stanza:
         self._gpg_key_filename, self._gpg_key_from_stanza = gpg_key_info
 
     @property
-    def repos(self) -> Tuple[DebianRepository, ...]:
+    def repos(self) -> tuple[DebianRepository, ...]:
         """The repositories defined by this deb822 stanza."""
         return self._repos
 
@@ -1554,7 +1556,7 @@ class _Deb822Stanza:
 class MissingRequiredKeyError(InvalidSourceError):
     """Missing a required value in a source file."""
 
-    def __init__(self, message: str = "", *, file: str, line: Optional[int], key: str) -> None:
+    def __init__(self, message: str = "", *, file: str, line: int | None, key: str) -> None:
         super().__init__(message, file, line, key)
         self.file = file
         self.line = line
@@ -1569,7 +1571,7 @@ class BadValueError(InvalidSourceError):
         message: str = "",
         *,
         file: str,
-        line: Optional[int],
+        line: int | None,
         key: str,
         value: str,
     ) -> None:
@@ -1580,7 +1582,7 @@ class BadValueError(InvalidSourceError):
         self.value = value
 
 
-def _iter_deb822_stanzas(lines: Iterable[str]) -> Iterator[List[Tuple[int, str]]]:
+def _iter_deb822_stanzas(lines: Iterable[str]) -> Iterator[list[tuple[int, str]]]:
     """Given lines from a deb822 format file, yield a stanza of lines.
 
     Args:
@@ -1590,7 +1592,7 @@ def _iter_deb822_stanzas(lines: Iterable[str]) -> Iterator[List[Tuple[int, str]]
         lists of numbered lines (a tuple of line number and line) that make up
         a deb822 stanza, with comments stripped out (but accounted for in line numbering)
     """
-    current_stanza: List[Tuple[int, str]] = []
+    current_stanza: list[tuple[int, str]] = []
     for n, line in enumerate(lines, start=1):  # 1 indexed line numbers
         if not line.strip():  # blank lines separate stanzas
             if current_stanza:
@@ -1605,8 +1607,8 @@ def _iter_deb822_stanzas(lines: Iterable[str]) -> Iterator[List[Tuple[int, str]]
 
 
 def _deb822_stanza_to_options(
-    lines: Iterable[Tuple[int, str]],
-) -> Tuple[Dict[str, str], Dict[str, int]]:
+    lines: Iterable[tuple[int, str]],
+) -> tuple[dict[str, str], dict[str, int]]:
     """Turn numbered lines into a dict of options and a dict of line numbers.
 
     Args:
@@ -1616,8 +1618,8 @@ def _deb822_stanza_to_options(
         a dictionary of option names to (potentially multiline) values, and
         a dictionary of option names to starting line number
     """
-    parts: Dict[str, List[str]] = {}
-    line_numbers: Dict[str, int] = {}
+    parts: dict[str, list[str]] = {}
+    line_numbers: dict[str, int] = {}
     current = None
     for n, line in lines:
         assert "#" not in line  # comments should be stripped out
@@ -1634,8 +1636,8 @@ def _deb822_stanza_to_options(
 
 
 def _deb822_options_to_repos(
-    options: Dict[str, str], line_numbers: Mapping[str, int] = {}, filename: str = ""
-) -> Tuple[Tuple[DebianRepository, ...], Tuple[str, Optional[str]]]:
+    options: dict[str, str], line_numbers: Mapping[str, int] = {}, filename: str = ""
+) -> tuple[tuple[DebianRepository, ...], tuple[str, str | None]]:
     """Return a collections of DebianRepository objects defined by this deb822 stanza.
 
     Args:
@@ -1666,7 +1668,7 @@ def _deb822_options_to_repos(
         )
     # Signed-By
     gpg_key_file = options.pop("Signed-By", "")
-    gpg_key_from_stanza: Optional[str] = None
+    gpg_key_from_stanza: str | None = None
     if "\n" in gpg_key_file:
         # actually a literal multi-line gpg-key rather than a filename
         gpg_key_from_stanza = gpg_key_file
@@ -1687,7 +1689,7 @@ def _deb822_options_to_repos(
     # suite can specify an exact path, in which case the components must be omitted and suite must end with a slash (/).
     # If suite does not specify an exact path, at least one component must be present.
     # https://manpages.ubuntu.com/manpages/noble/man5/sources.list.5.html
-    components: List[str]
+    components: list[str]
     if len(suites) == 1 and suites[0].endswith("/"):
         if "Components" in options:
             msg = (
