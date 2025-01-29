@@ -107,9 +107,6 @@ ignore = [
     # prefer capture_output over using stdout+stderr with PIPE
     # FIXME
     "UP022",
-    # Use fstrings instead of `format`
-    # FIXME: migrate to fstrings
-    "UP032",
 ]
 "lib/charms/operator_libs_linux/v0/dnf.py" = [
     # Use from err or from None explicitly
