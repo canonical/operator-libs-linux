@@ -1719,7 +1719,7 @@ def _deb822_options_to_repos(
             key=key,
             line=min(line_numbers.values()) if line_numbers else None,
             file=filename,
-        )
+        ) from e
     # Components
     # suite can specify an exact path, in which case the components must be omitted and suite must end with a slash (/).
     # If suite does not specify an exact path, at least one component must be present.

@@ -86,9 +86,6 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "lib/charms/operator_libs_linux/v0/apt.py" = [
-    # Use from err or from None explicitly
-    # FIXME
-    "B904",
     # Line too long
     # FIXME
     "E501",
