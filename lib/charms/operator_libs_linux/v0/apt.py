@@ -631,9 +631,10 @@ class Version:
                     return -1
         except IndexError:
             # a is longer than b but otherwise equal, greater unless there are tildes
-            # FIXME: type checker thinks "char" is possibly unbound -- I want to refactor this anyway
-            assert isinstance(char, str)  # pyright: ignore[reportPossiblyUnboundVariable]
-            if char == "~":
+            # FIXME: type checker thinks "char" is possibly unbound as it's a loop variable
+            #        but it won't be since the IndexError can only occur inside the loop
+            #        -- I'd like to refactor away this `try ... except` anyway
+            if char == "~":  # pyright: ignore[reportPossiblyUnboundVariable]
                 return -1
             return 1
         # if we get here, a is shorter than b but otherwise equal, so check for tildes...
