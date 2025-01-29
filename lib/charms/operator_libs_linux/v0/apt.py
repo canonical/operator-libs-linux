@@ -1140,12 +1140,7 @@ class DebianRepository:
         """
         # Use the same gpg command for both Xenial and Bionic
         cmd = ["gpg", "--with-colons", "--with-fingerprint"]
-        ps = subprocess.run(
-            cmd,
-            stdout=PIPE,
-            stderr=PIPE,
-            input=key_material,
-        )
+        ps = subprocess.run(cmd, capture_output=True, input=key_material)
         out, err = ps.stdout.decode(), ps.stderr.decode()
         if "gpg: no valid OpenPGP data found." in err:
             raise GPGKeyError("Invalid GPG key material provided")
@@ -1207,7 +1202,7 @@ class DebianRepository:
         Raises:
           GPGKeyError
         """
-        ps = subprocess.run(["gpg", "--dearmor"], stdout=PIPE, stderr=PIPE, input=key_asc)
+        ps = subprocess.run(["gpg", "--dearmor"], capture_output=True, input=key_asc)
         out, err = ps.stdout, ps.stderr.decode()
         if "gpg: no valid OpenPGP data found." in err:
             raise GPGKeyError(
