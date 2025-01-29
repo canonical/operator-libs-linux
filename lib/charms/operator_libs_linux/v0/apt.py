@@ -1335,7 +1335,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         For instance, ubuntu 24.04 (noble) lists its sources using deb822 style in:
             /etc/apt/sources.list.d/ubuntu.sources
         """
-        with open(filename, "r") as f:
+        with open(filename) as f:
             repos, errors = self._parse_deb822_lines(f, filename=filename)
         for repo in repos:
             self._repository_map[_repo_to_identifier(repo)] = repo
@@ -1383,7 +1383,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
         """
         parsed: list[int] = []
         skipped: list[int] = []
-        with open(filename, "r") as f:
+        with open(filename) as f:
             for n, line in enumerate(f, start=1):  # 1 indexed line numbers
                 try:
                     repo = self._parse(line, filename)

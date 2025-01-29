@@ -101,9 +101,6 @@ ignore = [
     # Use a context manager for opening files
     # FIXME: false positive, noqa it
     "SIM115",
-    # Unnecessary open mode parameters
-    # FIXME
-    "UP015",
     # prefer capture_output over using stdout+stderr with PIPE
     # FIXME
     "UP022",
