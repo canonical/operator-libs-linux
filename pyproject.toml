@@ -86,9 +86,6 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "lib/charms/operator_libs_linux/v0/apt.py" = [
-    # Line too long
-    # FIXME
-    "E501",
     # try/except inside loop
     # FIXME: lift or noqa individually as appropriate
     "PERF203",

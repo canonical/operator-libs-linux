@@ -377,7 +377,8 @@ class DebianPackage:
             # and providing meaningful error messages without this is ugly.
             arch_str = f".{arch}" if arch else ""
             raise PackageNotFoundError(
-                f"Package '{package}{arch_str}' could not be found on the system or in the apt cache!"
+                f"Package '{package}{arch_str}' "
+                "could not be found on the system or in the apt cache!"
             ) from None
 
     @classmethod
@@ -671,7 +672,8 @@ class Version:
             # rev1 is longer than rev2 but otherwise equal, hence greater
             # ...except for goddamn tildes
             # FIXME: bug?? we return 1 in both cases
-            # FIXME: first_list[len(second_list)] should be a string, why are we indexing to 0 twice?
+            # FIXME: first_list[len(second_list)] should be a string
+            #        why are we indexing to 0 twice?
             if first_list[len(second_list)][0][0] == "~":  # type: ignore
                 return 1
             return 1
@@ -1716,7 +1718,8 @@ def _deb822_options_to_repos(
             file=filename,
         ) from e
     # Components
-    # suite can specify an exact path, in which case the components must be omitted and suite must end with a slash (/).
+    # suite can specify an exact path, in which case the components must be omitted
+    # and suite must end with a slash (/).
     # If suite does not specify an exact path, at least one component must be present.
     # https://manpages.ubuntu.com/manpages/noble/man5/sources.list.5.html
     components: list[str]
