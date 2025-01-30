@@ -85,32 +85,6 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"lib/charms/operator_libs_linux/v0/apt.py" = [
-    # Use from err or from None explicitly
-    # FIXME
-    "B904",
-    # Line too long
-    # FIXME
-    "E501",
-    # try/except inside loop
-    # FIXME: lift or noqa individually as appropriate
-    "PERF203",
-    # Unused noqa
-    # FIXME: remove unneeded noqas
-    "RUF100",
-    # Use a context manager for opening files
-    # FIXME: false positive, noqa it
-    "SIM115",
-    # Unnecessary open mode parameters
-    # FIXME
-    "UP015",
-    # prefer capture_output over using stdout+stderr with PIPE
-    # FIXME
-    "UP022",
-    # Use fstrings instead of `format`
-    # FIXME: migrate to fstrings
-    "UP032",
-]
 "lib/charms/operator_libs_linux/v0/dnf.py" = [
     # Use from err or from None explicitly
     # FIXME
