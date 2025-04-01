@@ -124,7 +124,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 16
+LIBPATCH = 17
 
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
@@ -791,11 +791,14 @@ def add_package(
         pkg, _ = _add(p, version, arch)
         if isinstance(pkg, DebianPackage):
             succeeded.append(pkg)
-        else:
+        elif cache_refreshed:
             logger.warning("failed to locate and install/update '%s'", pkg)
+            failed.append(p)
+        else:
+            logger.warning("failed to locate and install/update '%s', will retry later", pkg)
             retry.append(p)
 
-    if retry and not cache_refreshed:
+    if retry:
         logger.info("updating the apt-cache and retrying installation of failed packages.")
         update()
 
@@ -809,7 +812,7 @@ def add_package(
     if failed:
         raise PackageError(f"Failed to install packages: {', '.join(failed)}")
 
-    return succeeded if len(succeeded) > 1 else succeeded[0]
+    return succeeded[0] if len(succeeded) == 1 else succeeded
 
 
 def _add(

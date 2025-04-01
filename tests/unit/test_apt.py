@@ -519,6 +519,24 @@ class TestAptBareMethods(unittest.TestCase):
 
     @patch("charms.operator_libs_linux.v0.apt.check_output")
     @patch("charms.operator_libs_linux.v0.apt.subprocess.run")
+    def test_refreshes_apt_cache_before_apt_install(self, mock_subprocess, mock_subprocess_output):
+        mock_subprocess.return_value = 0
+        mock_subprocess_output.side_effect = [
+            "amd64",
+            subprocess.CalledProcessError(returncode=100, cmd=["dpkg", "-l", "nothere"]),
+            "amd64",
+            subprocess.CalledProcessError(returncode=100, cmd=["apt-cache", "show", "nothere"]),
+        ] * 2  # Double up for the retry before update
+        with self.assertRaises(apt.PackageError) as ctx:
+            apt.add_package("nothere", update_cache=True)
+        mock_subprocess.assert_any_call(
+            ["apt-get", "update", "--error-on=any"], capture_output=True, check=True
+        )
+        self.assertEqual("<charms.operator_libs_linux.v0.apt.PackageError>", ctx.exception.name)
+        self.assertIn("Failed to install packages: nothere", ctx.exception.message)
+
+    @patch("charms.operator_libs_linux.v0.apt.check_output")
+    @patch("charms.operator_libs_linux.v0.apt.subprocess.run")
     def test_raises_package_not_found_error(self, mock_subprocess, mock_subprocess_output):
         mock_subprocess.return_value = 0
         mock_subprocess_output.side_effect = [
