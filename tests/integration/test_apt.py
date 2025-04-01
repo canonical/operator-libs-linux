@@ -150,7 +150,7 @@ def test_install_hardware_observer_ssacli():
 
         apt.add_package(self.pkg, update_cache=True)
     """
-    line = "deb http://downloads.linux.hpe.com/SDR/repo/mcp stretch/current non-free"
+    line = "deb https://downloads.linux.hpe.com/SDR/repo/mcp stretch/current non-free"
     repo_id = apt._repo_to_identifier(  # pyright: ignore[reportPrivateUsage]
         apt.DebianRepository.from_repo_line(line, write_file=False)
     )
