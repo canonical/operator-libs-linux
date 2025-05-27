@@ -389,7 +389,7 @@ class TestSnapCache(unittest.TestCase):
 
     @patch('charms.operator_libs_linux.v2.snap.subprocess.check_output')
     def test_refresh_classic(self, mock_subprocess: MagicMock):
-        """Test that ensure and _refresh succeed and call the correct snap commands."""
+        """Test that ensure and _refresh add the --classic flag with confinement set to classic."""
         foo = snap.Snap(
             name='foo',
             state=snap.SnapState.Present,
