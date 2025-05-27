@@ -632,9 +632,7 @@ class TestSnapCache(unittest.TestCase):
         ('strict', True, ['--classic']),
     ],
 )
-def test_refresh_classic(
-    mock_subprocess: MagicMock, confinement: str, classic: bool, expected_flag: list[str]
-):
+def test_refresh_classic(mock_subprocess: MagicMock, confinement, classic, expected_flag):
     """Test that ensure and _refresh add the --classic flag with confinement set to classic."""
     foo = snap.Snap(
         name='foo',
