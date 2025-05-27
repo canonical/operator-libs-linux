@@ -14,6 +14,7 @@ from typing import Any, Dict, Iterable, Optional
 from unittest.mock import MagicMock, mock_open, patch
 
 import fake_snapd as fake_snapd
+import pytest
 from charms.operator_libs_linux.v2 import snap
 
 patch("charms.operator_libs_linux.v2.snap._cache_init", lambda x: x).start()
@@ -387,31 +388,6 @@ class TestSnapCache(unittest.TestCase):
         )
         self.assertEqual(foo._cohort, "")
 
-    @patch('charms.operator_libs_linux.v2.snap.subprocess.check_output')
-    def test_refresh_classic(self, mock_subprocess: MagicMock):
-        """Test that ensure and _refresh add the --classic flag with confinement set to classic."""
-        foo = snap.Snap(
-            name='foo',
-            state=snap.SnapState.Present,
-            channel='stable',
-            revision='1',
-            confinement='classic',
-            apps=None,
-            cohort='A',
-        )
-        foo.ensure(snap.SnapState.Latest, revision='2', classic=True)
-        mock_subprocess.assert_called_with(
-            [
-                'snap',
-                'refresh',
-                'foo',
-                '--revision="2"',
-                '--classic',
-                '--cohort="A"',
-            ],
-            text=True,
-        )
-
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
     def test_no_subprocess_when_not_installed(self, mock_subprocess: MagicMock):
         """Don't call out to snap when ensuring an uninstalled state when not installed."""
@@ -644,6 +620,43 @@ class TestSnapCache(unittest.TestCase):
                 }
             },
         )
+
+
+@patch('charms.operator_libs_linux.v2.snap.subprocess.check_output')
+@pytest.mark.parametrize(
+    'confinement,classic,expected_flag',
+    [
+        ('classic', False, ['--classic']),
+        ('classic', True, ['--classic']),
+        ('strict', False, []),
+        ('strict', True, ['--classic']),
+    ],
+)
+def test_refresh_classic(
+    mock_subprocess: MagicMock, confinement: str, classic: bool, expected_flag: list[str]
+):
+    """Test that ensure and _refresh add the --classic flag with confinement set to classic."""
+    foo = snap.Snap(
+        name='foo',
+        state=snap.SnapState.Present,
+        channel='stable',
+        revision='1',
+        confinement=confinement,
+        apps=None,
+        cohort='A',
+    )
+    foo.ensure(snap.SnapState.Latest, revision='2', classic=classic)
+    mock_subprocess.assert_called_with(
+        [
+            'snap',
+            'refresh',
+            'foo',
+            '--revision="2"',
+        ]
+        + expected_flag
+        + ['--cohort="A"'],
+        text=True,
+    )
 
 
 class TestSocketClient(unittest.TestCase):
