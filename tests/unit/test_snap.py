@@ -387,6 +387,31 @@ class TestSnapCache(unittest.TestCase):
         )
         self.assertEqual(foo._cohort, "")
 
+    @patch('charms.operator_libs_linux.v2.snap.subprocess.check_output')
+    def test_refresh_classic(self, mock_subprocess: MagicMock):
+        """Test that ensure and _refresh succeed and call the correct snap commands."""
+        foo = snap.Snap(
+            name='foo',
+            state=snap.SnapState.Present,
+            channel='stable',
+            revision='1',
+            confinement='classic',
+            apps=None,
+            cohort='A',
+        )
+        foo.ensure(snap.SnapState.Latest, revision='2', classic=True)
+        mock_subprocess.assert_called_with(
+            [
+                'snap',
+                'refresh',
+                'foo',
+                '--revision="2"',
+                '--classic',
+                '--cohort="A"',
+            ],
+            text=True,
+        )
+
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
     def test_no_subprocess_when_not_installed(self, mock_subprocess: MagicMock):
         """Don't call out to snap when ensuring an uninstalled state when not installed."""
@@ -884,7 +909,7 @@ class TestSnapBareMethods(unittest.TestCase):
         self.assertTrue(foo.present)
         snap.add("curl", state="latest")  # cover string conversion path
         mock_subprocess.assert_called_with(
-            ["snap", "refresh", "curl", '--channel="latest"'],
+            ["snap", "refresh", "curl", '--channel="latest"', '--classic'],
             text=True,
         )
         with self.assertRaises(TypeError):  # cover error path
@@ -925,6 +950,7 @@ class TestSnapBareMethods(unittest.TestCase):
                 "refresh",
                 "curl",
                 '--channel="latest/beta"',
+                '--classic',
                 '--cohort="+"',
             ],
             text=True,

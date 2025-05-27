@@ -577,6 +577,9 @@ class Snap:
         if revision:
             args.append(f'--revision="{revision}"')
 
+        if self.confinement == 'classic':
+            args.append('--classic')
+
         if devmode:
             args.append("--devmode")
 
