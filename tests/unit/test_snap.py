@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime
 import io
 import json
+import subprocess
 import time
 import typing
 import unittest
@@ -329,7 +330,9 @@ class TestSnapCache(unittest.TestCase):
         mock_subprocess.assert_not_called()
 
         foo.ensure(snap.SnapState.Absent)
-        mock_subprocess.assert_called_with(["snap", "remove", "foo"], text=True)
+        mock_subprocess.assert_called_with(
+            ["snap", "remove", "foo"], text=True, stderr=subprocess.PIPE
+        )
 
         foo.ensure(snap.SnapState.Latest, classic=True, channel="latest/edge")
 
@@ -342,15 +345,20 @@ class TestSnapCache(unittest.TestCase):
                 '--channel="latest/edge"',
             ],
             text=True,
+            stderr=subprocess.PIPE,
         )
         self.assertEqual(foo.latest, True)
 
         foo.state = snap.SnapState.Absent
-        mock_subprocess.assert_called_with(["snap", "remove", "foo"], text=True)
+        mock_subprocess.assert_called_with(
+            ["snap", "remove", "foo"], text=True, stderr=subprocess.PIPE
+        )
 
         foo.ensure(snap.SnapState.Latest, revision="123")
         mock_subprocess.assert_called_with(
-            ["snap", "install", "foo", "--classic", '--revision="123"'], text=True
+            ["snap", "install", "foo", "--classic", '--revision="123"'],
+            text=True,
+            stderr=subprocess.PIPE,
         )
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
@@ -376,6 +384,7 @@ class TestSnapCache(unittest.TestCase):
                 '--cohort="A"',
             ],
             text=True,
+            stderr=subprocess.PIPE,
         )
 
         foo._refresh(leave_cohort=True)
@@ -387,6 +396,7 @@ class TestSnapCache(unittest.TestCase):
                 "--leave-cohort",
             ],
             text=True,
+            stderr=subprocess.PIPE,
         )
         self.assertEqual(foo._cohort, "")
 
@@ -408,7 +418,9 @@ class TestSnapCache(unittest.TestCase):
         self.assertEqual(foo.present, True)
 
         foo.ensure(snap.SnapState.Absent)
-        mock_check_output.assert_called_with(["snap", "remove", "foo"], text=True)
+        mock_check_output.assert_called_with(
+            ["snap", "remove", "foo"], text=True, stderr=subprocess.PIPE
+        )
 
         foo.ensure(snap.SnapState.Latest, devmode=True, channel="latest/edge")
 
@@ -421,15 +433,20 @@ class TestSnapCache(unittest.TestCase):
                 '--channel="latest/edge"',
             ],
             text=True,
+            stderr=subprocess.PIPE,
         )
         self.assertEqual(foo.latest, True)
 
         foo.state = snap.SnapState.Absent
-        mock_check_output.assert_called_with(["snap", "remove", "foo"], text=True)
+        mock_check_output.assert_called_with(
+            ["snap", "remove", "foo"], text=True, stderr=subprocess.PIPE
+        )
 
         foo.ensure(snap.SnapState.Latest, revision=123)
         mock_check_output.assert_called_with(
-            ["snap", "install", "foo", "--devmode", '--revision="123"'], text=True
+            ["snap", "install", "foo", "--devmode", '--revision="123"'],
+            text=True,
+            stderr=subprocess.PIPE,
         )
 
         with self.assertRaises(ValueError):  # devmode and classic are mutually exclusive
@@ -545,12 +562,12 @@ class TestSnapCache(unittest.TestCase):
             foo.connect(plug="bad", slot="argument")
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_snap_hold_timedelta(self, mock_subprocess):
-        mock_subprocess.return_value = 0
+    def test_snap_hold_timedelta(self, mock_check_output: MagicMock):
+        mock_check_output.return_value = 0
         foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
 
         foo.hold(duration=datetime.timedelta(hours=72))
-        mock_subprocess.assert_called_with(
+        mock_check_output.assert_called_with(
             [
                 "snap",
                 "refresh",
@@ -558,10 +575,11 @@ class TestSnapCache(unittest.TestCase):
                 "--hold=259200s",
             ],
             text=True,
+            stderr=subprocess.PIPE,
         )
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_snap_hold_forever(self, mock_subprocess):
+    def test_snap_hold_forever(self, mock_subprocess: MagicMock):
         mock_subprocess.return_value = 0
         foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
 
@@ -574,10 +592,11 @@ class TestSnapCache(unittest.TestCase):
                 "--hold=forever",
             ],
             text=True,
+            stderr=subprocess.PIPE,
         )
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_snap_unhold(self, mock_subprocess):
+    def test_snap_unhold(self, mock_subprocess: MagicMock):
         mock_subprocess.return_value = 0
         foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
 
@@ -590,6 +609,7 @@ class TestSnapCache(unittest.TestCase):
                 "--unhold",
             ],
             text=True,
+            stderr=subprocess.PIPE,
         )
 
     @patch("charms.operator_libs_linux.v2.snap.SnapClient.get_installed_snap_apps")
@@ -658,6 +678,7 @@ def test_refresh_classic(
             '--cohort="A"',
         ],
         text=True,
+        stderr=subprocess.PIPE,
     )
 
 
@@ -920,34 +941,38 @@ class TestSnapBareMethods(unittest.TestCase):
         mock_subprocess.assert_called_with(
             ["snap", "install", "curl", "--classic", '--channel="latest"'],
             text=True,
+            stderr=subprocess.PIPE,
         )
         self.assertTrue(foo.present)
         snap.add("curl", state="latest")  # cover string conversion path
         mock_subprocess.assert_called_with(
             ["snap", "refresh", "curl", '--channel="latest"', '--classic'],
             text=True,
+            stderr=subprocess.PIPE,
         )
         with self.assertRaises(TypeError):  # cover error path
             snap.add(snap_names=[])
 
         bar = snap.remove("curl")
-        mock_subprocess.assert_called_with(["snap", "remove", "curl"], text=True)
+        mock_subprocess.assert_called_with(
+            ["snap", "remove", "curl"], text=True, stderr=subprocess.PIPE
+        )
         self.assertFalse(bar.present)
         with self.assertRaises(TypeError):  # cover error path
             snap.remove(snap_names=[])
 
         baz = snap.add("curl", classic=True, revision=123)
         mock_subprocess.assert_called_with(
-            ["snap", "install", "curl", "--classic", '--revision="123"'], text=True
+            ["snap", "install", "curl", "--classic", '--revision="123"'],
+            text=True,
+            stderr=subprocess.PIPE,
         )
         self.assertTrue(baz.present)
 
-    @patch("charms.operator_libs_linux.v2.snap.subprocess")
-    def test_cohort(self, mock_subprocess):
-        mock_subprocess.check_output = MagicMock()
-
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
+    def test_cohort(self, mock_check_output: MagicMock):
         snap.add("curl", channel="latest", cohort="+")
-        mock_subprocess.check_output.assert_called_with(
+        mock_check_output.assert_called_with(
             [
                 "snap",
                 "install",
@@ -956,10 +981,11 @@ class TestSnapBareMethods(unittest.TestCase):
                 '--cohort="+"',
             ],
             text=True,
+            stderr=subprocess.PIPE,
         )
 
         snap.ensure("curl", "latest", classic=True, channel="latest/beta", cohort="+")
-        mock_subprocess.check_output.assert_called_with(
+        mock_check_output.assert_called_with(
             [
                 "snap",
                 "refresh",
@@ -969,10 +995,11 @@ class TestSnapBareMethods(unittest.TestCase):
                 '--cohort="+"',
             ],
             text=True,
+            stderr=subprocess.PIPE,
         )
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_revision_doesnt_refresh(self, mock_check_output):
+    def test_revision_doesnt_refresh(self, mock_check_output: MagicMock):
         snap.add("curl", revision="233", cohort="+")
         mock_check_output.assert_called_with(
             [
@@ -983,6 +1010,7 @@ class TestSnapBareMethods(unittest.TestCase):
                 '--cohort="+"',
             ],
             text=True,
+            stderr=subprocess.PIPE,
         )
 
         mock_check_output.reset_mock()
@@ -991,23 +1019,27 @@ class TestSnapBareMethods(unittest.TestCase):
         mock_check_output.assert_not_called()
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_can_ensure_states(self, mock_subprocess):
+    def test_can_ensure_states(self, mock_subprocess: MagicMock):
         mock_subprocess.return_value = 0
         foo = snap.ensure("curl", "latest", classic=True, channel="latest/test")
         mock_subprocess.assert_called_with(
             ["snap", "install", "curl", "--classic", '--channel="latest/test"'],
             text=True,
+            stderr=subprocess.PIPE,
         )
         self.assertTrue(foo.present)
 
         bar = snap.ensure("curl", "absent")
-        mock_subprocess.assert_called_with(["snap", "remove", "curl"], text=True)
+        mock_subprocess.assert_called_with(
+            ["snap", "remove", "curl"], text=True, stderr=subprocess.PIPE
+        )
         self.assertFalse(bar.present)
 
         baz = snap.ensure("curl", "present", classic=True, revision=123)
         mock_subprocess.assert_called_with(
             ["snap", "install", "curl", "--classic", '--revision="123"'],
             text=True,
+            stderr=subprocess.PIPE,
         )
         self.assertTrue(baz.present)
 
@@ -1128,18 +1160,21 @@ class TestSnapBareMethods(unittest.TestCase):
     def test_snap_unset(self, mock_subprocess: MagicMock):
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
         key: str = "test_key"
-        self.assertEqual(foo.unset(key), "")  # pyright: ignore[reportUnknownMemberType]
+        self.assertEqual(foo.unset(key), "")
         mock_subprocess.assert_called_with(
             ["snap", "unset", "foo", key],
             text=True,
+            stderr=subprocess.PIPE,
         )
 
-    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_call")
-    def test_system_set(self, mock_subprocess):
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.run")
+    def test_system_set(self, mock_subprocess: MagicMock):
         snap._system_set("refresh.hold", "foobar")
         mock_subprocess.assert_called_with(
             ["snap", "set", "system", "refresh.hold=foobar"],
             text=True,
+            check=True,
+            capture_output=True,
         )
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_call")
@@ -1160,26 +1195,30 @@ class TestSnapBareMethods(unittest.TestCase):
         with self.assertRaises(TypeError):
             snap.hold_refresh(forever="foobar")
 
-    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_call")
-    def test_hold_refresh_reset(self, mock_subprocess):
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.run")
+    def test_hold_refresh_reset(self, mock_subprocess: MagicMock):
         snap.hold_refresh(days=0)
         mock_subprocess.assert_called_with(
             ["snap", "set", "system", "refresh.hold="],
             text=True,
+            check=True,
+            capture_output=True,
         )
 
-    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_call")
-    def test_hold_refresh_forever(self, mock_subprocess):
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.run")
+    def test_hold_refresh_forever(self, mock_subprocess: MagicMock):
         snap.hold_refresh(forever=True)
 
         mock_subprocess.assert_called_with(
             ["snap", "set", "system", "refresh.hold=forever"],
             text=True,
+            check=True,
+            capture_output=True,
         )
 
     @patch("charms.operator_libs_linux.v2.snap.datetime")
-    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_call")
-    def test_hold_refresh_valid_days(self, mock_subprocess, mock_datetime):
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.run")
+    def test_hold_refresh_valid_days(self, mock_subprocess: MagicMock, mock_datetime: MagicMock):
         # A little too closely-tied to the internals of hold_refresh(), but at least
         # the test runs whatever your local time zone is.
         mock_datetime.now.return_value.astimezone.return_value = datetime.datetime(
@@ -1191,6 +1230,8 @@ class TestSnapBareMethods(unittest.TestCase):
         mock_subprocess.assert_called_with(
             ["snap", "set", "system", "refresh.hold=1970-04-01T00:00:00+00:00"],
             text=True,
+            check=True,
+            capture_output=True,
         )
 
     def test_ansi_filter(self):
@@ -1201,16 +1242,17 @@ class TestSnapBareMethods(unittest.TestCase):
         assert snap.ansi_filter.sub("", "\x1b[0m\x1b[?25h\x1b[Kparca") == "parca"
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_install_local(self, mock_subprocess):
+    def test_install_local(self, mock_subprocess: MagicMock):
         mock_subprocess.return_value = "curl XXX installed"
         snap.install_local("./curl.snap")
         mock_subprocess.assert_called_with(
             ["snap", "install", "./curl.snap"],
             text=True,
+            stderr=subprocess.PIPE,
         )
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_install_local_args(self, mock_subprocess):
+    def test_install_local_args(self, mock_subprocess: MagicMock):
         mock_subprocess.return_value = "curl XXX installed"
         for kwargs, cmd_args in [
             ({"classic": True}, ["--classic"]),
@@ -1222,6 +1264,7 @@ class TestSnapBareMethods(unittest.TestCase):
             mock_subprocess.assert_called_with(
                 ["snap", "install", "./curl.snap"] + cmd_args,
                 text=True,
+                stderr=subprocess.PIPE,
             )
             mock_subprocess.reset_mock()
 
@@ -1251,37 +1294,42 @@ class TestSnapBareMethods(unittest.TestCase):
         assert "dummy-output" in ctx.exception.message
         assert "dummy-stderr" in ctx.exception.message
 
-    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_alias(self, mock_subprocess):
-        mock_subprocess.return_value = ""
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.run")
+    def test_alias(self, mock_run: MagicMock):
         foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
         foo.alias("bar", "baz")
-        mock_subprocess.assert_called_once_with(
+        mock_run.assert_called_once_with(
             ["snap", "alias", "foo.bar", "baz"],
             text=True,
+            check=True,
+            capture_output=True,
         )
-        mock_subprocess.reset_mock()
+        mock_run.reset_mock()
 
         foo.alias("bar")
-        mock_subprocess.assert_called_once_with(
+        mock_run.assert_called_once_with(
             ["snap", "alias", "foo.bar", "bar"],
             text=True,
+            check=True,
+            capture_output=True,
         )
-        mock_subprocess.reset_mock()
+        mock_run.reset_mock()
 
-    @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_alias_raises_snap_error(self, mock_subprocess: MagicMock):
-        mock_subprocess.side_effect = CalledProcessError(
+    @patch("charms.operator_libs_linux.v2.snap.subprocess.run")
+    def test_alias_raises_snap_error(self, mock_run: MagicMock):
+        mock_run.side_effect = CalledProcessError(
             returncode=1, cmd=["snap", "alias", "foo.bar", "baz"]
         )
         foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
         with self.assertRaises(snap.SnapError):
             foo.alias("bar", "baz")
-        mock_subprocess.assert_any_call(
+        mock_run.assert_any_call(
             ["snap", "alias", "foo.bar", "baz"],
             text=True,
+            check=True,
+            capture_output=True,
         )
-        mock_subprocess.reset_mock()
+        mock_run.reset_mock()
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
     def test_held(self, mock_subprocess: MagicMock):
