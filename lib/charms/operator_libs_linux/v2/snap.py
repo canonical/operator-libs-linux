@@ -353,7 +353,7 @@ class Snap:
         optargs = optargs or []
         args = ["snap", command, self._name, *optargs]
         try:
-            return subprocess.check_output(args, text=True)
+            return subprocess.check_output(args, text=True, stderr=subprocess.PIPE)
         except CalledProcessError as e:
             msg = f'Snap: {self._name!r} -- command {args!r} failed!'
             raise SnapError._from_called_process_error(msg=msg, error=e) from e
@@ -520,7 +520,7 @@ class Snap:
             alias = application
         args = ["snap", "alias", f"{self.name}.{application}", alias]
         try:
-            subprocess.check_output(args, text=True)
+            subprocess.run(args, text=True, check=True, capture_output=True)
         except CalledProcessError as e:
             msg = f'Snap: {self._name!r} -- command {args!r} failed!'
             raise SnapError._from_called_process_error(msg=msg, error=e) from e
@@ -1277,7 +1277,7 @@ def install_local(
     if dangerous:
         args.append("--dangerous")
     try:
-        result = subprocess.check_output(args, text=True).splitlines()[-1]
+        result = subprocess.check_output(args, text=True, stderr=subprocess.PIPE).splitlines()[-1]
         snap_name, _ = result.split(" ", 1)
         snap_name = ansi_filter.sub("", snap_name)
 
@@ -1306,7 +1306,7 @@ def _system_set(config_item: str, value: str) -> None:
     """
     args = ["snap", "set", "system", f"{config_item}={value}"]
     try:
-        subprocess.check_call(args, text=True)
+        subprocess.run(args, text=True, check=True, capture_output=True)
     except CalledProcessError as e:
         msg = f"Failed setting system config '{config_item}' to '{value}'"
         raise SnapError._from_called_process_error(msg=msg, error=e) from e
