@@ -1013,11 +1013,11 @@ class TestSnapBareMethods(unittest.TestCase):
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
     def test_raises_snap_error_on_failed_subprocess(self, mock_subprocess: MagicMock):
-        def raise_error(cmd, **kwargs):
+        def raise_error(cmd: list[str], **kwargs: Any):
             # If we can't find the snap, we should raise a CalledProcessError.
             #
             # We do it artificially so that this test works on systems w/out snapd installed.
-            raise CalledProcessError(None, cmd)
+            raise CalledProcessError(returncode=1, cmd=cmd)
 
         mock_subprocess.side_effect = raise_error
         with self.assertRaises(snap.SnapError) as ctx:
@@ -1243,11 +1243,13 @@ class TestSnapBareMethods(unittest.TestCase):
     def test_install_local_called_process_error(self, mock_subprocess: MagicMock):
         """install_local raises a SnapError if the subprocess raises a CalledProcessError."""
         mock_subprocess.side_effect = CalledProcessError(
-            returncode=1, cmd="cmd", output="dummy-output"
+            returncode=1, cmd="cmd", output="dummy-output", stderr='dummy-stderr'
         )
         with self.assertRaises(snap.SnapError) as ctx:
             snap.install_local("./curl.snap")
-        self.assertEqual(ctx.exception.message, "Could not install snap ./curl.snap: dummy-output")
+        assert "./curl.snap" in ctx.exception.message
+        assert "dummy-output" in ctx.exception.message
+        assert "dummy-stderr" in ctx.exception.message
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
     def test_alias(self, mock_subprocess):
@@ -1268,14 +1270,14 @@ class TestSnapBareMethods(unittest.TestCase):
         mock_subprocess.reset_mock()
 
     @patch("charms.operator_libs_linux.v2.snap.subprocess.check_output")
-    def test_alias_raises_snap_error(self, mock_subprocess):
+    def test_alias_raises_snap_error(self, mock_subprocess: MagicMock):
         mock_subprocess.side_effect = CalledProcessError(
             returncode=1, cmd=["snap", "alias", "foo.bar", "baz"]
         )
         foo = snap.Snap("foo", snap.SnapState.Latest, "stable", "1", "classic")
         with self.assertRaises(snap.SnapError):
             foo.alias("bar", "baz")
-        mock_subprocess.assert_called_once_with(
+        mock_subprocess.assert_any_call(
             ["snap", "alias", "foo.bar", "baz"],
             text=True,
         )
