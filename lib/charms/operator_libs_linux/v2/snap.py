@@ -275,7 +275,7 @@ class SnapError(Error):
             cmd = ['journalctl', '--unit', 'snapd', '--lines', '20']
             logs = subprocess.check_output(cmd, text=True)
         except Exception as e:
-            lines.append(f'unable to retrieve logs due to {e}')
+            lines.append(f'Error fetching logs: {e}')
         else:
             lines.append('latest logs:')
             lines.append(logs)
