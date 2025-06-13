@@ -167,12 +167,10 @@ def test_unset_key_raises_snap_error():
 
     # Verify that the correct exception gets raised in the case of an unset key.
     key = "keythatdoesntexist01"
-    try:
+    with pytest.raises(snap.SnapError) as ctx:
         lxd.get(key)
-    except snap.SnapError:
-        pass
-    else:
-        logger.error("Getting an unset key should result in a SnapError.")
+    assert key in ctx.value.message
+    assert "\nLatest logs:\n" in ctx.value.message  # journalctl log retrieval on SnapError
 
     # We can make the above work w/ arbitrary config.
     lxd.set({key: "true"})
