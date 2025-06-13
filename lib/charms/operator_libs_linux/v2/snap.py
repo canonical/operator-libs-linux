@@ -270,15 +270,18 @@ class SnapError(Error):
 
     @classmethod
     def _from_called_process_error(cls, msg: str, error: CalledProcessError) -> Self:
-        lines = [msg, f'stdout: {error.output!r}', f'stderr: {error.stderr!r}']
+        lines = [msg]
+        if error.stdout:
+            lines.extend(['Stdout:', error.stdout])
+        if error.stderr:
+            lines.extend(['Stderr:', error.stderr])
         try:
             cmd = ['journalctl', '--unit', 'snapd', '--lines', '20']
             logs = subprocess.check_output(cmd, text=True)
         except Exception as e:
-            lines.append(f'Error fetching logs: {e}')
+            lines.extend(['Error fetching logs:', str(e)])
         else:
-            lines.append('latest logs:')
-            lines.append(logs)
+            lines.extend(['Latest logs:', logs])
         return cls('\n'.join(lines))
 
 
