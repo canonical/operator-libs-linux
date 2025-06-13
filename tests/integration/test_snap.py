@@ -170,7 +170,7 @@ def test_unset_key_raises_snap_error():
     with pytest.raises(snap.SnapError) as ctx:
         lxd.get(key)
     assert key in ctx.value.message
-    assert "\nlatest logs:\n" in ctx.value.message  # journalctl log retrieval on SnapError
+    assert "\nLatest logs:\n" in ctx.value.message  # journalctl log retrieval on SnapError
 
     # We can make the above work w/ arbitrary config.
     lxd.set({key: "true"})
