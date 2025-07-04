@@ -254,7 +254,7 @@ class DebianPackage:
         try:
             env = os.environ.copy()
             env["DEBIAN_FRONTEND"] = "noninteractive"
-            with tracer.start_as_current_span("FIXME") as span:
+            with tracer.start_as_current_span(_cmd[0]) as span:
                 span.set_attribute("argv", _cmd)
                 subprocess.run(_cmd, capture_output=True, check=True, text=True, env=env)
         except CalledProcessError as e:
@@ -472,7 +472,7 @@ class DebianPackage:
                 If an architecture is not specified, this will be used for selection.
         """
         cmd = ["dpkg", "--print-architecture"]
-        with tracer.start_as_current_span("FIXME") as span:
+        with tracer.start_as_current_span(cmd[0]) as span:
             span.set_attribute("argv", cmd)
             system_arch = check_output(cmd, universal_newlines=True).strip()
         arch = arch if arch else system_arch
@@ -482,7 +482,7 @@ class DebianPackage:
 
         cmd = ["apt-cache", "show", package]
         try:
-            with tracer.start_as_current_span("FIXME") as span:
+            with tracer.start_as_current_span(cmd[0]) as span:
                 span.set_attribute("argv", cmd)
                 output = check_output(cmd, stderr=PIPE, universal_newlines=True)
         except CalledProcessError as e:
@@ -889,7 +889,7 @@ def update() -> None:
     """Update the apt cache via `apt-get update`."""
     cmd = ["apt-get", "update", "--error-on=any"]
     try:
-        with tracer.start_as_current_span("FIXME") as span:
+        with tracer.start_as_current_span(cmd[0]) as span:
             span.set_attribute("argv", cmd)
             subprocess.run(cmd, capture_output=True, check=True)
     except CalledProcessError as e:
@@ -1118,7 +1118,7 @@ class DebianRepository:
                 " Please raise an issue if you require this feature."
             )
         searcher = f"{self.repotype} {self.make_options_string()}{self.uri} {self.release}"
-        with tracer.start_as_current_span("FIXME") as span:
+        with tracer.start_as_current_span("disable source") as span:
             span.set_attribute("filename", self._filename)
             with fileinput.input(self._filename, inplace=True) as lines:
                 for line in lines:
@@ -1158,7 +1158,7 @@ class DebianRepository:
         """
         # Use the same gpg command for both Xenial and Bionic
         cmd = ["gpg", "--with-colons", "--with-fingerprint"]
-        with tracer.start_as_current_span("FIXME") as span:
+        with tracer.start_as_current_span(cmd[0]) as span:
             span.set_attribute("argv", cmd)
             ps = subprocess.run(cmd, capture_output=True, input=key_material)
             out, err = ps.stdout.decode(), ps.stderr.decode()
@@ -1206,7 +1206,7 @@ class DebianRepository:
             "https://keyserver.ubuntu.com" "/pks/lookup?op=get&options=mr&exact=on&search=0x{}"
         )
         curl_cmd = ["curl", keyserver_url.format(keyid)]
-        with tracer.start_as_current_span("FIXME") as span:
+        with tracer.start_as_current_span(curl_cmd[0]) as span:
             span.set_attribute("argv", curl_cmd)
             # use proxy server settings in order to retrieve the key
             return check_output(curl_cmd).decode()
@@ -1225,7 +1225,7 @@ class DebianRepository:
           GPGKeyError
         """
         cmd = ["gpg", "--dearmor"]
-        with tracer.start_as_current_span("FIXME") as span:
+        with tracer.start_as_current_span(cmd[0]) as span:
             span.set_attribute("argv", cmd)
             ps = subprocess.run(cmd, capture_output=True, input=key_asc)
             out, err = ps.stdout, ps.stderr.decode()
@@ -1309,7 +1309,7 @@ class RepositoryMapping(Mapping[str, DebianRepository]):
                 if not os.path.isfile(default_sources):
                     raise
 
-        with tracer.start_as_current_span("load FIXME"):
+        with tracer.start_as_current_span("load sources"):
             # read sources.list.d
             for file in glob.iglob(os.path.join(sources_dir, "*.list")):
                 self.load(file)
@@ -1554,7 +1554,7 @@ def _add_repository(
         cmd.append("--no-update")
     logger.info("%s", cmd)
     try:
-        with tracer.start_as_current_span("FIXME") as span:
+        with tracer.start_as_current_span(cmd[0]) as span:
             span.set_attribute("argv", cmd)
             subprocess.run(cmd, check=True, capture_output=True)
     except CalledProcessError as e:
