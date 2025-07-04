@@ -66,8 +66,8 @@ except PackageError as e:
 and their properties (available groups, baseuri. gpg key). This class can add, disable, or
 manipulate repositories. Items can be retrieved as `DebianRepository` objects.
 
-In order add a new repository with explicit details for fields, a new `DebianRepository` can
-be added to `RepositoryMapping`
+In order to add a new repository with explicit details for fields, a new `DebianRepository`
+can be added to `RepositoryMapping`
 
 `RepositoryMapping` provides an abstraction around the existing repositories on the system,
 and can be accessed and iterated over like any `Mapping` object, to retrieve values by key,
@@ -98,6 +98,10 @@ if "deb-us.archive.ubuntu.com-xenial" not in repositories:
     repo = DebianRepository.from_repo_line(line)
     repositories.add(repo)
 ```
+
+Dependencies:
+Note that this module requires `opentelemetry-api`, which your charm already has if
+the `ops` dependency is up to date.
 """
 
 from __future__ import annotations
