@@ -100,8 +100,8 @@ if "deb-us.archive.ubuntu.com-xenial" not in repositories:
 ```
 
 Dependencies:
-Note that this module requires `opentelemetry-api`, which your charm already has if
-the `ops` dependency is up to date.
+Note that this module requires `opentelemetry-api`, which is already included into
+your charm's virtual environment via `ops >= 2.21`.
 """
 
 from __future__ import annotations
