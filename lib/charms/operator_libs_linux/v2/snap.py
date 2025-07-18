@@ -932,16 +932,7 @@ class SnapClient:
         request = urllib.request.Request(url, method=method, data=data, headers=headers)  # noqa: S310
 
         try:
-            with tracer.start_as_current_span(method) as span:
-                span.set_attributes({"url.full": url, "http.request.method": method})
-                try:
-                    response: http.client.HTTPResponse = self.opener.open(
-                        request, timeout=self.timeout
-                    )
-                    span.set_attribute("http.response.status_code", response.status)
-                except urllib.error.HTTPError as e:
-                    span.set_attribute("http.response.status_code", e.code)
-                    raise
+            response = self.opener.open(request, timeout=self.timeout)
         except urllib.error.HTTPError as e:
             code = e.code
             status = e.reason
@@ -960,15 +951,20 @@ class SnapClient:
 
     def get_installed_snaps(self) -> list[dict[str, JSONType]]:
         """Get information about currently installed snaps."""
-        return self._request("GET", "snaps")  # type: ignore
+        with tracer.start_as_current_span("get_installed_snaps"):
+            return self._request("GET", "snaps")  # type: ignore
 
     def get_snap_information(self, name: str) -> dict[str, JSONType]:
         """Query the snap server for information about single snap."""
-        return self._request("GET", "find", {"name": name})[0]  # type: ignore
+        with tracer.start_as_current_span("get_snap_information") as span:
+            span.set_attribute("name", name)
+            return self._request("GET", "find", {"name": name})[0]  # type: ignore
 
     def get_installed_snap_apps(self, name: str) -> list[dict[str, JSONType]]:
         """Query the snap server for apps belonging to a named, currently installed snap."""
-        return self._request("GET", "apps", {"names": name, "select": "service"})  # type: ignore
+        with tracer.start_as_current_span("get_installed_snap_apps") as span:
+            span.set_attribute("name", name)
+            return self._request("GET", "apps", {"names": name, "select": "service"})  # type: ignore
 
     def _put_snap_conf(self, name: str, conf: dict[str, JSONAble]) -> None:
         """Set the configuration details for an installed snap."""
