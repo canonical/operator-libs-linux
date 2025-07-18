@@ -54,6 +54,10 @@ try:
 except snap.SnapError as e:
     logger.error("An exception occurred when installing snaps. Reason: %s" % e.message)
 ```
+
+Dependencies:
+Note that this module requires `opentelemetry-api`, which is already included into
+your charm's virtual environment via `ops >= 2.21`.
 """
 
 from __future__ import annotations
@@ -85,6 +89,8 @@ from typing import (
     TypeVar,
 )
 
+import opentelemetry.trace
+
 if typing.TYPE_CHECKING:
     # avoid typing_extensions import at runtime
     from typing_extensions import NotRequired, ParamSpec, Required, Self, TypeAlias, Unpack
@@ -93,6 +99,7 @@ if typing.TYPE_CHECKING:
     _T = TypeVar("_T")
 
 logger = logging.getLogger(__name__)
+tracer = opentelemetry.trace.get_tracer(__name__)
 
 # The unique Charmhub library identifier, never change it
 LIBID = "05394e5893f94f2d90feb7cbe6b633cd"
@@ -102,7 +109,9 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 12
+LIBPATCH = 13
+
+PYDEPS = ["opentelemetry-api"]
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -277,7 +286,9 @@ class SnapError(Error):
             lines.extend(['Stderr:', error.stderr])
         try:
             cmd = ['journalctl', '--unit', 'snapd', '--lines', '20']
-            logs = subprocess.check_output(cmd, text=True)
+            with tracer.start_as_current_span(cmd[0]) as span:
+                span.set_attribute("argv", cmd)
+                logs = subprocess.check_output(cmd, text=True)
         except Exception as e:
             lines.extend(['Error fetching logs:', str(e)])
         else:
@@ -356,7 +367,9 @@ class Snap:
         optargs = optargs or []
         args = ["snap", command, self._name, *optargs]
         try:
-            return subprocess.check_output(args, text=True, stderr=subprocess.PIPE)
+            with tracer.start_as_current_span(args[0]) as span:
+                span.set_attribute("argv", args)
+                return subprocess.check_output(args, text=True, stderr=subprocess.PIPE)
         except CalledProcessError as e:
             msg = f'Snap: {self._name!r} -- command {args!r} failed!'
             raise SnapError._from_called_process_error(msg=msg, error=e) from e
@@ -384,7 +397,9 @@ class Snap:
         args = ["snap", *command, *services]
 
         try:
-            return subprocess.run(args, text=True, check=True, capture_output=True)
+            with tracer.start_as_current_span(args[0]) as span:
+                span.set_attribute("argv", args)
+                return subprocess.run(args, text=True, check=True, capture_output=True)
         except CalledProcessError as e:
             msg = f'Snap: {self._name!r} -- command {args!r} failed!'
             raise SnapError._from_called_process_error(msg=msg, error=e) from e
@@ -491,7 +506,9 @@ class Snap:
 
         args = ["snap", *command]
         try:
-            subprocess.run(args, text=True, check=True, capture_output=True)
+            with tracer.start_as_current_span(args[0]) as span:
+                span.set_attribute("argv", args)
+                subprocess.run(args, text=True, check=True, capture_output=True)
         except CalledProcessError as e:
             msg = f'Snap: {self._name!r} -- command {args!r} failed!'
             raise SnapError._from_called_process_error(msg=msg, error=e) from e
@@ -523,7 +540,9 @@ class Snap:
             alias = application
         args = ["snap", "alias", f"{self.name}.{application}", alias]
         try:
-            subprocess.run(args, text=True, check=True, capture_output=True)
+            with tracer.start_as_current_span(args[0]) as span:
+                span.set_attribute("argv", args)
+                subprocess.run(args, text=True, check=True, capture_output=True)
         except CalledProcessError as e:
             msg = f'Snap: {self._name!r} -- command {args!r} failed!'
             raise SnapError._from_called_process_error(msg=msg, error=e) from e
@@ -913,7 +932,16 @@ class SnapClient:
         request = urllib.request.Request(url, method=method, data=data, headers=headers)  # noqa: S310
 
         try:
-            response = self.opener.open(request, timeout=self.timeout)
+            with tracer.start_as_current_span(method) as span:
+                span.set_attributes({"url.full": url, "http.request.method": method})
+                try:
+                    response: http.client.HTTPResponse = self.opener.open(
+                        request, timeout=self.timeout
+                    )
+                    span.set_attribute("http.response.status_code", response.status)
+                except urllib.error.HTTPError as e:
+                    span.set_attribute("http.response.status_code", e.code)
+                    raise
         except urllib.error.HTTPError as e:
             code = e.code
             status = e.reason
@@ -1280,7 +1308,13 @@ def install_local(
     if dangerous:
         args.append("--dangerous")
     try:
-        result = subprocess.check_output(args, text=True, stderr=subprocess.PIPE).splitlines()[-1]
+        with tracer.start_as_current_span(args[0]) as span:
+            span.set_attribute("argv", args)
+            result = subprocess.check_output(
+                args,
+                text=True,
+                stderr=subprocess.PIPE,
+            ).splitlines()[-1]
         snap_name, _ = result.split(" ", 1)
         snap_name = ansi_filter.sub("", snap_name)
 
@@ -1309,7 +1343,9 @@ def _system_set(config_item: str, value: str) -> None:
     """
     args = ["snap", "set", "system", f"{config_item}={value}"]
     try:
-        subprocess.run(args, text=True, check=True, capture_output=True)
+        with tracer.start_as_current_span(args[0]) as span:
+            span.set_attribute("argv", args)
+            subprocess.run(args, text=True, check=True, capture_output=True)
     except CalledProcessError as e:
         msg = f"Failed setting system config '{config_item}' to '{value}'"
         raise SnapError._from_called_process_error(msg=msg, error=e) from e
