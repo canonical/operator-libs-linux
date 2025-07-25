@@ -22,7 +22,7 @@ from charms.operator_libs_linux.v2 import snap
 
 patch("charms.operator_libs_linux.v2.snap._cache_init", lambda x: x).start()
 
-snap_information_result = r"""
+snap_information_response = r"""
 {
   "type": "sync",
   "status-code": 200,
@@ -103,7 +103,7 @@ snap_information_result = r"""
 }
 """
 
-installed_result = r"""
+installed_snaps_response = r"""
 {
   "type": "sync",
   "status-code": 200,
@@ -195,7 +195,7 @@ installed_result = r"""
 }
 """
 
-snap_apps_result = {
+installed_snap_apps_response = {
     "type": "sync",
     "result": [
         {
@@ -279,7 +279,7 @@ class TestSnapCache(unittest.TestCase):
         m.return_value.__next__ = lambda self: next(iter(self.readline, ""))
         mock_exists.return_value = True
         s = SnapCacheTester()
-        s._snap_client.get_snap_information.return_value = json.loads(snap_information_result)[
+        s._snap_client.get_snap_information.return_value = json.loads(snap_information_response)[
             "result"
         ][0]
         s._load_available_snaps()
@@ -296,7 +296,9 @@ class TestSnapCache(unittest.TestCase):
     def test_can_load_installed_snap_info(self, mock_exists):
         mock_exists.return_value = True
         s = SnapCacheTester()
-        s._snap_client.get_installed_snaps.return_value = json.loads(installed_result)["result"]
+        s._snap_client.get_installed_snaps.return_value = json.loads(installed_snaps_response)[
+            "result"
+        ]
 
         s._load_installed_snaps()
 
@@ -628,20 +630,24 @@ class TestSnapCache(unittest.TestCase):
     @patch("charms.operator_libs_linux.v2.snap.SnapClient.get_installed_snap_apps")
     def test_apps_property(self, patched):
         s = SnapCacheTester()
-        s._snap_client.get_installed_snaps.return_value = json.loads(installed_result)["result"]
+        s._snap_client.get_installed_snaps.return_value = json.loads(installed_snaps_response)[
+            "result"
+        ]
         s._load_installed_snaps()
 
-        patched.return_value = json.loads(installed_result)["result"][0]["apps"]
+        patched.return_value = json.loads(installed_snaps_response)["result"][0]["apps"]
         self.assertEqual(len(s["charmcraft"].apps), 2)
         self.assertIn({"snap": "charmcraft", "name": "charmcraft"}, s["charmcraft"].apps)
 
     @patch("charms.operator_libs_linux.v2.snap.SnapClient.get_installed_snap_apps")
     def test_services_property(self, patched):
         s = SnapCacheTester()
-        s._snap_client.get_installed_snaps.return_value = json.loads(installed_result)["result"]
+        s._snap_client.get_installed_snaps.return_value = json.loads(installed_snaps_response)[
+            "result"
+        ]
         s._load_installed_snaps()
 
-        patched.return_value = json.loads(installed_result)["result"][0]["apps"]
+        patched.return_value = json.loads(installed_snaps_response)["result"][0]["apps"]
         self.assertEqual(len(s["charmcraft"].services), 1)
         self.assertDictEqual(
             s["charmcraft"].services,
@@ -939,10 +945,10 @@ class TestSnapBareMethods(unittest.TestCase):
         mock_exists.return_value = True
         snap._Cache.cache = SnapCacheTester()
         snap._Cache.cache._snap_client.get_installed_snaps.return_value = json.loads(
-            installed_result
+            installed_snaps_response
         )["result"]
         snap._Cache.cache._snap_client.get_snap_information.return_value = json.loads(
-            snap_information_result
+            snap_information_response
         )["result"][0]
         snap._Cache.cache._load_installed_snaps()
         snap._Cache.cache._load_available_snaps()
@@ -1366,15 +1372,15 @@ def snap_client():
 
 
 def test_get_installed_snaps(snap_client: snap.SnapClient, fake_request: MagicMock):
-    fake_request.return_value = json.loads(installed_result)["result"]
+    fake_request.return_value = json.loads(installed_snaps_response)["result"]
     snap_client.get_installed_snaps()
 
 
 def test_get_installed_snap_apps(snap_client: snap.SnapClient, fake_request: MagicMock):
-    fake_request.return_value = snap_apps_result["result"]
+    fake_request.return_value = installed_snap_apps_response["result"]
     snap_client.get_installed_snap_apps("some-snap")
 
 
 def test_get_snap_information(snap_client: snap.SnapClient, fake_request: MagicMock):
-    fake_request.return_value = json.loads(snap_information_result)["result"]
+    fake_request.return_value = json.loads(snap_information_response)["result"]
     snap_client.get_snap_information("some-snap")
