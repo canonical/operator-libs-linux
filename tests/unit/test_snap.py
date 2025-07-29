@@ -14,7 +14,7 @@ import typing
 import unittest
 from subprocess import CalledProcessError
 from typing import Any, Iterable
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import ANY, MagicMock, mock_open, patch
 
 import fake_snapd as fake_snapd
 import pytest
@@ -1373,14 +1373,26 @@ def snap_client():
 
 def test_get_installed_snaps(snap_client: snap.SnapClient, fake_request: MagicMock):
     fake_request.return_value = json.loads(installed_snaps_response)["result"]
-    snap_client.get_installed_snaps()
+    rv = snap_client.get_installed_snaps()
+    charmcraft = next(snap for snap in rv if snap["name"] == "charmcraft")
+    assert charmcraft["version"] == "1.2.1"
 
 
 def test_get_installed_snap_apps(snap_client: snap.SnapClient, fake_request: MagicMock):
     fake_request.return_value = installed_snap_apps_response["result"]
-    snap_client.get_installed_snap_apps("some-snap")
+    rv = snap_client.get_installed_snap_apps("juju")
+    assert rv == [
+        {
+            "name": "fetch-oci",
+            "snap": "juju",
+            "daemon": "oneshot",
+            "daemon-scope": ANY,
+            "enabled": ANY,
+        }
+    ]
 
 
 def test_get_snap_information(snap_client: snap.SnapClient, fake_request: MagicMock):
     fake_request.return_value = json.loads(snap_information_response)["result"]
-    snap_client.get_snap_information("some-snap")
+    rv = snap_client.get_snap_information("curl")
+    assert rv["version"] == "7.78.0"
