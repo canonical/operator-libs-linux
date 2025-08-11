@@ -109,7 +109,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 13
+LIBPATCH = 14
 
 PYDEPS = ["opentelemetry-api"]
 
@@ -149,6 +149,7 @@ class _SnapDict(TypedDict, total=True):
     name: str
     channel: str
     revision: str
+    version: str
     confinement: str
     apps: NotRequired[list[dict[str, JSONType]] | None]
 
@@ -308,6 +309,7 @@ class Snap:
       - state: a `SnapState` representation of its install status
       - channel: "stable", "candidate", "beta", and "edge" are common
       - revision: a string representing the snap's revision
+      - version: a string representing the snap's version
       - confinement: "classic", "strict", or "devmode"
     """
 
@@ -317,6 +319,7 @@ class Snap:
         state: SnapState,
         channel: str,
         revision: str,
+        version: str,
         confinement: str,
         apps: list[dict[str, JSONType]] | None = None,
         cohort: str | None = None,
@@ -325,6 +328,7 @@ class Snap:
         self._state = state
         self._channel = channel
         self._revision = revision
+        self._version = version
         self._confinement = confinement
         self._cohort = cohort or ""
         self._apps = apps or []
@@ -750,6 +754,11 @@ class Snap:
         return self._revision
 
     @property
+    def version(self) -> str:
+        """Returns the version for a snap."""
+        return self._version
+
+    @property
     def channel(self) -> str:
         """Returns the channel for a snap."""
         return self._channel
@@ -1046,6 +1055,7 @@ class SnapCache(Mapping[str, Snap]):
                 state=SnapState.Latest,
                 channel=i["channel"],
                 revision=i["revision"],
+                version=i["version"],
                 confinement=i["confinement"],
                 apps=i.get("apps"),
             )
@@ -1065,6 +1075,7 @@ class SnapCache(Mapping[str, Snap]):
             state=SnapState.Available,
             channel=info["channel"],
             revision=info["revision"],
+            version=info["version"],
             confinement=info["confinement"],
             apps=None,
         )
