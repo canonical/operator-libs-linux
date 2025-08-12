@@ -291,6 +291,7 @@ class TestSnapCache(unittest.TestCase):
         self.assertEqual(result.channel, "stable")
         self.assertEqual(result.confinement, "strict")
         self.assertEqual(result.revision, "233")
+        self.assertEqual(result.version, "7.78.0")
 
     @patch("os.path.isfile")
     def test_can_load_installed_snap_info(self, mock_exists):
@@ -326,9 +327,14 @@ class TestSnapCache(unittest.TestCase):
         self.assertIn("snapd is not running", ctx.exception.message)
 
     def test_can_compare_snap_equality(self):
-        foo1 = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
+        foo1 = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic", version="v42")
         foo2 = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
         self.assertEqual(foo1, foo2)
+
+    def test_can_compare_snap_inequality(self):
+        foo1 = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic", version="v42")
+        foo2 = snap.Snap("foo", snap.SnapState.Present, "stable", "2", "classic", version="v42")
+        self.assertNotEqual(foo1, foo2)
 
     def test_snap_magic_methods(self):
         foo = snap.Snap("foo", snap.SnapState.Present, "stable", "1", "classic")
