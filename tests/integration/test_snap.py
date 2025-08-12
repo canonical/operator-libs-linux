@@ -204,12 +204,14 @@ def test_snap_ensure_revision():
         ["snap", "info", "juju"], capture_output=True, encoding="utf-8"
     ).stdout.split("\n")
 
+    edge_version = None
     edge_revision = None
     for line in snap_info_juju:
-        match = re.search(r"3/stable.*\((\d+)\)", line)
+        match = re.search(r"3/stable:\s+([^\s]+).+\((\d+)\)", line)
 
         if match:
-            edge_revision = match.group(1)
+            edge_version = match.group(1)
+            edge_revision = match.group(2)
             break
     assert edge_revision is not None
 
@@ -226,10 +228,13 @@ def test_snap_ensure_revision():
     assert "installed" in snap_info_juju
     for line in snap_info_juju.split("\n"):
         if "installed" in line:
-            match = re.search(r"installed.*\((\d+)\)", line)
+            match = re.search(r"installed:\s+([^\s]+).+\((\d+)\)", line)
 
             assert match is not None
-            assert match.group(1) == edge_revision
+            assert match.group(1) == edge_version
+            assert match.group(2) == edge_revision
+
+    assert juju.version == edge_version
 
 
 def test_snap_start():

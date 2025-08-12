@@ -309,8 +309,8 @@ class Snap:
       - state: a `SnapState` representation of its install status
       - channel: "stable", "candidate", "beta", and "edge" are common
       - revision: a string representing the snap's revision
-      - version: a string representing the snap's version
       - confinement: "classic", "strict", or "devmode"
+      - version: a string representing the snap's version, if set by the snap author
     """
 
     def __init__(
@@ -319,19 +319,20 @@ class Snap:
         state: SnapState,
         channel: str,
         revision: str,
-        version: str,
         confinement: str,
         apps: list[dict[str, JSONType]] | None = None,
         cohort: str | None = None,
+        *,
+        version: str | None = None,
     ) -> None:
         self._name = name
         self._state = state
         self._channel = channel
         self._revision = revision
-        self._version = version
         self._confinement = confinement
         self._cohort = cohort or ""
         self._apps = apps or []
+        self._version = version
         self._snap_client = SnapClient()
 
     def __eq__(self, other: object) -> bool:
@@ -754,11 +755,6 @@ class Snap:
         return self._revision
 
     @property
-    def version(self) -> str:
-        """Returns the version for a snap."""
-        return self._version
-
-    @property
     def channel(self) -> str:
         """Returns the channel for a snap."""
         return self._channel
@@ -791,6 +787,11 @@ class Snap:
         """Report whether the snap has a hold."""
         info = self._snap("info")
         return "hold:" in info
+
+    @property
+    def version(self) -> str | None:
+        """Returns the version for a snap."""
+        return self._version
 
 
 class _UnixSocketConnection(http.client.HTTPConnection):
@@ -1055,9 +1056,9 @@ class SnapCache(Mapping[str, Snap]):
                 state=SnapState.Latest,
                 channel=i["channel"],
                 revision=i["revision"],
-                version=i["version"],
                 confinement=i["confinement"],
                 apps=i.get("apps"),
+                version=i.get("version"),
             )
             self._snap_map[snap.name] = snap
 
@@ -1075,9 +1076,9 @@ class SnapCache(Mapping[str, Snap]):
             state=SnapState.Available,
             channel=info["channel"],
             revision=info["revision"],
-            version=info["version"],
             confinement=info["confinement"],
             apps=None,
+            version=info.get("version"),
         )
 
 
