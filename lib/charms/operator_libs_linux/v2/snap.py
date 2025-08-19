@@ -480,7 +480,7 @@ class Snap:
         args = ["stop", "--disable"] if disable else ["stop"]
         self._snap_daemons(args, services)
 
-    def logs(self, services: list[str] | None = None, num_lines: int = 10) -> str:
+    def logs(self, services: list[str] | None = None, num_lines: int | Literal["all"] = 10) -> str:
         """Fetch a snap services' logs.
 
         Args:
