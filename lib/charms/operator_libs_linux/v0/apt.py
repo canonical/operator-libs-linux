@@ -35,11 +35,13 @@ try:
     apt.update()
     apt.add_package("zsh")
     apt.add_package(["vim", "htop", "wget"])
-except PackageNotFoundError:
-    logger.error("a specified package not found in package cache or on system")
 except PackageError as e:
     logger.error("could not install package. Reason: %s", e.message)
 ````
+
+The convenience methods don't raise `PackageNotFoundError`. If any packages aren't found in
+the cache, `apt.add_package` raises `PackageError` with a message 'Failed to install
+packages: foo, bar'.
 
 To find details of a specific package:
 
@@ -131,7 +133,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 18
+LIBPATCH = 19
 
 PYDEPS = ["opentelemetry-api"]
 
@@ -160,11 +162,15 @@ class Error(Exception):
 
 
 class PackageError(Error):
-    """Raised when there's an error installing or removing a package."""
+    """Raised when there's an error installing or removing a package.
+
+    Additionally, `apt.add_package` raises `PackageError` if any packages aren't found in
+    the cache.
+    """
 
 
 class PackageNotFoundError(Error):
-    """Raised when a requested package is not known to the system."""
+    """Raised by `DebianPackage` methods if a requested package is not found."""
 
 
 class PackageState(Enum):
@@ -779,8 +785,8 @@ def add_package(
 
     Raises:
         TypeError if no package name is given, or explicit version is set for multiple packages
-        PackageNotFoundError if the package is not in the cache.
-        PackageError if packages fail to install
+        PackageError: if packages fail to install, including if any packages aren't found in the
+            cache
     """
     cache_refreshed = False
     if update_cache:
