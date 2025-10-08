@@ -12,7 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Abstractions for the system's Debian/Ubuntu package information and repositories.
+"""Legacy Charmhub-hosted snap library, deprecated in favour of ``charmlibs.apt``.
+
+WARNING: This library is deprecated and will no longer receive feature updates or bugfixes.
+``charmlibs.apt`` version 1.0 is a bug-for-bug compatible migration of this library.
+Add 'charmlibs-apt~=1.0' to your charm's dependencies, and remove this Charmhub-hosted library.
+Then replace `from charms.operator_libs_linux.v0 import apt` with `from charmlibs import apt`.
+Read more:
+- https://documentation.ubuntu.com/charmlibs
+- https://pypi.org/project/charmlibs-apt
+
+---
+
+Abstractions for the system's Debian/Ubuntu package information and repositories.
 
 This module contains abstractions and wrappers around Debian/Ubuntu-style repositories and
 packages, in order to easily provide an idiomatic and Pythonic mechanism for adding packages and/or
@@ -133,7 +145,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 19
+LIBPATCH = 20
 
 PYDEPS = ["opentelemetry-api"]
 
