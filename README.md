@@ -3,6 +3,14 @@
 ![Release Libraries](https://github.com/canonical/operator-libs-linux/actions/workflows/release-libs.yaml/badge.svg)
 ![Release to Charmhub](https://github.com/canonical/operator-libs-linux/actions/workflows/release.yaml/badge.svg)
 
+> [!WARNING]
+> This libraries provided by this charm are deprecated and will no longer receive feature updates or bugfixes. Some of the libraries have been migrated to packages in the `charmlibs` monorepo:
+> - [apt](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/apt/)
+> - [passwd](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/passwd/)
+> - [snap](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/snap/)
+> - [sysctl](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/sysctl/)
+> - [systemd](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/systemd/)
+
 ## Description
 
 The `operator-libs-linux` charm provides a set of [charm libraries] which can be used for managing and manipulating Debian packages, [snap packages], system repositories, users and groups, and other operations
