@@ -4,7 +4,10 @@
 ![Release to Charmhub](https://github.com/canonical/operator-libs-linux/actions/workflows/release.yaml/badge.svg)
 
 > [!WARNING]
-> This libraries provided by this charm are deprecated and will no longer receive feature updates or bugfixes. Some of the libraries have been migrated to packages in the `charmlibs` monorepo:
+> The libraries provided by this charm are deprecated and will no longer receive feature updates or bugfixes.
+>
+> Some of the libraries have been migrated to packages in the `charmlibs` monorepo:
+>
 > - [apt](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/apt/)
 > - [passwd](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/passwd/)
 > - [snap](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/snap/)
