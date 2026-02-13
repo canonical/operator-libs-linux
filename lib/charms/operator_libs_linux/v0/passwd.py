@@ -12,7 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Simple library for managing Linux users and groups.
+"""Legacy Charmhub-hosted passwd library, deprecated in favour of ``charmlibs.passwd``.
+
+WARNING: This library is deprecated and will no longer receive feature updates or bugfixes.
+``charmlibs.passwd`` version 1.0 is a bug-for-bug compatible migration of this library.
+Add 'charmlibs-passwd~=1.0' to your charm's dependencies, and remove this Charmhub-hosted library.
+Then replace `from charms.operator_libs_linux.v0 import passwd` with
+`from charmlibs import passwd`.
+Read more:
+- https://documentation.ubuntu.com/charmlibs
+- https://pypi.org/project/charmlibs-passwd
+
+---
+
+Simple library for managing Linux users and groups.
 
 The `passwd` module provides convenience methods and abstractions around users and groups on a
 Linux system, in order to make adding and managing users and groups easy.
@@ -45,7 +58,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 5
 
 
 def user_exists(user: Union[str, int]) -> Optional[pwd.struct_passwd]:

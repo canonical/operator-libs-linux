@@ -12,7 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Handler for the sysctl config.
+"""Legacy Charmhub-hosted sysctl library, deprecated in favour of ``charmlibs.sysctl``.
+
+WARNING: This library is deprecated and will no longer receive feature updates or bugfixes.
+``charmlibs.sysctl`` version 1.0 is a bug-for-bug compatible migration of this library.
+Add 'charmlibs-sysctl~=1.0' to your charm's dependencies, and remove this Charmhub-hosted library.
+Then replace `from charms.operator_libs_linux.v0 import sysctl` with
+`from charmlibs import sysctl`.
+Read more:
+- https://documentation.ubuntu.com/charmlibs
+- https://pypi.org/project/charmlibs-sysctl
+
+---
+
+Handler for the sysctl config.
 
 This library allows your charm to create and configure sysctl options to the machine.
 
@@ -84,7 +97,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 5
 
 CHARM_FILENAME_PREFIX = "90-juju-"
 SYSCTL_DIRECTORY = Path("/etc/sysctl.d")
