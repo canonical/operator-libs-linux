@@ -1288,10 +1288,10 @@ def _wrap_snap_operations(
             snaps.append(snap)
         except SnapError as e:  # noqa: PERF203
             logger.warning("Failed to %s snap %s: %s!", op, s, e.message)
-            errors.append(s)
+            errors.append(e.message)
         except SnapNotFoundError:
             logger.warning("Snap '%s' not found in cache!", s)
-            errors.append(s)
+            errors.append(f"Snap '{s}' not found in cache!")
 
     if errors:
         raise SnapError(f"Failed to install or refresh snap(s): {', '.join(errors)}")
