@@ -13,6 +13,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   test:
     uses: ./.github/workflows/build-and-test.yaml
@@ -26,14 +29,15 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Select charmhub channel
-        uses: canonical/charming-actions/channel@2.2.3
+        uses: canonical/charming-actions/channel@f87f8885aeb69e668b50c6c6095af5eadac457d2 # 2.2.3
         id: channel
       - name: Upload charm to charmhub
-        uses: canonical/charming-actions/upload-charm@2.2.3
+        uses: canonical/charming-actions/upload-charm@f87f8885aeb69e668b50c6c6095af5eadac457d2 # 2.2.3
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
