@@ -95,5 +95,13 @@ jobs:
         run: sudo snap install --classic concierge
       - name: Prepare for deploying machine charms
         run: sudo concierge prepare -p machine
+      - name: Pack test charm
+        run: |
+          sudo snap install --classic charmcraft
+          charm_dir=tests/integration/juju_systemd_notices/notices-charm
+          cp lib/charms/operator_libs_linux/v1/systemd.py "$charm_dir/lib/charms/operator_libs_linux/v1/"
+          cp lib/charms/operator_libs_linux/v0/juju_systemd_notices.py "$charm_dir/lib/charms/operator_libs_linux/v0/"
+          charmcraft pack -p "$charm_dir" --verbose
+          echo "CHARM_PATH=$(ls $charm_dir/*.charm)" >> "$GITHUB_ENV"
       - name: Run integration tests (juju-systemd-notices)
         run: tox run -e integration-juju-systemd-notices
