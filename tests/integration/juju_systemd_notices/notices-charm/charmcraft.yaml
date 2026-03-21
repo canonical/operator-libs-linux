@@ -12,6 +12,10 @@ base: ubuntu@22.04
 platforms:
   amd64:
 
+parts:
+  charm:
+    plugin: charm
+
 actions:
   stop-service:
     description: Stop internal test service inside charm
