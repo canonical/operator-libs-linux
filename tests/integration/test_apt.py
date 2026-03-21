@@ -11,7 +11,6 @@ from typing import List
 from urllib.request import urlopen
 
 import pytest
-
 from charms.operator_libs_linux.v0 import apt
 from helpers import get_command_path
 
