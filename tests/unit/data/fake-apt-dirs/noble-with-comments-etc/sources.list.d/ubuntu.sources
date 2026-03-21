@@ -1,0 +1,45 @@
+Components: main restricted universe multiverse  # Components first! I don't think deb822 cares about ordering
+Types: deb deb-src # this could be one or both of these options
+URIs: http://nz.archive.ubuntu.com/ubuntu/ http://archive.ubuntu.com/ubuntu/
+    # there can be multiple space separated URIs
+    # sources are specified in priority order
+    # apt does some de-duplication of sources after parsing too
+#Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+#    let's make this insecure! (jk, just testing parsing)
+Suites: noble noble-updates noble-backports
+
+Foo: Bar  # this is a separate (malformed) entry
+
+## a fully commented out stanza
+#Types: deb
+#URIs: http://security.ubuntu.com/ubuntu
+#Suites: noble-security
+#Components: main restricted universe multiverse
+#Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+## disable security updates while we're at it
+
+Types: deb
+URIs: http://nz.archive.ubuntu.com/ubuntu/
+Suites: an/exact/path/
+
+Types: deb
+URIs: http://nz.archive.ubuntu.com/ubuntu/
+Suites: an/exact/path/
+Components: main  # this is an error, can't have components with an exact path
+
+Types: deb
+URIs: http://nz.archive.ubuntu.com/ubuntu/
+Suites: noble noble-updates noble-backports
+# this is an error, must have at least one component if suites isn't an exact path
+
+Types: deb
+URIs: http://nz.archive.ubuntu.com/ubuntu/
+Suites: noble noble-updates noble-backports
+Components: main restricted universe multiverse
+Enabled: no
+
+Types: deb
+URIs: http://nz.archive.ubuntu.com/ubuntu/
+Suites: noble noble-updates noble-backports
+Components: main restricted universe multiverse
+Enabled: bad

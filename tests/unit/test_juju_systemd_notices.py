@@ -7,10 +7,10 @@
 import argparse
 import subprocess
 import unittest
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from charms.operator_libs_linux.v0.juju_systemd_notices import (
+    Service,
     ServiceStartedEvent,
     ServiceStoppedEvent,
     SystemdNotices,
@@ -37,7 +37,9 @@ class MockNoticesCharm(CharmBase):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-        self._systemd_notices = SystemdNotices(self, ["foobar"])
+        self.notices = SystemdNotices(
+            self, ["foobar", Service("snap.test.service", alias="service")]
+        )
         event_handler_bindings = {
             self.on.install: self._on_install,
             self.on.stop: self._on_stop,
@@ -49,11 +51,11 @@ class MockNoticesCharm(CharmBase):
 
     def _on_install(self, _: InstallEvent) -> None:
         """Subscribe to foobar service to watch for events."""
-        self._systemd_notices.subscribe()
+        self.notices.subscribe()
 
     def _on_stop(self, _: StopEvent) -> None:
         """Stop watching foobar service as machine is removed."""
-        self._systemd_notices.stop()
+        self.notices.stop()
 
     def _on_foobar_started(self, _: ServiceStartedEvent) -> None:
         """Set status to active after systemctl marks service as active."""
@@ -72,23 +74,47 @@ class TestJujuSystemdNoticesCharmAPI(unittest.TestCase):
         self.addCleanup(self.harness.cleanup)
         self.harness.begin()
 
-    @patch("pathlib.Path.write_text")
     @patch("pathlib.Path.symlink_to")
-    @patch("subprocess.check_output")
     @patch("pathlib.Path.exists")
-    def test_subscribe(self, mock_exists, mock_subp, *_) -> None:
-        # Scenario 1 - Subscribe success but no pre-existing service file.
+    def test_generate_hooks(self, mock_exists, _) -> None:
+        """Test that legacy event hooks for observed services are created correctly."""
+        # Scenario 1 - Generate success but no pre-existing hooks.
         mock_exists.return_value = False
-        self.harness.charm.on.install.emit()
+        self.harness.charm.notices._generate_hooks()
 
-        # Scenario 2 - Subscribe success and pre-existing service file.
+        # Scenario 2 - Generate success but pre-existing hooks.
         mock_exists.return_value = True
-        self.harness.charm.on.install.emit()
+        self.harness.charm.notices._generate_hooks()
 
-        # Scenario 3 - Subscribe success but systemctl fails to start notices daemon.
+    @patch("pathlib.Path.write_text")
+    @patch("pathlib.Path.exists")
+    def test_generate_service(self, mock_exists, _) -> None:
+        """Test that watch configuration file is generated correctly."""
+        # Scenario 1 - Generate success but no pre-existing watch configuration.
+        mock_exists.return_value = False
+        self.harness.charm.notices._generate_service()
+
+        # Scenario 2 - Generate success but pre-existing watch configuration.
+        mock_exists.return_value = True
+        self.harness.charm.notices._generate_service()
+
+    @patch("subprocess.check_output")
+    def test_start(self, mock_subp) -> None:
+        """Test that start method correctly starts notices daemon."""
+        # Scenario 1 - systemctl successfully starts notices daemon.
+        self.harness.charm.notices._start()
+
+        # Scenario 2 - systemctl fails to start notices daemon.
         mock_subp.side_effect = subprocess.CalledProcessError(1, "systemctl start foobar")
         with self.assertRaises(subprocess.CalledProcessError):
-            self.harness.charm.on.install.emit()
+            self.harness.charm.notices._start()
+
+    @patch("charms.operator_libs_linux.v0.juju_systemd_notices.SystemdNotices._generate_hooks")
+    @patch("charms.operator_libs_linux.v0.juju_systemd_notices.SystemdNotices._generate_service")
+    @patch("charms.operator_libs_linux.v0.juju_systemd_notices.SystemdNotices._start")
+    def test_subscribe(self, *_) -> None:
+        """Test `subscribe` method."""
+        self.harness.charm.on.install.emit()
 
     @patch("subprocess.check_output")
     def test_stop(self, *_) -> None:
@@ -170,21 +196,25 @@ class TestJujuSystemdNoticesDaemon(unittest.IsolatedAsyncioTestCase):
         ):
             self.assertTrue(_systemd_unit_changed(mock_message))
 
+    @patch(
+        "charms.operator_libs_linux.v0.juju_systemd_notices._observed_services",
+        return_value={"foobar": "foobar"},
+    )
     @patch("charms.operator_libs_linux.v0.juju_systemd_notices._juju_unit", "foobar/0")
     @patch("asyncio.create_subprocess_exec")
-    async def test_send_juju_notification(self, mock_subp, *_) -> None:
+    async def test_send_juju_notification(self, mock_subcmd, *_) -> None:
         # Scenario 1 - .service in service name and notification succeeds.
         mock_p = AsyncMock()
         mock_p.wait.return_value = None
         mock_p.returncode = 0
-        mock_subp.return_value = mock_p
+        mock_subcmd.return_value = mock_p
         await _send_juju_notification("foobar.service", "active")
 
         # Scenario 2 - No .service in name and state is stopped but notification fails.
         mock_p = AsyncMock()
         mock_p.wait.return_value = None
         mock_p.returncode = 1
-        mock_subp.return_value = mock_p
+        mock_subcmd.return_value = mock_p
         await _send_juju_notification("foobar", "inactive")
 
     async def test_get_service_state(self) -> None:
@@ -205,28 +235,20 @@ class TestJujuSystemdNoticesDaemon(unittest.IsolatedAsyncioTestCase):
         state = await _get_service_state(mock_sysbus, "foobar")
         self.assertEqual(state, "unknown")
 
+    @patch(
+        "charms.operator_libs_linux.v0.juju_systemd_notices._observed_services",
+        {"foobar": "foobar", "snap.test.service": "service"},
+    )
     @patch("charms.operator_libs_linux.v0.juju_systemd_notices._get_service_state")
-    @patch("pathlib.Path.iterdir")
-    @patch("pathlib.Path.exists")
-    async def test_async_load_services(self, mock_exists, mock_iterdir, mock_state) -> None:
-        # Scenario 1 - Hooks dir does not exist.
-        mock_exists.return_value = False
-        self.assertIsNone(await _async_load_services())
-
-        # Scenario 2 - There are no services to watch.
-        mock_exists.return_value = True
-        mock_iterdir.return_value = []
-        self.assertIsNone(await _async_load_services())
-
-        # Scenario 3 - Desired outcome (services are subscribed to for watching).
-        mock_exists.return_value = True
-        mock_iterdir.return_value = [
-            Path("service-foobar-started"),
-            Path("service-foobar-stopped"),
-            Path("dispatch"),  # Ensure that unmatched hooks are ignored/not registered.
-        ]
+    async def test_async_load_services(self, mock_state) -> None:
         mock_state.return_value = "active"
-        self.assertIsNone(await _async_load_services())
+        await _async_load_services()
+
+        # Somehow calling `_async_load_services()` fully
+        # covers the for-loop without any additional changes to
+        # the `_observed_services` global ¯\_(ツ)_/¯
+        mock_state.return_value = "stopped"
+        await _async_load_services()
 
     @patch("pathlib.Path.exists", return_value=False)
     @patch("asyncio.Event.wait")
@@ -239,12 +261,16 @@ class TestJujuSystemdNoticesDaemon(unittest.IsolatedAsyncioTestCase):
     def test_main(self, mocked_args, *_) -> None:
         # Scenario 1 - Desired outcome (juju-systemd-notices daemon starts successfully)
         #   and debug is set to True.
-        mocked_args.return_value = argparse.Namespace(debug=True, unit="foobar/0")
+        mocked_args.return_value = argparse.Namespace(
+            debug=True, unit="foobar/0", services=["foobar=foobar", "snap.test.service=service"]
+        )
         _main()
 
         # Scenario 2 - Desired outcome (juju-systemd-notices daemon starts successfully)
         #   and debug is set to False
-        mocked_args.return_value = argparse.Namespace(debug=False, unit="foobar/0")
+        mocked_args.return_value = argparse.Namespace(
+            debug=False, unit="foobar/0", services=["foobar=foobar", "snap.test.service=service"]
+        )
         _main()
 
         # Scenario 3 - Debug flag is passed to script but no unit name.

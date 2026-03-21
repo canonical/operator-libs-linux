@@ -155,12 +155,10 @@ class TestUtils(BaseTest):
             grub._save_config(path, {"test": '"1234"'})
 
         mock_open.assert_called_once_with(path, "w", encoding="UTF-8")
-        mock_open.return_value.write.assert_has_calls(
-            [
-                mock.call(grub.CONFIG_HEADER),
-                mock.call("test='\"1234\"'\n"),
-            ]
-        )
+        mock_open.return_value.write.assert_has_calls([
+            mock.call(grub.CONFIG_HEADER),
+            mock.call("test='\"1234\"'\n"),
+        ])
 
     def test_save_config_overwrite(self):
         """Test overwriting if GRUB config already exist."""
@@ -568,15 +566,13 @@ class TestFullConfig(BaseTest):
         self.filecmp.cmp.assert_called_once_with(
             Path("/boot/grub/grub.cfg"), Path("/tmp/tmp_grub.cfg")
         )
-        self.check_call.assert_has_calls(
-            [
-                mock.call(
-                    ["/usr/sbin/grub-mkconfig", "-o", "/tmp/tmp_grub.cfg"],
-                    stderr=subprocess.STDOUT,
-                ),
-                mock.call(["/usr/sbin/update-grub"], stderr=subprocess.STDOUT),
-            ]
-        )
+        self.check_call.assert_has_calls([
+            mock.call(
+                ["/usr/sbin/grub-mkconfig", "-o", "/tmp/tmp_grub.cfg"],
+                stderr=subprocess.STDOUT,
+            ),
+            mock.call(["/usr/sbin/update-grub"], stderr=subprocess.STDOUT),
+        ])
 
     def test_update_validation_error(self):
         """Test update raising ValidationError."""
@@ -614,12 +610,10 @@ class TestFullConfig(BaseTest):
         self.filecmp.cmp.assert_called_once_with(
             Path("/boot/grub/grub.cfg"), Path("/tmp/tmp_grub.cfg")
         )
-        self.check_call.assert_has_calls(
-            [
-                mock.call(
-                    ["/usr/sbin/grub-mkconfig", "-o", "/tmp/tmp_grub.cfg"],
-                    stderr=subprocess.STDOUT,
-                ),
-                mock.call(["/usr/sbin/update-grub"], stderr=subprocess.STDOUT),
-            ]
-        )
+        self.check_call.assert_has_calls([
+            mock.call(
+                ["/usr/sbin/grub-mkconfig", "-o", "/tmp/tmp_grub.cfg"],
+                stderr=subprocess.STDOUT,
+            ),
+            mock.call(["/usr/sbin/update-grub"], stderr=subprocess.STDOUT),
+        ])

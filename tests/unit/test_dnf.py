@@ -17,37 +17,27 @@ example_version_output = """
 
   Installed: rpm-0:4.16.1.3-22.el9.x86_64 at Mon 06 Mar 2023 03:55:23 PM GMT
   Built    : builder@centos.org at Mon 19 Dec 2022 11:57:50 PM GMT
-""".strip(
-    "\n"
-)
+""".strip("\n")
 
 example_installed_output = """
 Installed Packages
 NetworkManager.x86_64 1:1.42.2-1.el9 @baseos
-""".strip(
-    "\n"
-)
+""".strip("\n")
 
 example_available_output = """
 Available Packages
 slurm-slurmd.x86_64 22.05.6-3.el9 epel
-""".strip(
-    "\n"
-)
+""".strip("\n")
 
 example_bad_state_output = """
 Obsolete Packages
 yowzah yowzah yowzah
-""".strip(
-    "\n"
-)
+""".strip("\n")
 
 example_bad_version_output = """
 Available Packages
 slurm-slurmd.x86_64 yowzah epel
-""".strip(
-    "\n"
-)
+""".strip("\n")
 
 
 class TestDNF(unittest.TestCase):

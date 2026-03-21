@@ -1,0 +1,4 @@
+Types: deb
+URIs: http://nz.archive.ubuntu.com/ubuntu/
+Suites: an/exact/path/
+Components: main  # this is an error, can't have components with an exact path

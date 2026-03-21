@@ -1,5 +1,11 @@
-# Copyright 2023 Canonical Ltd.
+# Copyright 2023-2024 Canonical Ltd.
 # See LICENSE file for licensing details.
+
+name: juju-systemd-notices
+description: |
+  Test charm used for the juju_systemd_notices charm library integration tests.
+summary: |
+  A charm with a minimal daemon for testing the juju-systemd-notices charm library.
 
 type: charm
 bases:
@@ -9,3 +15,8 @@ bases:
     run-on:
     - name: ubuntu
       channel: "22.04"
+
+actions:
+  stop-service:
+    description: Stop internal test service inside charm
+

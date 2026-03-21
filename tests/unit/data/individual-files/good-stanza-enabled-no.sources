@@ -1,0 +1,5 @@
+Types: deb
+URIs: http://nz.archive.ubuntu.com/ubuntu/
+Suites: noble noble-updates noble-backports
+Components: main restricted universe multiverse
+Enabled: no

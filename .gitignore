@@ -3,6 +3,7 @@ build/
 *.charm
 *.orig
 .coverage
+.report
 **/__pycache__/
 *.py[cod]
 .idea/

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2023 Canonical Ltd.
+# Copyright 2023-2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 """Minimal charm for testing the juju_systemd_notices charm library.
@@ -46,7 +46,7 @@ class NoticesCharm(CharmBase):
         systemd.daemon_reload()
         self._systemd_notices.subscribe()
 
-    def _on_start(self, _: StartEvent) -> None:  # noqa
+    def _on_start(self, _: StartEvent) -> None:
         """Handle start event."""
         systemd.service_start("test")
 
@@ -58,7 +58,7 @@ class NoticesCharm(CharmBase):
         """Handle service stopped event."""
         self.unit.status = BlockedStatus("test service not running :(")
 
-    def _on_stop_service_action(self, _) -> None:  # noqa
+    def _on_stop_service_action(self, _) -> None:
         """Handle stop-service action."""
         systemd.service_stop("test")
 

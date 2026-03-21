@@ -5,6 +5,7 @@
 
 import logging
 import re
+import time
 from datetime import datetime, timedelta
 from subprocess import CalledProcessError, check_output, run
 
@@ -65,7 +66,18 @@ def test_snap_refresh():
 def test_snap_set_and_get_with_typed():
     cache = snap.SnapCache()
     lxd = cache["lxd"]
-    lxd.ensure(snap.SnapState.Latest, channel="latest")
+
+    def try_ensure_snap(retries: int) -> None:
+        try:
+            lxd.ensure(snap.SnapState.Latest, channel="latest")
+        except snap.SnapError:
+            if retries <= 0:
+                raise
+            time.sleep(20)
+            try_ensure_snap(retries=retries - 1)
+
+    try_ensure_snap(retries=10)
+
     configs = {
         "true": True,
         "false": False,
@@ -116,12 +128,32 @@ def test_snap_set_and_get_with_typed():
 
     assert lxd.get("criu.enable", typed=True) == "true"
     assert lxd.get("ceph.external", typed=True) == "false"
+    assert lxd.get(None, typed=True) == {
+        "true": True,
+        "false": False,
+        "integer": 1,
+        "float": 2.0,
+        "list": [1, 2.0, True, False, None],
+        "dict": {
+            "true": True,
+            "false": False,
+            "integer": 1,
+            "float": 2.0,
+            "list": [1, 2.0, True, False, None],
+        },
+        "criu": {"enable": "true"},
+        "ceph": {"external": "false"},
+    }
 
 
 def test_snap_set_and_get_untyped():
     cache = snap.SnapCache()
     lxd = cache["lxd"]
-    lxd.ensure(snap.SnapState.Latest, channel="latest")
+    try:
+        lxd.ensure(snap.SnapState.Latest, channel="latest")
+    except snap.SnapError:
+        time.sleep(60)
+        lxd.ensure(snap.SnapState.Latest, channel="latest")
 
     lxd.set({"foo": "true", "bar": True}, typed=False)
     assert lxd.get("foo", typed=False) == "true"
@@ -135,12 +167,10 @@ def test_unset_key_raises_snap_error():
 
     # Verify that the correct exception gets raised in the case of an unset key.
     key = "keythatdoesntexist01"
-    try:
+    with pytest.raises(snap.SnapError) as ctx:
         lxd.get(key)
-    except snap.SnapError:
-        pass
-    else:
-        logger.error("Getting an unset key should result in a SnapError.")
+    assert key in ctx.value.message
+    assert "\nLatest logs:\n" in ctx.value.message  # journalctl log retrieval on SnapError
 
     # We can make the above work w/ arbitrary config.
     lxd.set({key: "true"})
@@ -174,12 +204,14 @@ def test_snap_ensure_revision():
         ["snap", "info", "juju"], capture_output=True, encoding="utf-8"
     ).stdout.split("\n")
 
+    edge_version = None
     edge_revision = None
     for line in snap_info_juju:
-        match = re.search(r"latest/edge.*\((\d+)\)", line)
+        match = re.search(r"3/stable:\s+([^\s]+).+\((\d+)\)", line)
 
         if match:
-            edge_revision = match.group(1)
+            edge_version = match.group(1)
+            edge_revision = match.group(2)
             break
     assert edge_revision is not None
 
@@ -196,10 +228,13 @@ def test_snap_ensure_revision():
     assert "installed" in snap_info_juju
     for line in snap_info_juju.split("\n"):
         if "installed" in line:
-            match = re.search(r"installed.*\((\d+)\)", line)
+            match = re.search(r"installed:\s+([^\s]+).+\((\d+)\)", line)
 
             assert match is not None
-            assert match.group(1) == edge_revision
+            assert match.group(1) == edge_version
+            assert match.group(2) == edge_revision
+
+    assert juju.version == edge_version
 
 
 def test_snap_start():

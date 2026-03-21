@@ -208,8 +208,9 @@ class TestSysctlConfig(unittest.TestCase):
         config._desired_config = {"vm.swappiness": "0", "other_value": "10"}
         snapshot = config._create_snapshot()
 
-        assert mock_output.called_with(["sysctl", "vm.swappiness", "-n"])
-        assert mock_output.called_with(["sysctl", "other_value", "-n"])
+        mock_output.assert_called_once_with(
+            ["sysctl", "-n", "vm.swappiness", "other_value"], stderr=-2, universal_newlines=True
+        )
         assert snapshot == {"vm.swappiness": "1", "other_value": "5"}
 
     @patch("charms.operator_libs_linux.v0.sysctl.check_output")
@@ -222,7 +223,9 @@ class TestSysctlConfig(unittest.TestCase):
         snapshot = {"vm.swappiness": "1", "other_value": "5"}
         config._restore_snapshot(snapshot)
 
-        assert mock_output.called_with(["sysctl", "vm.swappiness=1", "other_value=5"])
+        mock_output.assert_called_once_with(
+            ["sysctl", "vm.swappiness=1", "other_value=5"], stderr=-2, universal_newlines=True
+        )
 
     @patch("charms.operator_libs_linux.v0.sysctl.check_output")
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
@@ -233,7 +236,9 @@ class TestSysctlConfig(unittest.TestCase):
 
         result = config._sysctl(["-n", "vm.swappiness"])
 
-        assert mock_output.called_with(["sysctl", "-n", "vm.swappiness"])
+        mock_output.assert_called_once_with(
+            ["sysctl", "-n", "vm.swappiness"], stderr=-2, universal_newlines=True
+        )
         assert result == ["1"]
 
     @patch("charms.operator_libs_linux.v0.sysctl.check_output")
@@ -246,7 +251,9 @@ class TestSysctlConfig(unittest.TestCase):
         with self.assertRaises(sysctl.CommandError) as e:
             config._sysctl(["exception"])
 
-        assert mock_output.called_with(["sysctl", "exception"])
+        mock_output.assert_called_once_with(
+            ["sysctl", "exception"], stderr=-2, universal_newlines=True
+        )
         assert e.exception.message == "Error executing '['sysctl', 'exception']': error on command"
 
     @patch("charms.operator_libs_linux.v0.sysctl.Config._sysctl")
@@ -259,7 +266,7 @@ class TestSysctlConfig(unittest.TestCase):
         config._desired_config = {"vm.swappiness": "0"}
         config._apply()
 
-        assert mock_sysctl.called_with(["vm.swappiness=0"])
+        mock_sysctl.assert_called_with(["vm.swappiness=0"])
 
     @patch("charms.operator_libs_linux.v0.sysctl.Config._sysctl")
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
@@ -272,7 +279,7 @@ class TestSysctlConfig(unittest.TestCase):
         with self.assertRaises(sysctl.ApplyError) as e:
             config._apply()
 
-        assert mock_sysctl.called_with(["vm.swappiness=0"])
+        mock_sysctl.assert_called_with(["vm.swappiness=0"])
         self.assertEqual(e.exception.message, "Unable to set params: ['vm.swappiness']")
 
     @patch("charms.operator_libs_linux.v0.sysctl.Config._sysctl")
@@ -286,7 +293,7 @@ class TestSysctlConfig(unittest.TestCase):
         with self.assertRaises(sysctl.ApplyError) as e:
             config._apply()
 
-        assert mock_sysctl.called_with(["vm.swappiness=0", "net.ipv4.tcp_max_syn_backlog=4096"])
+        mock_sysctl.assert_called_with(["vm.swappiness=0", "net.ipv4.tcp_max_syn_backlog=4096"])
         self.assertEqual(e.exception.message, "Unable to set params: ['vm.swappiness']")
 
     @patch("charms.operator_libs_linux.v0.sysctl.Config._load_data")
