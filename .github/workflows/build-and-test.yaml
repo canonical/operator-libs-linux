@@ -86,7 +86,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Pre-install tox
-        run: sudo pip3 install --break-system-packages tox
+        run: sudo pip3 install --break-system-packages --ignore-installed packaging && sudo pip3 install --break-system-packages tox
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@3d3eb35d73c0f326d07880d83a99876d321f823c # 1.1.0
         with:
