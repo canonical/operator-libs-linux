@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List
 from urllib.request import urlopen
 
+import pytest
 from charms.operator_libs_linux.v0 import apt
 from helpers import get_command_path
 
@@ -137,6 +138,7 @@ def test_install_higher_version_package_from_external_repository():
     assert not get_command_path("fish")
 
 
+@pytest.mark.skip(reason="HPE GPG signing key has expired, causing apt-get update to fail")
 def test_install_hardware_observer_ssacli():
     """Test the ability to install a package used by the hardware-observer charm.
 

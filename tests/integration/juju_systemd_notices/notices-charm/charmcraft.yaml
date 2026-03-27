@@ -8,15 +8,14 @@ summary: |
   A charm with a minimal daemon for testing the juju-systemd-notices charm library.
 
 type: charm
-bases:
-  - build-on:
-    - name: ubuntu
-      channel: "22.04"
-    run-on:
-    - name: ubuntu
-      channel: "22.04"
+base: ubuntu@22.04
+platforms:
+  amd64:
+
+parts:
+  charm:
+    plugin: charm
 
 actions:
   stop-service:
     description: Stop internal test service inside charm
-

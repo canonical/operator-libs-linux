@@ -4,6 +4,9 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint
@@ -11,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Python 3
         uses: actions/setup-python@v5
         with:
@@ -25,6 +30,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Python 3
         uses: actions/setup-python@v5
         with:
@@ -43,6 +50,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -57,6 +66,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Python 3
         uses: actions/setup-python@v5
         with:
@@ -72,10 +83,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
         with:
-          provider: lxd
-          juju-channel: 3.6/stable
+          persist-credentials: false
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install tox
+        run: pip install tox~=4.2
+      - name: Install Concierge
+        run: sudo snap install --classic concierge
+      - name: Prepare for deploying machine charms
+        run: sudo concierge prepare -p machine
+      - name: Pack test charm
+        run: |
+          charm_dir=tests/integration/juju_systemd_notices/notices-charm
+          cp lib/charms/operator_libs_linux/v1/systemd.py "$charm_dir/lib/charms/operator_libs_linux/v1/"
+          cp lib/charms/operator_libs_linux/v0/juju_systemd_notices.py "$charm_dir/lib/charms/operator_libs_linux/v0/"
+          cd "$charm_dir"
+          charmcraft pack --verbose
+          echo "CHARM_PATH=$(pwd)/$(ls *.charm)" >> "$GITHUB_ENV"
       - name: Run integration tests (juju-systemd-notices)
         run: tox run -e integration-juju-systemd-notices
